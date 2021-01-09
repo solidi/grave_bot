@@ -915,10 +915,10 @@ void StartFrame( void )
 						spawn_time_reset = TRUE;
 						
 						if (respawn_time >= 1.0)
-							respawn_time = fmin(respawn_time, gpGlobals->time + (float)1.0);
+							respawn_time = min(respawn_time, gpGlobals->time + (float)1.0);
 						
 						if (bot_cfg_pause_time >= 1.0)
-							bot_cfg_pause_time = fmin(bot_cfg_pause_time, gpGlobals->time + (float)1.0);
+							bot_cfg_pause_time = min(bot_cfg_pause_time, gpGlobals->time + (float)1.0);
 					}
 				}
 			}

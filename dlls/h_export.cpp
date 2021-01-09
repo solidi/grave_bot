@@ -131,18 +131,17 @@ BOOL WINAPI DllMain(HINSTANCE hinstDLL, DWORD fdwReason, LPVOID lpvReserved)
 	
 	strcpy(mod_name, &game_dir[pos]);
 	
-	//Removed support for HLDM - [APG]RoboCop[CL]
-	/*if (strcmpi(mod_name, "valve") == 0)
+	if (strcmpi(mod_name, "iceg") == 0)
 	{
 		mod_id = VALVE_DLL;
 
       #ifndef METAMOD_BUILD
          #ifndef __linux__		
 		         // test if the game DLL file is NOT available outside of the Steam/PAK cache
-		         if (access("valve\dlls\hl.dll", 0) == -1)
+		         if (access("iceg/dlls/hl.dll", 0) == -1)
 		         {
-			         filebuf = LOAD_FILE_FOR_ME ("dlls\hl.dll", &filesize);
-			         filep = fopen ("valve\dlls\hl.dll", "wb");
+			         filebuf = LOAD_FILE_FOR_ME ("dlls/hl.dll", &filesize);
+			         filep = fopen ("iceg/dlls/hl.dll", "wb");
 			         if (filep != NULL)
 			         {
 				         fwrite (filebuf, 1, filesize, filep); // if in cache, then extract it
@@ -150,13 +149,13 @@ BOOL WINAPI DllMain(HINSTANCE hinstDLL, DWORD fdwReason, LPVOID lpvReserved)
 			         }
 		         }
 
-		         h_Library = LoadLibrary("valve\dlls\hl.dll"); // and load the library
+		         h_Library = LoadLibrary("iceg/dlls/hl.dll"); // and load the library
          #else
 		         // test if the game DLL file is NOT available outside of the Steam/PAK cache
-		         if (access("valve/dlls/hl.so", 0) == -1)
+		         if (access("iceg/dlls/hl.so", 0) == -1)
 		         {
 			         filebuf = LOAD_FILE_FOR_ME ("dlls/hl.so", &filesize);
-			         filep = fopen ("valve/dlls/hl.so", "wb");
+			         filep = fopen ("iceg/dlls/hl.so", "wb");
 			         if (filep != NULL)
 			         {
 				         fwrite (filebuf, 1, filesize, filep); // if in cache, then extract it
@@ -164,7 +163,7 @@ BOOL WINAPI DllMain(HINSTANCE hinstDLL, DWORD fdwReason, LPVOID lpvReserved)
 			         }
 		         }
 
-		         h_Library = dlopen("valve/dlls/hl.so", RTLD_NOW);
+		         h_Library = dlopen("iceg/dlls/hl.so", RTLD_NOW);
          #endif
       #endif
 	}
@@ -180,7 +179,7 @@ BOOL WINAPI DllMain(HINSTANCE hinstDLL, DWORD fdwReason, LPVOID lpvReserved)
          #endif
       #endif
 	}
-	else */if (strcmpi(mod_name, "si") == 0)
+	else if (strcmpi(mod_name, "si") == 0)
 	{
 		mod_id = SI_DLL;
 

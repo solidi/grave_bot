@@ -66,12 +66,7 @@ InputName=grave_bot
 SOURCE="$(InputPath)"
 
 "$(TargetName)" : $(SOURCE) "$(INTDIR)" "$(OUTDIR)"
-	copy $(TargetDir)\$(InputName).dll C:\Steam\SteamApps\ghoul@nocensmundus.net\half-life\crabbed\dlls 
-	copy $(TargetDir)\$(InputName).dll C:\Steam\SteamApps\ghoul@nocensmundus.net\half-life\si\dlls 
-	copy $(TargetDir)\$(InputName).dll C:\Steam\SteamApps\ghoul@nocensmundus.net\half-life\valve\dlls 
-	copy $(TargetDir)\$(InputName).dll C:\Steam\SteamApps\ghoul@nocensmundus.net\HLServer\crabbed\dlls 
-	copy $(TargetDir)\$(InputName).dll C:\Steam\SteamApps\ghoul@nocensmundus.net\HLServer\valve\dlls 
-	copy $(TargetDir)\$(InputName).dll C:\Steam\SteamApps\ghoul@nocensmundus.net\HLServer\si\dlls 
+	copy $(TargetDir)\$(InputName).dll Z:\redist\dlls
 	
 # End Custom Build
 
