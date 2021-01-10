@@ -173,7 +173,7 @@ BOOL WINAPI DllMain(HINSTANCE hinstDLL, DWORD fdwReason, LPVOID lpvReserved)
 
       #ifndef METAMOD_BUILD
          #ifndef __linux__
-		         h_Library = LoadLibrary("crabbed\dlls\crabbed.dll"); // and load the library
+		         h_Library = LoadLibrary("crabbed/dlls/crabbed.dll"); // and load the library
          #else
 		         h_Library = dlopen("valve/dlls/hl_i386.so", RTLD_NOW);
          #endif
@@ -185,7 +185,7 @@ BOOL WINAPI DllMain(HINSTANCE hinstDLL, DWORD fdwReason, LPVOID lpvReserved)
 
       #ifndef METAMOD_BUILD
          #ifndef __linux__
-		         h_Library = LoadLibrary("si\dlls\si.dll"); // and load the library
+		         h_Library = LoadLibrary("si/dlls/si.dll"); // and load the library
          #else
 		         h_Library = dlopen("si/dlls/si.so", RTLD_NOW);
          #endif
