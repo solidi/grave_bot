@@ -302,6 +302,10 @@
    LINK_ENTITY_TO_FUNC(xen_tree);
    LINK_ENTITY_TO_FUNC(xen_ttrigger);
 
+   // Cold Ice
+   LINK_ENTITY_TO_FUNC(grapple_hook);
+   LINK_ENTITY_TO_FUNC(weapon_vest);
+
    // Science and Industry
    LINK_ENTITY_TO_FUNC(ammo_rocketpistol);
    LINK_ENTITY_TO_FUNC(ammo_snUZI);
