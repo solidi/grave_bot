@@ -305,6 +305,8 @@
    // Cold Ice
    LINK_ENTITY_TO_FUNC(grapple_hook);
    LINK_ENTITY_TO_FUNC(weapon_vest);
+   LINK_ENTITY_TO_FUNC(weapon_knife);
+   LINK_ENTITY_TO_FUNC(flying_knife);
 
    // Science and Industry
    LINK_ENTITY_TO_FUNC(ammo_rocketpistol);
