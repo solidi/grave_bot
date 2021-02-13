@@ -307,6 +307,7 @@
    LINK_ENTITY_TO_FUNC(weapon_vest);
    LINK_ENTITY_TO_FUNC(weapon_knife);
    LINK_ENTITY_TO_FUNC(flying_knife);
+   LINK_ENTITY_TO_FUNC(flying_crowbar);
 
    // Science and Industry
    LINK_ENTITY_TO_FUNC(ammo_rocketpistol);
