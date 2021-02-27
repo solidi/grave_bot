@@ -19,6 +19,7 @@
 #include <sys/stat.h>
 #include <iostream>
 #include <fstream>
+#include <unistd.h>
 #endif
 
 #ifdef _WIN32

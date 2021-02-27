@@ -1,12 +1,9 @@
-CPP = g++
-TARGET = gravebot_mm
+CPP = g++-4.8 -m32
+TARGET = gravebot
 ARCHFLAG = i686
-BASEFLAGS = -Dstricmp=strcasecmp -Dstrcmpi=strcasecmp -DMETAMOD_BUILD
+BASEFLAGS = -Dstricmp=strcasecmp -Dstrcmpi=strcasecmp
 OPTFLAGS = 
-CPPFLAGS = ${BASEFLAGS} ${OPTFLAGS} -march=${ARCHFLAG} -m32 \
-	-O2 -mtune=generic -msse -msse2 -mfpmath=sse -w -s -pipe \
-	-Wno-write-strings -Wno-unused-local-typedefs -funsafe-math-optimizations \
-	-I"../common" -I"../dlls" -I"../engine" -I"../pm_shared" -I"../metamod" 
+CPPFLAGS = ${BASEFLAGS} ${OPTFLAGS} -march=${ARCHFLAG} -mtune=generic -msse2 -O2 -m32 -mfpmath=sse -finline-functions -pipe -w -I"../metamod" -I"../common" -I"../dlls" -I"../engine" -I"../pm_shared"
 
 OBJ = 	bot.o \
 	bot_client.o \
@@ -19,24 +16,24 @@ OBJ = 	bot.o \
 	dll.o \
 	engine.o \
 	h_export.o \
+	linkfunc.o \
 	util.o \
 	waypoint.o
 
 ${TARGET}.so: ${OBJ}
 	${CPP} -fPIC -shared -static -o $@ ${OBJ} -Xlinker -Map -Xlinker ${TARGET}.map -ldl
 	strip -s ${TARGET}.so 
-#	mv *.o Release_Metamod
-#	mv *.map Release_Metamod
-#	mv $@ Release_Metamod
+	mv *.o Release
+	mv *.map Release
+	mv $@ Release
 
 clean:
-	rm -f *.o
-	rm -f *.so
-	rm -f *.map
+	rm -f Release/*.o
+	rm -f Release/*.map
 
 distclean:
-	rm -rf Release_Metamod
-	mkdir Release_Metamod	
+	rm -rf Release
+	mkdir Release	
 
 %.o:	%.cpp
 	${CPP} ${CPPFLAGS} -c $< -o $@
