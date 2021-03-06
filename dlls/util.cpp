@@ -589,7 +589,7 @@ void UTIL_BuildFileName(char *filename, char *arg1, char *arg2)
 #ifdef _WIN32
 		strcpy(filename, "");
 #else
-		strcpy(filename, "iceg/");
+		strcpy(filename, "ice/");
 #endif
 	else if (mod_id == CRABBED_DLL)
 		strcpy(filename, "crabbed/");
