@@ -310,6 +310,7 @@
    LINK_ENTITY_TO_FUNC(flying_crowbar);
    LINK_ENTITY_TO_FUNC(weapon_chumtoad);
    LINK_ENTITY_TO_FUNC(monster_chumtoad);
+   LINK_ENTITY_TO_FUNC(weapon_sniperrifle);
 
    // Science and Industry
    LINK_ENTITY_TO_FUNC(ammo_rocketpistol);
