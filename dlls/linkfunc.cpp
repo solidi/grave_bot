@@ -311,6 +311,7 @@
    LINK_ENTITY_TO_FUNC(weapon_chumtoad);
    LINK_ENTITY_TO_FUNC(monster_chumtoad);
    LINK_ENTITY_TO_FUNC(weapon_sniperrifle);
+   LINK_ENTITY_TO_FUNC(weapon_railgun);
 
    // Science and Industry
    LINK_ENTITY_TO_FUNC(ammo_rocketpistol);
