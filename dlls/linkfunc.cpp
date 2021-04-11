@@ -312,6 +312,13 @@
    LINK_ENTITY_TO_FUNC(monster_chumtoad);
    LINK_ENTITY_TO_FUNC(weapon_sniperrifle);
    LINK_ENTITY_TO_FUNC(weapon_railgun);
+   LINK_ENTITY_TO_FUNC(rune_frag);
+   LINK_ENTITY_TO_FUNC(rune_vampire);
+   LINK_ENTITY_TO_FUNC(rune_protect);
+   LINK_ENTITY_TO_FUNC(rune_regen);
+   LINK_ENTITY_TO_FUNC(rune_haste);
+   LINK_ENTITY_TO_FUNC(rune_gravity);
+   LINK_ENTITY_TO_FUNC(rune_strength);
 
    // Science and Industry
    LINK_ENTITY_TO_FUNC(ammo_rocketpistol);
