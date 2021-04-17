@@ -36,6 +36,7 @@ dlls/.vs/grave_bot/v16/ipch/AutoPCH/a70f0781ce81ac45/BOT_CLIENT.ipch
 dlls/.vs/grave_bot/v16/ipch/AutoPCH/f5f48f42f607943/BOT_NAVIGATE.ipch
 
 dlls/grave_bot.plg
+dlls/Debug
 dlls/Release
 dlls/Release_Metamod/
 dlls/.vs/

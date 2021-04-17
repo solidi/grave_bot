@@ -1,3 +1,8 @@
+ifeq "$(CFG)" ""
+CFG=release
+endif
+BUILD_DIR=$(CFG)
+
 CPP = g++-4.8 -m32
 TARGET = gravebot
 ARCHFLAG = i686
@@ -23,17 +28,17 @@ OBJ = 	bot.o \
 ${TARGET}.so: ${OBJ}
 	${CPP} -fPIC -shared -static -o $@ ${OBJ} -Xlinker -Map -Xlinker ${TARGET}.map -ldl
 	strip -s ${TARGET}.so 
-	mv *.o Release
-	mv *.map Release
-	mv $@ Release
+	mv *.o $(BUILD_DIR)
+	mv *.map $(BUILD_DIR)
+	mv $@ $(BUILD_DIR)
 
 clean:
-	rm -f Release/*.o
-	rm -f Release/*.map
+	rm -f $(BUILD_DIR)/*.o
+	rm -f $(BUILD_DIR)/*.map
 
 distclean:
-	rm -rf Release
-	mkdir Release	
+	rm -rf $(BUILD_DIR)
+	mkdir $(BUILD_DIR)
 
 %.o:	%.cpp
 	${CPP} ${CPPFLAGS} -c $< -o $@
