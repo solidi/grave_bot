@@ -32,6 +32,4 @@ jobs:
 
     - name: Build gravebot.co
       working-directory: ./dlls
-      run: |
-      make distclean CFG=${{env.BUILD_CONFIGURATION}}
-      make CFG=${{env.BUILD_CONFIGURATION}}
+      run: make distclean CFG=${{env.BUILD_CONFIGURATION}} && make CFG=${{env.BUILD_CONFIGURATION}}
