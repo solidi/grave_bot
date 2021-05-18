@@ -3,7 +3,7 @@ name: MakeBuild
 on: [push]
 
 env:
-  BUILD_CONFIGURATION: release
+  BUILD_CONFIGURATION: Release
 
 jobs:
   Game:
@@ -32,4 +32,6 @@ jobs:
 
     - name: Build gravebot.co
       working-directory: ./dlls
-      run: make CFG=${{env.BUILD_CONFIGURATION}}
+      run: |
+      make distclean CFG=${{env.BUILD_CONFIGURATION}}
+      make CFG=${{env.BUILD_CONFIGURATION}}
