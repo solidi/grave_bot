@@ -3,7 +3,7 @@ name: MakeBuild
 on: [push]
 
 env:
-  BUILD_CONFIGURATION: Release
+  BUILD_CONFIGURATION: release
 
 jobs:
   Game:
