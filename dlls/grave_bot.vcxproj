@@ -314,6 +314,6 @@
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>
   <Target Name="AfterBuild">
-    <Copy SourceFiles="$(ProjectDir)$(OutDir)$(ProjectName).dll" DestinationFolder="..\..\redist\dlls" SkipUnchangedFiles="false" />
+    <Copy SourceFiles="$(ProjectDir)$(OutDir)$(ProjectName).dll" DestinationFolder="..\..\libs\dlls" SkipUnchangedFiles="false" />
   </Target>
 </Project>
