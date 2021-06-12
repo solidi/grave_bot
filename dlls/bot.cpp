@@ -10,6 +10,11 @@
 #include <io.h>
 #endif
 
+#ifndef __linux__
+#include <direct.h>
+#define GetCurrentDir _getcwd
+#endif
+
 #include <fcntl.h>
 
 #ifndef __linux__
@@ -405,6 +410,14 @@ void BotNameInit( void )
 	}
 	else
 	{
+		#ifndef __linux__
+		char buff[FILENAME_MAX]; //create string buffer to hold path
+		GetCurrentDir( buff, FILENAME_MAX );
+		char err_msg[80];
+
+		sprintf( err_msg, "directory?: %s", buff);
+		SERVER_PRINT(err_msg);
+		#endif
 		SERVER_PRINT( "Grave Bot - Couldn't find grave_bot_names.txt!\n");
 	}
 }
