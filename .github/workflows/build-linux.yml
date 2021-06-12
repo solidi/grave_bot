@@ -1,4 +1,4 @@
-name: MakeBuild
+name: Linux
 
 on: [push]
 
