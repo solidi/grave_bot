@@ -313,6 +313,7 @@
    LINK_ENTITY_TO_FUNC(weapon_sniperrifle);
    LINK_ENTITY_TO_FUNC(weapon_railgun);
    LINK_ENTITY_TO_FUNC(weapon_cannon);
+   LINK_ENTITY_TO_FUNC(weapon_mag60);
    LINK_ENTITY_TO_FUNC(flak);
    LINK_ENTITY_TO_FUNC(flak_bomb);
    LINK_ENTITY_TO_FUNC(rune_frag);
