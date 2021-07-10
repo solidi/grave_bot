@@ -634,6 +634,37 @@ bot_weapon_select_t valve_weapon_select[] =
 		0.0,					// time to charge weapon (primary)
 		0.0						// time to charge weapon (secondary)
 	},
+	// grenade launcehr
+	{
+		VALVE_WEAPON_GLAUNCHER,		// id
+		"weapon_glauncher",			// classname
+		"9mmAR",				// third person model
+		{						// primary ammo pickup classnames
+			"ammo_ARgrenades",
+			"",
+		},
+		{						// secondary ammo pickup classnames
+			"ammo_ARgrenades",
+			"",
+		},
+		5,						// skill level
+		7,						// priority
+		300.0,					// min primary distance
+		600.0,					// max primary distance
+		300.0,					// min secondary distance
+		786.0,					// max secondary distance
+		FALSE,					// can use underwater?
+		1.5,					// how long does this weapon take to reload?
+		50,						// times out of 100 to use primary fire
+		1,						// minimum ammout of primary ammo needed to fire
+		1,						// minimum ammout of seconday ammo needed to fire
+		FALSE,					// hold down primary fire button to use?
+		FALSE,					// hold down secondary fire button to use?
+		FALSE,					// charge weapon using primary fire?
+		FALSE,					// charge weapon using secondary fire?
+		0.0,					// time to charge weapon (primary)
+		0.0						// time to charge weapon (secondary)
+	},
 	/* terminator */
 	{
 		0,
@@ -1330,6 +1361,39 @@ bot_fire_delay_t valve_fire_delay[] =
 			0.0,
 			0.0,
 			0.0
+		}
+	},
+	{
+		VALVE_WEAPON_GLAUNCHER,
+		0.1,
+		{
+			0.0,
+			0.0,
+			0.0,
+			0.1,
+			0.2
+		},
+		{
+			0.0,
+			0.05,
+			0.1,
+			0.3,
+			0.5
+		},
+		1.0,
+		{
+			0.0,
+			0.0,
+			0.7,
+			1.0,
+			1.4
+		},
+		{
+			0.0,
+			0.7,
+			1.0,
+			1.6,
+			2.0
 		}
 	},
 	// terminator 
