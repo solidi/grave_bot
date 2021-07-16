@@ -634,7 +634,7 @@ bot_weapon_select_t valve_weapon_select[] =
 		0.0,					// time to charge weapon (primary)
 		0.0						// time to charge weapon (secondary)
 	},
-	// grenade launcehr
+	// grenade launcher
 	{
 		VALVE_WEAPON_GLAUNCHER,		// id
 		"weapon_glauncher",			// classname
@@ -659,6 +659,37 @@ bot_weapon_select_t valve_weapon_select[] =
 		1,						// minimum ammout of primary ammo needed to fire
 		1,						// minimum ammout of seconday ammo needed to fire
 		FALSE,					// hold down primary fire button to use?
+		FALSE,					// hold down secondary fire button to use?
+		FALSE,					// charge weapon using primary fire?
+		FALSE,					// charge weapon using secondary fire?
+		0.0,					// time to charge weapon (primary)
+		0.0						// time to charge weapon (secondary)
+	},
+	// smg
+	{
+		VALVE_WEAPON_SMG,		// id
+		"weapon_smg",			// classname
+		"9mmAR",				// third person model
+		{						// primary ammo pickup classnames
+			"ammo_9mmclip",
+			"ammo_9mmAR",
+		},
+		{						// secondary ammo pickup classnames
+			"",
+			"",
+		},
+		5,						// skill level
+		7,						// priority
+		0.0,					// min primary distance
+		786.0,					// max primary distance
+		300.0,					// min secondary distance
+		600.0,					// max secondary distance
+		FALSE,					// can use underwater?
+		1.5,					// how long does this weapon take to reload?
+		100,						// times out of 100 to use primary fire
+		1,						// minimum ammout of primary ammo needed to fire
+		1,						// minimum ammout of seconday ammo needed to fire
+		TRUE,					// hold down primary fire button to use?
 		FALSE,					// hold down secondary fire button to use?
 		FALSE,					// charge weapon using primary fire?
 		FALSE,					// charge weapon using secondary fire?
@@ -1365,6 +1396,39 @@ bot_fire_delay_t valve_fire_delay[] =
 	},
 	{
 		VALVE_WEAPON_GLAUNCHER,
+		0.1,
+		{
+			0.0,
+			0.0,
+			0.0,
+			0.1,
+			0.2
+		},
+		{
+			0.0,
+			0.05,
+			0.1,
+			0.3,
+			0.5
+		},
+		1.0,
+		{
+			0.0,
+			0.0,
+			0.7,
+			1.0,
+			1.4
+		},
+		{
+			0.0,
+			0.7,
+			1.0,
+			1.6,
+			2.0
+		}
+	},
+	{
+		VALVE_WEAPON_SMG,
 		0.1,
 		{
 			0.0,
