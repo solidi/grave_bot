@@ -316,6 +316,7 @@
    LINK_ENTITY_TO_FUNC(weapon_mag60);
    LINK_ENTITY_TO_FUNC(weapon_chaingun);
    LINK_ENTITY_TO_FUNC(weapon_glauncher);
+   LINK_ENTITY_TO_FUNC(weapon_smg);
    LINK_ENTITY_TO_FUNC(flak);
    LINK_ENTITY_TO_FUNC(flak_bomb);
    LINK_ENTITY_TO_FUNC(rune_frag);
