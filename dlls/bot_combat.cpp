@@ -628,7 +628,7 @@ bool BotFireWeapon( Vector v_enemy, bot_t *pBot, int weapon_choice, bool nofire)
 			
 			// is this weapon worse than our previous choice?
 			if (((pSelect[select_index].priority >= best_priority) ||
-				(pSelect[select_index].priority < 0)) && (best_priority != VALVE_WEAPON_CROWBAR ||
+				(pSelect[select_index].priority < 0)) && (best_priority != VALVE_WEAPON_FISTS ||
 				best_priority != SI_WEAPON_BRIEFCASE))
 			{
 				//ALERT( at_console, "Skipping %s, priority too low\n", pSelect[select_index].weapon_name);
