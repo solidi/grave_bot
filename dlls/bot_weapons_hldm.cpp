@@ -761,7 +761,7 @@ bot_weapon_select_t valve_weapon_select[] =
 	// wrench
 	{
 		VALVE_WEAPON_WRENCH,	// id
-		"weapon_knife",		// classname
+		"weapon_wrench",		// classname
 		"crowbar",				// third person model
 		{						// primary ammo pickup classnames
 			"",
