@@ -332,6 +332,7 @@
    LINK_ENTITY_TO_FUNC(rune_haste);
    LINK_ENTITY_TO_FUNC(rune_gravity);
    LINK_ENTITY_TO_FUNC(rune_strength);
+   LINK_ENTITY_TO_FUNC(rune_cloak);
 
    // Science and Industry
    LINK_ENTITY_TO_FUNC(ammo_rocketpistol);
