@@ -820,6 +820,37 @@ bot_weapon_select_t valve_weapon_select[] =
 		0.0,					// time to charge weapon (primary)
 		0.0						// time to charge weapon (secondary)
 	},
+	// chainsaw
+	{
+		VALVE_WEAPON_CHAINSAW,	// id
+		"weapon_chainsaw",		// classname
+		"crowbar",				// third person model
+		{						// primary ammo pickup classnames
+			"",
+			"",
+		},
+		{						// secondary ammo pickup classnames
+			"",
+			"",
+		},
+		5,						// skill level
+		1,						// priority
+		0.0,					// min primary distance
+		50.0,					// max primary distance
+		0.0,					// min secondary distance
+		50.0,					// max secondary distance
+		TRUE,					// can use underwater?
+		0,						// how long does this weapon take to reload?
+		80,						// times out of 100 to use primary fire
+		0,						// minimum ammout of primary ammo needed to fire
+		0,						// minimum ammout of seconday ammo needed to fire
+		TRUE,					// hold down primary fire button to use?
+		TRUE,					// hold down secondary fire button to use?
+		FALSE,					// charge weapon using primary fire?
+		FALSE,					// charge weapon using secondary fire?
+		0.0,					// time to charge weapon (primary)
+		0.0						// time to charge weapon (secondary)
+	},
 	/* terminator */
 	{
 		0,
@@ -1699,6 +1730,39 @@ bot_fire_delay_t valve_fire_delay[] =
 			2.0,
 			3.0,
 			4.0
+		},
+		0.0,
+		{
+			0.0,
+			0.0,
+			0.0,
+			0.0,
+			0.0
+		},
+		{
+			0.0,
+			0.0,
+			0.0,
+			0.0,
+			0.0
+		}
+	},
+	{
+		VALVE_WEAPON_CHAINSAW,
+		0.0,
+		{
+			0.0,
+			0.2,
+			0.3,
+			0.4,
+			0.6
+		},
+		{
+			0.0,
+			0.3,
+			0.5,
+			0.7,
+			1.0
 		},
 		0.0,
 		{
