@@ -851,6 +851,37 @@ bot_weapon_select_t valve_weapon_select[] =
 		0.0,					// time to charge weapon (primary)
 		0.0						// time to charge weapon (secondary)
 	},
+	// shotgun
+	{
+		VALVE_WEAPON_12GAUGE,	// id
+		"weapon_12gauge",		// classname
+		"shotgun",	// third person model
+		{						// primary ammo pickup classnames
+			"ammo_buckshot",
+			"",
+		},
+		{						// secondary ammo pickup classnames
+			"",
+			"",
+		},
+		5,						// skill level
+		4,						// priority
+		0.0,					// min primary distance
+		300.0,					// max primary distance
+		0.0,					// min secondary distance
+		300.0,					// max secondary distance
+		FALSE,					// can use underwater?
+		2.0,					// how long does this weapon take to reload?
+		60,						// times out of 100 to use primary fire
+		1,						// minimum ammout of primary ammo needed to fire
+		2,						// minimum ammout of seconday ammo needed to fire
+		FALSE,					// hold down primary fire button to use?
+		FALSE,					// hold down secondary fire button to use?
+		FALSE,					// charge weapon using primary fire?
+		FALSE,					// charge weapon using secondary fire?
+		0.0,					// time to charge weapon (primary)
+		0.0						// time to charge weapon (secondary)
+	},
 	/* terminator */
 	{
 		0,
@@ -1778,6 +1809,39 @@ bot_fire_delay_t valve_fire_delay[] =
 			0.0,
 			0.0,
 			0.0
+		}
+	},
+	{
+		VALVE_WEAPON_12GAUGE,
+		0.75,
+		{
+			0.0,
+			0.0,
+			0.1,
+			0.4,
+			0.6
+		},
+		{
+			0.0,
+			0.3,
+			0.5,
+			0.7,
+			1.0
+		},
+		1.5,
+		{
+			0.0,
+			0.0,
+			0.4,
+			0.6,
+			0.8
+		},
+		{
+			0.0,
+			0.2,
+			0.5,
+			0.8,
+			1.2
 		}
 	},
 	// terminator 
