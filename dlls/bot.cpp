@@ -83,6 +83,7 @@ int number_names = 0;
 #define MAX_BOT_NAMES 100
 
 #define VALVE_MAX_SKINS    10
+#define ICE_MAX_SKINS      11
 #define GEARBOX_MAX_SKINS  20
 
 // indicate which models are currently used for random model allocation
@@ -93,11 +94,19 @@ bool valve_skin_used[VALVE_MAX_SKINS] = {
 char *valve_bot_skins[VALVE_MAX_SKINS] = {
 	"barney", "gina", "gman", "gordon", "helmet",
 	"hgrunt", "recon", "robo", "scientist", "zombie"};
+
+char *ice_bot_skins[ICE_MAX_SKINS] = {
+   "alpina", "commando", "grunt", "hhev", "holo", "hotfire",
+   "iceman", "navy", "recon", "stormtrooper", "swat"};
 				
 // store the player names for each of the models...
 char *valve_bot_names[VALVE_MAX_SKINS] = {
 	"Barney", "Gina", "G-Man", "Gordon", "Helmet",
 	"H-Grunt", "Recon", "Robo", "Scientist", "Zombie"};
+
+char *ice_bot_names[ICE_MAX_SKINS] = {
+   "Alpina", "Commando", "Grunt", "HHev", "Holo", "HotFire",
+   "Iceman", "Navy", "Recon", "Stormtrooper", "Swat"};
 						
 char bot_names[MAX_BOT_NAMES][BOT_NAME_LEN+1];
 						
@@ -545,7 +554,7 @@ void BotCreate( edict_t *pPlayer, const char *arg1, const char *arg2,
 				for (i = 0; i < max_skin_index; i++)
 					pSkinUsed[i] = FALSE;
 			}
-			strcpy( c_skin, valve_bot_skins[index] );
+			strcpy( c_skin, ice_bot_skins[index] );
 		}
 		else
 		{
@@ -560,7 +569,7 @@ void BotCreate( edict_t *pPlayer, const char *arg1, const char *arg2,
 		
 		while ((!found) && (index < max_skin_index))
 		{
-			if (strcmp(c_skin, valve_bot_skins[index]) == 0)
+			if (strcmp(c_skin, ice_bot_skins[index]) == 0)
 				found = TRUE;
 			else
 				index++;
@@ -578,7 +587,7 @@ void BotCreate( edict_t *pPlayer, const char *arg1, const char *arg2,
 				if (number_names > 0)
 					BotPickName( c_name );
 				else
-					strcpy( c_name, valve_bot_names[index] );
+					strcpy( c_name, ice_bot_names[index] );
 			}
 		}
 		else
