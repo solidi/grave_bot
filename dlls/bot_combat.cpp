@@ -1349,6 +1349,8 @@ float BotAssessSecondaryAmmo( bot_t *pBot, int weapon_id )
 	// select pointer not valid?
 	if (pSelect == NULL)
 		return AMMO_NONE;
+	if (weapon_id - 1 > ARRAYSIZE(weapon_defs))
+		return AMMO_NONE;
 	// does this weapon even use ammo?	
 	if (weapon_defs[weapon_id].iAmmo2 == -1 || weapon_defs[weapon_id].iAmmo2Max <= 0)
 		return AMMO_NONE;
