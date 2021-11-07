@@ -30,7 +30,7 @@ bot_weapon_select_t valve_weapon_select[] =
 			"",
 		},
 		5,						// skill level
-		0,						// priority
+		1,						// priority
 		0.0,					// min primary distance
 		50.0,					// max primary distance
 		100.0,					// min secondary distance
@@ -61,7 +61,7 @@ bot_weapon_select_t valve_weapon_select[] =
 			"",
 		},
 		5,						// skill level
-		1,						// priority
+		18,						// priority
 		32.0,					// min primary distance
 		1024.0,					// max primary distance
 		0.0,					// min secondary distance
@@ -123,7 +123,7 @@ bot_weapon_select_t valve_weapon_select[] =
 			"",
 		},
 		5,						// skill level
-		3,						// priority
+		16,						// priority
 		300.0,					// min primary distance
 		9999.0,					// max primary distance
 		300.0,					// min secondary distance
@@ -154,7 +154,7 @@ bot_weapon_select_t valve_weapon_select[] =
 			"",
 		},
 		5,						// skill level
-		4,						// priority
+		10,						// priority
 		0.0,					// min primary distance
 		300.0,					// max primary distance
 		0.0,					// min secondary distance
@@ -185,7 +185,7 @@ bot_weapon_select_t valve_weapon_select[] =
 			""
 		},
 		5,						// skill level
-		5,						// priority
+		11,						// priority
 		50.0,					// min primary distance
 		9999.0,					// max primary distance
 		0.0,					// min secondary distance
@@ -247,7 +247,7 @@ bot_weapon_select_t valve_weapon_select[] =
 			"",
 		},
 		5,						// skill level
-		7,						// priority
+		9,						// priority
 		0.0,					// min primary distance
 		786.0,					// max primary distance
 		300.0,					// min secondary distance
@@ -309,7 +309,7 @@ bot_weapon_select_t valve_weapon_select[] =
 			"",
 		},
 		5,						// skill level
-		9,						// priority
+		19,						// priority
 		30.0,					// min primary distance
 		1000.0,					// max primary distance
 		30.0,					// min secondary distance
@@ -340,7 +340,7 @@ bot_weapon_select_t valve_weapon_select[] =
 			"",
 		},
 		5,						// skill level
-		10,						// priority
+		22,						// priority
 		250.0,					// min primary distance
 		750.0,					// max primary distance
 		0.0,					// min secondary distance
@@ -371,7 +371,7 @@ bot_weapon_select_t valve_weapon_select[] =
 			"",
 		},
 		5,						// skill level
-		11,						// priority
+		23,						// priority
 		150.0,					// min primary distance
 		500.0,					// max primary distance
 		0.0,					// min secondary distance
@@ -402,7 +402,7 @@ bot_weapon_select_t valve_weapon_select[] =
 			"",
 		},
 		5,						// skill level
-		12,						// priority
+		25,						// priority
 		0.0,					// min primary distance
 		300.0,					// max primary distance
 		0.0,					// min secondary distance
@@ -423,7 +423,7 @@ bot_weapon_select_t valve_weapon_select[] =
 	{
 		VALVE_WEAPON_KNIFE,	// id
 		"weapon_knife",		// classname
-		"crowbar",				// third person model
+		"knife",				// third person model
 		{						// primary ammo pickup classnames
 			"",
 			"",
@@ -433,7 +433,7 @@ bot_weapon_select_t valve_weapon_select[] =
 			"",
 		},
 		5,						// skill level
-		1,						// priority
+		2,						// priority
 		0.0,					// min primary distance
 		50.0,					// max primary distance
 		100.0,					// min secondary distance
@@ -443,7 +443,7 @@ bot_weapon_select_t valve_weapon_select[] =
 		90,						// times out of 100 to use primary fire
 		0,						// minimum ammout of primary ammo needed to fire
 		0,						// minimum ammout of seconday ammo needed to fire
-		TRUE,					// hold down primary fire button to use?
+		FALSE,					// hold down primary fire button to use?
 		FALSE,					// hold down secondary fire button to use?
 		FALSE,					// charge weapon using primary fire?
 		FALSE,					// charge weapon using secondary fire?
@@ -454,7 +454,7 @@ bot_weapon_select_t valve_weapon_select[] =
 	{
 		VALVE_WEAPON_CHUMTOAD,		// id
 		"weapon_chumtoad",			// classname
-		"squeak",	// third person model
+		"chumtoad",	// third person model
 		{						// primary ammo pickup classnames
 			"weapon_chumtoad",
 			"",
@@ -464,7 +464,7 @@ bot_weapon_select_t valve_weapon_select[] =
 			"",
 		},
 		5,						// skill level
-		11,						// priority
+		24,						// priority
 		150.0,					// min primary distance
 		500.0,					// max primary distance
 		150.0,					// min secondary distance
@@ -484,7 +484,7 @@ bot_weapon_select_t valve_weapon_select[] =
 	{
 		VALVE_WEAPON_SNIPER_RIFLE,	// id
 		"weapon_sniperrifle",		// classname
-		"rpg",				// third person model
+		"sniperrifle",				// third person model
 		{						// primary ammo pickup classnames
 			"ammo_crossbow",
 			""
@@ -494,7 +494,7 @@ bot_weapon_select_t valve_weapon_select[] =
 			""
 		},
 		5,						// skill level
-		5,						// priority
+		12,						// priority
 		50.0,					// min primary distance
 		9999.0,					// max primary distance
 		0.0,					// min secondary distance
@@ -515,7 +515,7 @@ bot_weapon_select_t valve_weapon_select[] =
 	{
 		VALVE_WEAPON_RAILGUN,		// id
 		"weapon_railgun",			// classname
-		"gauss",				// third person model
+		"railgun",				// third person model
 		{						// primary ammo pickup classnames
 			"ammo_gaussclip",
 			"",
@@ -525,7 +525,7 @@ bot_weapon_select_t valve_weapon_select[] =
 			"",
 		},
 		5,						// skill level
-		2,						// priority
+		20,						// priority
 		0.0,					// min primary distance
 		9999.0,					// max primary distance
 		0.0,					// min secondary distance
@@ -546,7 +546,7 @@ bot_weapon_select_t valve_weapon_select[] =
 	{
 		VALVE_WEAPON_CANNON,		// id
 		"weapon_cannon",			// classname
-		"rpg",					// third person model
+		"cannon",					// third person model
 		{						// primary ammo pickup classnames
 			"ammo_flak",
 			"",
@@ -556,7 +556,7 @@ bot_weapon_select_t valve_weapon_select[] =
 			"",
 		},
 		5,						// skill level
-		3,						// priority
+		21,						// priority
 		300.0,					// min primary distance
 		9999.0,					// max primary distance
 		300.0,					// min secondary distance
@@ -577,7 +577,7 @@ bot_weapon_select_t valve_weapon_select[] =
 	{
 		VALVE_WEAPON_MAG60,		// id
 		"weapon_mag60",	// classname
-		"9mmhandgun",// third person model
+		"mag60",// third person model
 		{						// primary ammo pickup classnames
 			"ammo_9mmAR",
 			"ammo_9mmclip"
@@ -587,7 +587,7 @@ bot_weapon_select_t valve_weapon_select[] =
 			"",
 		},
 		5,						// skill level
-		8,						// priority
+		7,						// priority
 		0.0,					// min primary distance
 		9999.0,					// max primary distance
 		0.0,					// min secondary distance
@@ -607,7 +607,7 @@ bot_weapon_select_t valve_weapon_select[] =
 	{
 		VALVE_WEAPON_CHAINGUN,		// id
 		"weapon_chaingun",			// classname
-		"9mmAR",				// third person model
+		"chaingun",				// third person model
 		{						// primary ammo pickup classnames
 			"ammo_9mmclip",
 			"ammo_9mmAR",
@@ -617,7 +617,7 @@ bot_weapon_select_t valve_weapon_select[] =
 			"",
 		},
 		5,						// skill level
-		7,						// priority
+		13,						// priority
 		0.0,					// min primary distance
 		786.0,					// max primary distance
 		300.0,					// min secondary distance
@@ -638,7 +638,7 @@ bot_weapon_select_t valve_weapon_select[] =
 	{
 		VALVE_WEAPON_GLAUNCHER,		// id
 		"weapon_glauncher",			// classname
-		"9mmAR",				// third person model
+		"glauncher",				// third person model
 		{						// primary ammo pickup classnames
 			"ammo_ARgrenades",
 			"",
@@ -648,7 +648,7 @@ bot_weapon_select_t valve_weapon_select[] =
 			"",
 		},
 		5,						// skill level
-		7,						// priority
+		14,						// priority
 		300.0,					// min primary distance
 		600.0,					// max primary distance
 		300.0,					// min secondary distance
@@ -669,7 +669,7 @@ bot_weapon_select_t valve_weapon_select[] =
 	{
 		VALVE_WEAPON_SMG,		// id
 		"weapon_smg",			// classname
-		"9mmAR",				// third person model
+		"smg",				// third person model
 		{						// primary ammo pickup classnames
 			"ammo_9mmclip",
 			"ammo_9mmAR",
@@ -679,7 +679,7 @@ bot_weapon_select_t valve_weapon_select[] =
 			"",
 		},
 		5,						// skill level
-		7,						// priority
+		8,						// priority
 		0.0,					// min primary distance
 		786.0,					// max primary distance
 		300.0,					// min secondary distance
@@ -700,7 +700,7 @@ bot_weapon_select_t valve_weapon_select[] =
 	{
 		VALVE_WEAPON_USAS,	// id
 		"weapon_usas",		// classname
-		"9mmAR",	// third person model
+		"usas",	// third person model
 		{						// primary ammo pickup classnames
 			"ammo_buckshot",
 			"",
@@ -710,7 +710,7 @@ bot_weapon_select_t valve_weapon_select[] =
 			"",
 		},
 		5,						// skill level
-		4,						// priority
+		15,						// priority
 		0.0,					// min primary distance
 		300.0,					// max primary distance
 		0.0,					// min secondary distance
@@ -731,7 +731,7 @@ bot_weapon_select_t valve_weapon_select[] =
 	{
 		VALVE_WEAPON_FISTS,	// id
 		"weapon_fists",		// classname
-		"crowbar",				// third person model
+		"fists",				// third person model
 		{						// primary ammo pickup classnames
 			"",
 			"",
@@ -751,7 +751,7 @@ bot_weapon_select_t valve_weapon_select[] =
 		100,					// times out of 100 to use primary fire
 		0,						// minimum ammout of primary ammo needed to fire
 		0,						// minimum ammout of seconday ammo needed to fire
-		TRUE,					// hold down primary fire button to use?
+		FALSE,					// hold down primary fire button to use?
 		FALSE,					// hold down secondary fire button to use?
 		FALSE,					// charge weapon using primary fire?
 		FALSE,					// charge weapon using secondary fire?
@@ -762,7 +762,7 @@ bot_weapon_select_t valve_weapon_select[] =
 	{
 		VALVE_WEAPON_WRENCH,	// id
 		"weapon_wrench",		// classname
-		"crowbar",				// third person model
+		"wrench",				// third person model
 		{						// primary ammo pickup classnames
 			"",
 			"",
@@ -772,7 +772,7 @@ bot_weapon_select_t valve_weapon_select[] =
 			"",
 		},
 		5,						// skill level
-		1,						// priority
+		3,						// priority
 		0.0,					// min primary distance
 		50.0,					// max primary distance
 		100.0,					// min secondary distance
@@ -782,7 +782,7 @@ bot_weapon_select_t valve_weapon_select[] =
 		90,						// times out of 100 to use primary fire
 		0,						// minimum ammout of primary ammo needed to fire
 		0,						// minimum ammout of seconday ammo needed to fire
-		TRUE,					// hold down primary fire button to use?
+		FALSE,					// hold down primary fire button to use?
 		FALSE,					// hold down secondary fire button to use?
 		FALSE,					// charge weapon using primary fire?
 		FALSE,					// charge weapon using secondary fire?
@@ -803,7 +803,7 @@ bot_weapon_select_t valve_weapon_select[] =
 			"",
 		},
 		5,						// skill level
-		10,						// priority
+		21,						// priority
 		50.0,					// min primary distance
 		750.0,					// max primary distance
 		0.0,					// min secondary distance
@@ -824,7 +824,7 @@ bot_weapon_select_t valve_weapon_select[] =
 	{
 		VALVE_WEAPON_CHAINSAW,	// id
 		"weapon_chainsaw",		// classname
-		"crowbar",				// third person model
+		"chainsaw",				// third person model
 		{						// primary ammo pickup classnames
 			"",
 			"",
@@ -834,7 +834,7 @@ bot_weapon_select_t valve_weapon_select[] =
 			"",
 		},
 		5,						// skill level
-		1,						// priority
+		4,						// priority
 		0.0,					// min primary distance
 		50.0,					// max primary distance
 		0.0,					// min secondary distance
@@ -855,7 +855,7 @@ bot_weapon_select_t valve_weapon_select[] =
 	{
 		VALVE_WEAPON_12GAUGE,	// id
 		"weapon_12gauge",		// classname
-		"shotgun",	// third person model
+		"12gauge",	// third person model
 		{						// primary ammo pickup classnames
 			"ammo_buckshot",
 			"",
@@ -865,7 +865,7 @@ bot_weapon_select_t valve_weapon_select[] =
 			"",
 		},
 		5,						// skill level
-		4,						// priority
+		9,						// priority
 		0.0,					// min primary distance
 		300.0,					// max primary distance
 		0.0,					// min secondary distance
