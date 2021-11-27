@@ -325,6 +325,8 @@
    LINK_ENTITY_TO_FUNC(flying_snowball);
    LINK_ENTITY_TO_FUNC(weapon_chainsaw);
    LINK_ENTITY_TO_FUNC(weapon_12gauge);
+   LINK_ENTITY_TO_FUNC(weapon_nuke);
+   LINK_ENTITY_TO_FUNC(nuke_rocket);
    LINK_ENTITY_TO_FUNC(flak);
    LINK_ENTITY_TO_FUNC(flak_bomb);
    LINK_ENTITY_TO_FUNC(rune_frag);
