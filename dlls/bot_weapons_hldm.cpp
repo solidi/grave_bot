@@ -340,7 +340,7 @@ bot_weapon_select_t valve_weapon_select[] =
 			"",
 		},
 		5,						// skill level
-		22,						// priority
+		23,						// priority
 		250.0,					// min primary distance
 		750.0,					// max primary distance
 		0.0,					// min secondary distance
@@ -371,7 +371,7 @@ bot_weapon_select_t valve_weapon_select[] =
 			"",
 		},
 		5,						// skill level
-		23,						// priority
+		24,						// priority
 		150.0,					// min primary distance
 		500.0,					// max primary distance
 		0.0,					// min secondary distance
@@ -402,7 +402,7 @@ bot_weapon_select_t valve_weapon_select[] =
 			"",
 		},
 		5,						// skill level
-		25,						// priority
+		26,						// priority
 		0.0,					// min primary distance
 		300.0,					// max primary distance
 		0.0,					// min secondary distance
@@ -464,7 +464,7 @@ bot_weapon_select_t valve_weapon_select[] =
 			"",
 		},
 		5,						// skill level
-		24,						// priority
+		25,						// priority
 		150.0,					// min primary distance
 		500.0,					// max primary distance
 		150.0,					// min secondary distance
@@ -875,6 +875,37 @@ bot_weapon_select_t valve_weapon_select[] =
 		60,						// times out of 100 to use primary fire
 		1,						// minimum ammout of primary ammo needed to fire
 		2,						// minimum ammout of seconday ammo needed to fire
+		FALSE,					// hold down primary fire button to use?
+		FALSE,					// hold down secondary fire button to use?
+		FALSE,					// charge weapon using primary fire?
+		FALSE,					// charge weapon using secondary fire?
+		0.0,					// time to charge weapon (primary)
+		0.0						// time to charge weapon (secondary)
+	},
+	// nuke
+	{
+		VALVE_WEAPON_NUKE,		// id
+		"weapon_nuke",			// classname
+		"nuke",					// third person model
+		{						// primary ammo pickup classnames
+			"ammo_rpgclip",
+			"",
+		},
+		{						// secondary ammo pickup classnames
+			"",
+			"",
+		},
+		5,						// skill level
+		22,						// priority
+		300.0,					// min primary distance
+		9999.0,					// max primary distance
+		300.0,					// min secondary distance
+		9999.0,					// max secondary distance
+		TRUE,					// can use underwater?
+		2.0,					// how long does this weapon take to reload?
+		50,					// times out of 100 to use primary fire
+		1,						// minimum ammout of primary ammo needed to fire
+		1,						// minimum ammout of seconday ammo needed to fire
 		FALSE,					// hold down primary fire button to use?
 		FALSE,					// hold down secondary fire button to use?
 		FALSE,					// charge weapon using primary fire?
@@ -1842,6 +1873,39 @@ bot_fire_delay_t valve_fire_delay[] =
 			0.5,
 			0.8,
 			1.2
+		}
+	},
+	{
+		VALVE_WEAPON_NUKE,
+		1.5,
+		{
+			0.0,
+			0.0,
+			1.0,
+			2.0,
+			3.0
+		},
+		{
+			0.0,
+			1.0,
+			2.0,
+			4.0,
+			5.0
+		},
+		0.0,
+		{
+			0.0,
+			0.0,
+			0.0,
+			0.0,
+			0.0
+		},
+		{
+			0.0,
+			0.0,
+			0.0,
+			0.0,
+			0.0
 		}
 	},
 	// terminator 
