@@ -92,7 +92,7 @@ bot_weapon_select_t valve_weapon_select[] =
 			"",
 		},
 		5,						// skill level
-		2,						// priority
+		17,						// priority
 		0.0,					// min primary distance
 		9999.0,					// max primary distance
 		0.0,					// min secondary distance
