@@ -748,7 +748,7 @@ bot_weapon_select_t valve_weapon_select[] =
 		100.0,					// max secondary distance
 		TRUE,					// can use underwater?
 		0,						// how long does this weapon take to reload?
-		100,					// times out of 100 to use primary fire
+		80,						// times out of 100 to use primary fire
 		0,						// minimum ammout of primary ammo needed to fire
 		0,						// minimum ammout of seconday ammo needed to fire
 		FALSE,					// hold down primary fire button to use?
