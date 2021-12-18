@@ -1532,10 +1532,29 @@ void BotThink( bot_t *pBot )
 
 			pBot->need_to_initialize = FALSE;
 		}
-		
-		if ((RANDOM_LONG(1, 100) > 50) && (mod_id != SI_DLL))
-			pEdict->v.button = IN_ATTACK;
-		
+
+		if (!pBot->respawn_set) {
+#ifdef _DEBUG
+			ALERT(at_console, "Set respawn.\n");
+#endif
+			pBot->respawn_time = gpGlobals->time + RANDOM_FLOAT(1,5);
+			pBot->respawn_set = TRUE;
+		}
+
+#ifdef _DEBUG
+		ALERT(at_console, "%d? %.1f <= %.1f\n", pBot->respawn_time <= gpGlobals->time, pBot->respawn_time,gpGlobals->time );
+#endif
+
+		if (pBot->respawn_set && pBot->respawn_time <= gpGlobals->time) {
+			if ((RANDOM_LONG(1, 100) > 50) && (mod_id != SI_DLL)) {
+#ifdef _DEBUG
+				ALERT(at_console, "Firing button...\n");
+#endif
+				pEdict->v.button = IN_ATTACK;
+				pBot->respawn_set = FALSE;
+			}
+		}
+
 		BotFixIdealPitch (pEdict);
 		BotFixIdealYaw (pEdict);
 		BotFixBodyAngles (pEdict);

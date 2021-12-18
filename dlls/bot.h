@@ -357,6 +357,9 @@ typedef struct
 	int		i_carry_type;
 	char	c_carry_name[32];
 
+	float respawn_time;
+	BOOL respawn_set;
+
 } bot_t;
 
 
