@@ -720,8 +720,6 @@ void BotCreate( edict_t *pPlayer, const char *arg1, const char *arg2,
 		int clientIndex;
 		int index;
 		
-		SERVER_PRINT( "Creating Grave Bot bot...\n");
-		
 		index = 0;
 		while ((bots[index].is_used) && (index < 32))
 			index++;
@@ -853,6 +851,10 @@ void BotCreate( edict_t *pPlayer, const char *arg1, const char *arg2,
 		// a client may command us to be though
 		// only set this on bot create
 		pBot->b_role_locked = false;
+
+		char message[80];
+		sprintf(message, "Creating Grave Bot \"%s\" [name=%s, skill=%d]...\n", c_name, c_skin, skill);
+		SERVER_PRINT(message);
 
 		BotSpawnInit(pBot);
 	}
