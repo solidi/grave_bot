@@ -184,12 +184,13 @@ typedef struct clientdata_s
 } clientdata_t;
 
 #include "weaponinfo.h"
+#include "../dlls/cdll_dll.h"
 
 typedef struct local_state_s
 {
 	entity_state_t playerstate;
 	clientdata_t   client;
-	weapon_data_t  weapondata[ 32 ];
+	weapon_data_t  weapondata[ MAX_WEAPONS ];
 } local_state_t;
 
 #endif // !ENTITY_STATEH
