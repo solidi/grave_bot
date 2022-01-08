@@ -766,6 +766,11 @@ bool BotFireWeapon( Vector v_enemy, bot_t *pBot, int weapon_choice, bool nofire)
 			if (mod_id == SI_DLL && iId == SI_WEAPON_SNUZI)
 				pEdict->v.button |= IN_ATTACK2;
 
+			if (distance < 100) {
+				// ALERT(at_aiconsole, "Kick time!");
+				pEdict->v.impulse = 202;
+			}
+
 			if (pSelect[final_index].primary_fire_charge)
 			{
 				pBot->charging_weapon_id = iId;
