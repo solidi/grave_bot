@@ -314,6 +314,8 @@
    LINK_ENTITY_TO_FUNC(weapon_sniperrifle);
    LINK_ENTITY_TO_FUNC(weapon_railgun);
    LINK_ENTITY_TO_FUNC(weapon_cannon);
+   LINK_ENTITY_TO_FUNC(flak);
+   LINK_ENTITY_TO_FUNC(flak_bomb);
    LINK_ENTITY_TO_FUNC(weapon_mag60);
    LINK_ENTITY_TO_FUNC(weapon_chaingun);
    LINK_ENTITY_TO_FUNC(weapon_glauncher);
@@ -327,8 +329,7 @@
    LINK_ENTITY_TO_FUNC(weapon_12gauge);
    LINK_ENTITY_TO_FUNC(weapon_nuke);
    LINK_ENTITY_TO_FUNC(nuke_rocket);
-   LINK_ENTITY_TO_FUNC(flak);
-   LINK_ENTITY_TO_FUNC(flak_bomb);
+   LINK_ENTITY_TO_FUNC(weapon_deagle);
    LINK_ENTITY_TO_FUNC(rune_frag);
    LINK_ENTITY_TO_FUNC(rune_vampire);
    LINK_ENTITY_TO_FUNC(rune_protect);
