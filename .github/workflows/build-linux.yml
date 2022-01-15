@@ -6,7 +6,7 @@ env:
   BUILD_CONFIGURATION: Release
 
 jobs:
-  Game:
+  linux_libs:
     runs-on: ubuntu-18.04
 
     steps:
