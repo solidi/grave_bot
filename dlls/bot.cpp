@@ -1547,6 +1547,12 @@ void BotThink( bot_t *pBot )
 		ALERT(at_console, "%d? %.1f <= %.1f\n", pBot->respawn_time <= gpGlobals->time, pBot->respawn_time,gpGlobals->time );
 #endif
 
+		// Something went wrong. Reset.
+		if ( pBot->respawn_time >= gpGlobals->time + 6 ) {
+			pBot->respawn_time = 0;
+			pBot->respawn_set = FALSE;
+		}
+
 		if (pBot->respawn_set && pBot->respawn_time <= gpGlobals->time) {
 			if ((RANDOM_LONG(1, 100) > 50) && (mod_id != SI_DLL)) {
 #ifdef _DEBUG
