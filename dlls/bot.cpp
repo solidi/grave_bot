@@ -298,6 +298,10 @@ void BotSpawnInit( bot_t *pBot )
 
 	pBot->b_longjump = FALSE;
 
+	pBot->respawn_time = 0;
+	pBot->respawn_set = FALSE;
+	pBot->weapons2 = 0;
+
 	if (mod_id == SI_DLL)
 	{	// get longjump
 		if (g_Researched[UTIL_GetTeam(pBot->pEdict)][RESEARCH_LEGS_2].researched ||
@@ -1271,7 +1275,7 @@ void BotFindItem( bot_t *pBot )
 							select_index++;
 						}
 						// only pick it up if we need ammo or don't have the weapon
-						if ((ammo < AMMO_MAX) || !(pEdict->v.weapons & (1<<pSelect[weapon_index].iId)))
+						if ((ammo < AMMO_MAX) || !UTIL_HasWeaponId(pEdict, pSelect[select_index].iId))
 							can_pickup = TRUE;
 					}
 				}

@@ -359,6 +359,7 @@ typedef struct
 
 	float respawn_time;
 	BOOL respawn_set;
+	int weapons2;
 
 } bot_t;
 

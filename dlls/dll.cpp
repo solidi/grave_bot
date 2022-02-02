@@ -1498,9 +1498,11 @@ bool ProcessCommand( edict_t *pEntity, const char *pcmd, const char *arg1, const
 							int select_index = 0;
 							while (pSelect[select_index].iId)
 							{
-								sprintf(msg, "(%s) %s : %.2f : %.2f\n",
-									(pPlayer->v.weapons & (1<<pSelect[select_index].iId)) ? "Yes" : "No",
-									pSelect[select_index].weapon_name, 
+								BOOL hasWeapon = UTIL_HasWeaponId(pPlayer, pSelect[select_index].iId);
+								sprintf(msg, "(%s) %s - (%d == %d) : %.2f : %.2f\n",
+									hasWeapon ? "Yes" : "No",
+									pSelect[select_index].weapon_name,
+									select_index, pSelect[select_index].iId,
 									BotAssessPrimaryAmmo(pBot, pSelect[select_index].iId),
 									BotAssessSecondaryAmmo(pBot, pSelect[select_index].iId));
 								SERVER_PRINT( msg);

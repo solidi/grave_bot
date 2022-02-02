@@ -166,7 +166,7 @@ void BotClient_Valve_CurrentWeapon(void *p, edict_t *pEdict)
 		
 		iClip = *static_cast<int *>(p);  // ammo currently in the clip for this weapon
 		
-		if (iId <= 31 && iId >= 0)
+		if (iId <= 63 && iId >= 0)
 		{
 			if (iState == 1)
 			{
@@ -417,7 +417,22 @@ void BotClient_Valve_ItemPickup(void *p, edict_t *pEdict)
 
 void BotClient_Valve_WeapPickup(void *p, edict_t *pEdict)
 {
-	// nothing to here
+	if (!pEdict)
+		return;
+
+	static bot_t *pBot = NULL;
+	pBot = UTIL_GetBotPointer(pEdict);
+
+	if (!pBot)
+		return;
+
+	int weaponId = *static_cast<int *>(p);
+	char msg[80];
+	sprintf(msg, ">>> %s picked up %d!\n", STRING(pBot->pEdict->v.netname), weaponId);
+	SERVER_PRINT(msg);
+
+	if (weaponId > 31)
+		pBot->weapons2 |= (1<<(weaponId - 32));
 }
 
 void BotClient_Valve_Battery(void *p, edict_t *pEdict)
