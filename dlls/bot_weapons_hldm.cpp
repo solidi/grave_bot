@@ -30,7 +30,7 @@ bot_weapon_select_t valve_weapon_select[] =
 			"",
 		},
 		5,						// skill level
-		1,						// priority
+		10,						// priority
 		0.0,					// min primary distance
 		50.0,					// max primary distance
 		100.0,					// min secondary distance
@@ -61,7 +61,7 @@ bot_weapon_select_t valve_weapon_select[] =
 			"",
 		},
 		5,						// skill level
-		18,						// priority
+		5,						// priority
 		32.0,					// min primary distance
 		1024.0,					// max primary distance
 		0.0,					// min secondary distance
@@ -92,7 +92,7 @@ bot_weapon_select_t valve_weapon_select[] =
 			"",
 		},
 		5,						// skill level
-		17,						// priority
+		5,						// priority
 		0.0,					// min primary distance
 		9999.0,					// max primary distance
 		0.0,					// min secondary distance
@@ -123,10 +123,10 @@ bot_weapon_select_t valve_weapon_select[] =
 			"",
 		},
 		5,						// skill level
-		16,						// priority
-		300.0,					// min primary distance
+		4,						// priority
+		250.0,					// min primary distance
 		9999.0,					// max primary distance
-		300.0,					// min secondary distance
+		250.0,					// min secondary distance
 		9999.0,					// max secondary distance
 		TRUE,					// can use underwater?
 		2.0,					// how long does this weapon take to reload?
@@ -154,7 +154,7 @@ bot_weapon_select_t valve_weapon_select[] =
 			"",
 		},
 		5,						// skill level
-		10,						// priority
+		6,						// priority
 		0.0,					// min primary distance
 		300.0,					// max primary distance
 		0.0,					// min secondary distance
@@ -185,7 +185,7 @@ bot_weapon_select_t valve_weapon_select[] =
 			""
 		},
 		5,						// skill level
-		11,						// priority
+		6,						// priority
 		50.0,					// min primary distance
 		9999.0,					// max primary distance
 		0.0,					// min secondary distance
@@ -216,7 +216,7 @@ bot_weapon_select_t valve_weapon_select[] =
 			"",
 		},
 		5,						// skill level
-		6,						// priority
+		7,						// priority
 		30.0,					// min primary distance
 		2048.0,					// max primary distance
 		0.0,					// min secondary distance
@@ -247,7 +247,7 @@ bot_weapon_select_t valve_weapon_select[] =
 			"",
 		},
 		5,						// skill level
-		9,						// priority
+		5,						// priority
 		0.0,					// min primary distance
 		786.0,					// max primary distance
 		300.0,					// min secondary distance
@@ -278,7 +278,7 @@ bot_weapon_select_t valve_weapon_select[] =
 			"",
 		},
 		5,						// skill level
-		8,						// priority
+		9,						// priority
 		0.0,					// min primary distance
 		9999.0,					// max primary distance
 		0.0,					// min secondary distance
@@ -309,7 +309,7 @@ bot_weapon_select_t valve_weapon_select[] =
 			"",
 		},
 		5,						// skill level
-		19,						// priority
+		5,						// priority
 		30.0,					// min primary distance
 		1000.0,					// max primary distance
 		30.0,					// min secondary distance
@@ -340,7 +340,7 @@ bot_weapon_select_t valve_weapon_select[] =
 			"",
 		},
 		5,						// skill level
-		23,						// priority
+		4,						// priority
 		250.0,					// min primary distance
 		750.0,					// max primary distance
 		0.0,					// min secondary distance
@@ -371,7 +371,7 @@ bot_weapon_select_t valve_weapon_select[] =
 			"",
 		},
 		5,						// skill level
-		24,						// priority
+		5,						// priority
 		150.0,					// min primary distance
 		500.0,					// max primary distance
 		0.0,					// min secondary distance
@@ -402,7 +402,7 @@ bot_weapon_select_t valve_weapon_select[] =
 			"",
 		},
 		5,						// skill level
-		26,						// priority
+		1,						// priority
 		0.0,					// min primary distance
 		300.0,					// max primary distance
 		0.0,					// min secondary distance
@@ -433,7 +433,7 @@ bot_weapon_select_t valve_weapon_select[] =
 			"",
 		},
 		5,						// skill level
-		2,						// priority
+		9,						// priority
 		0.0,					// min primary distance
 		50.0,					// max primary distance
 		100.0,					// min secondary distance
@@ -464,7 +464,7 @@ bot_weapon_select_t valve_weapon_select[] =
 			"",
 		},
 		5,						// skill level
-		25,						// priority
+		3,						// priority
 		150.0,					// min primary distance
 		500.0,					// max primary distance
 		150.0,					// min secondary distance
@@ -494,7 +494,7 @@ bot_weapon_select_t valve_weapon_select[] =
 			""
 		},
 		5,						// skill level
-		12,						// priority
+		6,						// priority
 		50.0,					// min primary distance
 		9999.0,					// max primary distance
 		0.0,					// min secondary distance
@@ -525,7 +525,7 @@ bot_weapon_select_t valve_weapon_select[] =
 			"",
 		},
 		5,						// skill level
-		20,						// priority
+		4,						// priority
 		0.0,					// min primary distance
 		9999.0,					// max primary distance
 		0.0,					// min secondary distance
@@ -556,7 +556,7 @@ bot_weapon_select_t valve_weapon_select[] =
 			"",
 		},
 		5,						// skill level
-		21,						// priority
+		4,						// priority
 		300.0,					// min primary distance
 		9999.0,					// max primary distance
 		300.0,					// min secondary distance
@@ -587,7 +587,7 @@ bot_weapon_select_t valve_weapon_select[] =
 			"",
 		},
 		5,						// skill level
-		7,						// priority
+		6,						// priority
 		0.0,					// min primary distance
 		9999.0,					// max primary distance
 		0.0,					// min secondary distance
@@ -617,7 +617,7 @@ bot_weapon_select_t valve_weapon_select[] =
 			"",
 		},
 		5,						// skill level
-		13,						// priority
+		4,						// priority
 		0.0,					// min primary distance
 		786.0,					// max primary distance
 		300.0,					// min secondary distance
@@ -648,7 +648,7 @@ bot_weapon_select_t valve_weapon_select[] =
 			"",
 		},
 		5,						// skill level
-		14,						// priority
+		4,						// priority
 		300.0,					// min primary distance
 		600.0,					// max primary distance
 		300.0,					// min secondary distance
@@ -679,7 +679,7 @@ bot_weapon_select_t valve_weapon_select[] =
 			"",
 		},
 		5,						// skill level
-		8,						// priority
+		6,						// priority
 		0.0,					// min primary distance
 		786.0,					// max primary distance
 		300.0,					// min secondary distance
@@ -710,7 +710,7 @@ bot_weapon_select_t valve_weapon_select[] =
 			"",
 		},
 		5,						// skill level
-		15,						// priority
+		5,						// priority
 		0.0,					// min primary distance
 		300.0,					// max primary distance
 		0.0,					// min secondary distance
@@ -741,7 +741,7 @@ bot_weapon_select_t valve_weapon_select[] =
 			"",
 		},
 		5,						// skill level
-		0,						// priority
+		10,						// priority
 		0.0,					// min primary distance
 		100.0,					// max primary distance
 		0.0,					// min secondary distance
@@ -772,7 +772,7 @@ bot_weapon_select_t valve_weapon_select[] =
 			"",
 		},
 		5,						// skill level
-		3,						// priority
+		8,						// priority
 		0.0,					// min primary distance
 		50.0,					// max primary distance
 		100.0,					// min secondary distance
@@ -803,7 +803,7 @@ bot_weapon_select_t valve_weapon_select[] =
 			"",
 		},
 		5,						// skill level
-		21,						// priority
+		11,						// priority
 		50.0,					// min primary distance
 		750.0,					// max primary distance
 		0.0,					// min secondary distance
@@ -834,7 +834,7 @@ bot_weapon_select_t valve_weapon_select[] =
 			"",
 		},
 		5,						// skill level
-		4,						// priority
+		2,						// priority
 		0.0,					// min primary distance
 		50.0,					// max primary distance
 		0.0,					// min secondary distance
@@ -865,7 +865,7 @@ bot_weapon_select_t valve_weapon_select[] =
 			"",
 		},
 		5,						// skill level
-		9,						// priority
+		6,						// priority
 		0.0,					// min primary distance
 		300.0,					// max primary distance
 		0.0,					// min secondary distance
@@ -896,7 +896,7 @@ bot_weapon_select_t valve_weapon_select[] =
 			"",
 		},
 		5,						// skill level
-		22,						// priority
+		1,						// priority
 		300.0,					// min primary distance
 		9999.0,					// max primary distance
 		300.0,					// min secondary distance
@@ -947,7 +947,7 @@ bot_weapon_select_t valve_weapon_select[] =
 	// dual deagle
 	{
 		VALVE_WEAPON_DUAL_DEAGLE,	// id
-		"weapon_deagle",			// classname
+		"weapon_dual_deagle",	// classname
 		"357",					// third person model
 		{						// primary ammo pickup classnames
 			"ammo_357",
@@ -958,7 +958,7 @@ bot_weapon_select_t valve_weapon_select[] =
 			"",
 		},
 		5,						// skill level
-		7,						// priority
+		5,						// priority
 		30.0,					// min primary distance
 		2048.0,					// max primary distance
 		0.0,					// min secondary distance
@@ -1020,7 +1020,7 @@ bot_weapon_select_t valve_weapon_select[] =
 			"",
 		},
 		0,
-		12,
+		MAX_WEAPONS,
 		0.0,
 		0.0,
 		0.0,
