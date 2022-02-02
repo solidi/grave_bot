@@ -571,14 +571,14 @@ bool BotFireWeapon( Vector v_enemy, bot_t *pBot, int weapon_choice, bool nofire)
 				select_index++;  // skip to next weapon
 				continue;
 			}
-			
+
 			// is the bot NOT carrying this weapon?
-			if (!(pEdict->v.weapons & (1<<pSelect[select_index].iId)))
+			if (!UTIL_HasWeaponId(pEdict, pSelect[select_index].iId))
 			{
 				//ALERT( at_console, "Skipping %s, don't have it\n", pSelect[select_index].weapon_name);
 				select_index++;  // skip to next weapon
 				continue;
-			}   
+			}
 			
 			// is the bot NOT skilled enough to use this weapon?
 			if ((pBot->bot_skill+1) > pSelect[select_index].skill_level &&

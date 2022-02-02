@@ -1599,7 +1599,7 @@ int BotFindWaypointGoal( bot_t *pBot )
 			while (pSelect[select_index].iId)
 			{
 				// bot shouldn't be carrying this weapon
-				if (!(pEdict->v.weapons & (1<<pSelect[select_index].iId)))
+				if (!UTIL_HasWeaponId(pEdict, pSelect[select_index].iId))
 				{
 					// find our weapon
 					temp_index = WaypointFindNearestGoal(pEdict, pBot->curr_waypoint_index, team, W_FL_WEAPON, pSelect[select_index].weapon_name);
@@ -1627,7 +1627,7 @@ int BotFindWaypointGoal( bot_t *pBot )
 			while (pSelect[select_index].iId)
 			{
 				// bot should be carrying this weapon
-				if ((pEdict->v.weapons & (1<<pSelect[select_index].iId)))
+				if (UTIL_HasWeaponId(pEdict, pSelect[select_index].iId))
 				{
 					pri = BotAssessPrimaryAmmo(pBot, pSelect[select_index].iId);
 					sec = BotAssessSecondaryAmmo(pBot, pSelect[select_index].iId);
@@ -1823,7 +1823,7 @@ int BotFindWaypointGoalSI( bot_t *pBot )
 					continue;
 				}
 				// is the bot NOT carrying this weapon?
-				if (!(pEdict->v.weapons & (1<<pSelect[select_index].iId)))
+				if (!UTIL_HasWeaponId(pEdict, pSelect[select_index].iId))
 				{
 					select_index++;  // skip to next weapon
 					continue;
@@ -1902,8 +1902,8 @@ int BotFindWaypointGoalSI( bot_t *pBot )
 
 
 			// is the bot carrying this weapon and weapon has full ammo?
-			if (pEdict->v.weapons & (1<<pSelect[select_index].iId) &&
-				BotAssessPrimaryAmmo(pBot, pSelect[select_index].iId) >= 1.0)
+			if (UTIL_HasWeaponId(pEdict, pSelect[select_index].iId)
+				&& BotAssessPrimaryAmmo(pBot, pSelect[select_index].iId) >= 1.0)
 			{
 				select_index++;  // skip to next weapon
 				continue;

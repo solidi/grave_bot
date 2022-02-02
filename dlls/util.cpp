@@ -629,3 +629,13 @@ void UTIL_StringToStringArray( char *pVector[], int count, const char *pString )
 		pVector[j] = 0;
 	}
 }
+
+bool UTIL_HasWeaponId(edict_t *pEdict, int weaponId) {
+	bot_t *pBot = UTIL_GetBotPointer(pEdict);
+
+	if (weaponId > 31) {
+		return (pBot->weapons2 & (1<<(weaponId - 32)));
+	}
+
+	return (pEdict->v.weapons & (1<<weaponId));
+}
