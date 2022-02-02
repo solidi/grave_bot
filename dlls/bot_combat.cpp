@@ -375,7 +375,7 @@ bool BotShouldEngageEnemy( bot_t *pBot, edict_t *pEnemy )
 	{
 		// is our weapon not good compared to their weapon? AND
 		// our health is less than their health plus armor
-		if ((pSelect[our_weapon].priority > (pSelect[enemy_weapon].priority + i)) &&
+		/*if ((pSelect[our_weapon].priority > (pSelect[enemy_weapon].priority + i)) &&
 			((pBot->pEdict->v.health + pBot->pEdict->v.armorvalue) < (pEnemy->v.health +
 			pEnemy->v.armorvalue + (25 * i))))
 		{
@@ -390,7 +390,7 @@ bool BotShouldEngageEnemy( bot_t *pBot, edict_t *pEnemy )
 				UTIL_HostSay(pBot->pEdict, 0, pBot->debugchat);
 			}
 			return FALSE;
-		}
+		}*/
 	}
 
 	return TRUE;
