@@ -331,6 +331,7 @@
    LINK_ENTITY_TO_FUNC(nuke_rocket);
    LINK_ENTITY_TO_FUNC(weapon_deagle);
    LINK_ENTITY_TO_FUNC(weapon_dual_deagle);
+   LINK_ENTITY_TO_FUNC(weapon_dual_rpg);
    LINK_ENTITY_TO_FUNC(rune_frag);
    LINK_ENTITY_TO_FUNC(rune_vampire);
    LINK_ENTITY_TO_FUNC(rune_protect);
