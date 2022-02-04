@@ -32,8 +32,8 @@ bot_weapon_select_t valve_weapon_select[] =
 		5,						// skill level
 		10,						// priority
 		0.0,					// min primary distance
-		50.0,					// max primary distance
-		100.0,					// min secondary distance
+		75.0,					// max primary distance
+		0.0,					// min secondary distance
 		1000.0,					// max secondary distance
 		TRUE,					// can use underwater?
 		0,						// how long does this weapon take to reload?
@@ -436,7 +436,7 @@ bot_weapon_select_t valve_weapon_select[] =
 		9,						// priority
 		0.0,					// min primary distance
 		50.0,					// max primary distance
-		100.0,					// min secondary distance
+		0.0,					// min secondary distance
 		1000.0,					// max secondary distance
 		TRUE,					// can use underwater?
 		0,						// how long does this weapon take to reload?
@@ -774,8 +774,8 @@ bot_weapon_select_t valve_weapon_select[] =
 		5,						// skill level
 		8,						// priority
 		0.0,					// min primary distance
-		50.0,					// max primary distance
-		100.0,					// min secondary distance
+		75.0,					// max primary distance
+		0.0,					// min secondary distance
 		1000.0,					// max secondary distance
 		TRUE,					// can use underwater?
 		0,						// how long does this weapon take to reload?
@@ -836,9 +836,9 @@ bot_weapon_select_t valve_weapon_select[] =
 		5,						// skill level
 		2,						// priority
 		0.0,					// min primary distance
-		50.0,					// max primary distance
+		75.0,					// max primary distance
 		0.0,					// min secondary distance
-		50.0,					// max secondary distance
+		75.0,					// max secondary distance
 		TRUE,					// can use underwater?
 		0,						// how long does this weapon take to reload?
 		80,						// times out of 100 to use primary fire
@@ -1022,8 +1022,8 @@ bot_weapon_select_t valve_weapon_select[] =
 		5,						// skill level
 		3,						// priority
 		0.0,					// min primary distance
-		50.0,					// max primary distance
-		100.0,					// min secondary distance
+		75.0,					// max primary distance
+		0.0,					// min secondary distance
 		1000.0,					// max secondary distance
 		TRUE,					// can use underwater?
 		0,						// how long does this weapon take to reload?
