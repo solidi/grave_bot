@@ -32,8 +32,8 @@ bot_weapon_select_t valve_weapon_select[] =
 		5,						// skill level
 		10,						// priority
 		0.0,					// min primary distance
-		50.0,					// max primary distance
-		100.0,					// min secondary distance
+		75.0,					// max primary distance
+		0.0,					// min secondary distance
 		1000.0,					// max secondary distance
 		TRUE,					// can use underwater?
 		0,						// how long does this weapon take to reload?
@@ -436,7 +436,7 @@ bot_weapon_select_t valve_weapon_select[] =
 		9,						// priority
 		0.0,					// min primary distance
 		50.0,					// max primary distance
-		100.0,					// min secondary distance
+		0.0,					// min secondary distance
 		1000.0,					// max secondary distance
 		TRUE,					// can use underwater?
 		0,						// how long does this weapon take to reload?
@@ -774,8 +774,8 @@ bot_weapon_select_t valve_weapon_select[] =
 		5,						// skill level
 		8,						// priority
 		0.0,					// min primary distance
-		50.0,					// max primary distance
-		100.0,					// min secondary distance
+		75.0,					// max primary distance
+		0.0,					// min secondary distance
 		1000.0,					// max secondary distance
 		TRUE,					// can use underwater?
 		0,						// how long does this weapon take to reload?
@@ -836,9 +836,9 @@ bot_weapon_select_t valve_weapon_select[] =
 		5,						// skill level
 		2,						// priority
 		0.0,					// min primary distance
-		50.0,					// max primary distance
+		75.0,					// max primary distance
 		0.0,					// min secondary distance
-		50.0,					// max secondary distance
+		75.0,					// max secondary distance
 		TRUE,					// can use underwater?
 		0,						// how long does this weapon take to reload?
 		80,						// times out of 100 to use primary fire
@@ -999,6 +999,37 @@ bot_weapon_select_t valve_weapon_select[] =
 		50,					// times out of 100 to use primary fire
 		1,						// minimum ammout of primary ammo needed to fire
 		1,						// minimum ammout of seconday ammo needed to fire
+		FALSE,					// hold down primary fire button to use?
+		FALSE,					// hold down secondary fire button to use?
+		FALSE,					// charge weapon using primary fire?
+		FALSE,					// charge weapon using secondary fire?
+		0.0,					// time to charge weapon (primary)
+		0.0						// time to charge weapon (secondary)
+	},
+	// dual wrench
+	{
+		VALVE_WEAPON_DUAL_WRENCH,	// id
+		"weapon_dual_wrench",		// classname
+		"wrench",				// third person model
+		{						// primary ammo pickup classnames
+			"",
+			"",
+		},
+		{						// secondary ammo pickup classnames
+			"",
+			"",
+		},
+		5,						// skill level
+		3,						// priority
+		0.0,					// min primary distance
+		75.0,					// max primary distance
+		0.0,					// min secondary distance
+		1000.0,					// max secondary distance
+		TRUE,					// can use underwater?
+		0,						// how long does this weapon take to reload?
+		90,						// times out of 100 to use primary fire
+		0,						// minimum ammout of primary ammo needed to fire
+		0,						// minimum ammout of seconday ammo needed to fire
 		FALSE,					// hold down primary fire button to use?
 		FALSE,					// hold down secondary fire button to use?
 		FALSE,					// charge weapon using primary fire?
@@ -2083,6 +2114,39 @@ bot_fire_delay_t valve_fire_delay[] =
 			2.0,
 			4.0,
 			5.0
+		},
+		0.0,
+		{
+			0.0,
+			0.0,
+			0.0,
+			0.0,
+			0.0
+		},
+		{
+			0.0,
+			0.0,
+			0.0,
+			0.0,
+			0.0
+		}
+	},
+	{
+		VALVE_WEAPON_DUAL_WRENCH,
+		0.0,
+		{
+			0.0,
+			0.2,
+			0.3,
+			0.4,
+			0.6
+		},
+		{
+			0.0,
+			0.3,
+			0.5,
+			0.7,
+			1.0
 		},
 		0.0,
 		{
