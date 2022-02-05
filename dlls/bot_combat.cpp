@@ -76,6 +76,11 @@ edict_t *BotFindEnemy( bot_t *pBot )
 	
 	if (pEdict->v.flags & FL_GODMODE)
 		return NULL;
+
+	// Cannot see transparent player (with rune)
+	if (pEdict->v.rendermode == kRenderTransAlpha && pEdict->v.renderamt < 60) {
+		return NULL;
+	}
 	
 	if (pBot->pBotEnemy != NULL)  // does the bot already have an enemy?
 	{
