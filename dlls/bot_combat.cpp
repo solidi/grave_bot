@@ -768,7 +768,7 @@ bool BotFireWeapon( Vector v_enemy, bot_t *pBot, int weapon_choice, bool nofire)
 
 			if (distance < 100) {
 				// ALERT(at_aiconsole, "Kick time!");
-				pEdict->v.impulse = 204;
+				pEdict->v.impulse = 206;
 			}
 
 			if (pSelect[final_index].primary_fire_charge)
