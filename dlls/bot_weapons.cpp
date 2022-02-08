@@ -276,4 +276,25 @@ float WeaponProjectileSpeed( int iId )
 				return 0;
 		}
 	}
+	else if (mod_id == VALVE_DLL)
+	{
+		switch (iId)
+		{
+			case VALVE_WEAPON_RPG:
+			case VALVE_WEAPON_DUAL_RPG:
+			case VALVE_WEAPON_NUKE:
+				return 2000;
+			case VALVE_WEAPON_CANNON:
+				return 1500;
+			case VALVE_WEAPON_GLAUNCHER:
+				return 800;
+			case VALVE_WEAPON_HANDGRENADE:
+			case VALVE_WEAPON_SNOWBALL:
+				return 500;
+			case VALVE_WEAPON_SATCHEL:
+				return 274;
+			default:
+				return 0;
+		}
+	}
 }
