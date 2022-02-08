@@ -27,10 +27,10 @@ extern bot_fire_delay_t si_fire_delay[];
 // Begin weapon based functions //
 //////////////////////////////////
 
-bot_weapon_select_t *WeaponGetSelectPointer( void )
+bot_weapon_select_t *WeaponGetSelectPointer()
 {
 //	ALERT(at_console, "WeaponGetSelectPointer\n");
-	bot_weapon_select_t *pSelect = NULL;
+	bot_weapon_select_t *pSelect = nullptr;
 
 	if (mod_id == CRABBED_DLL || mod_id == VALVE_DLL)
 		pSelect = &valve_weapon_select[0];
@@ -40,10 +40,10 @@ bot_weapon_select_t *WeaponGetSelectPointer( void )
 	return pSelect;
 }
 
-bot_fire_delay_t *WeaponGetDelayPointer( void )
+bot_fire_delay_t *WeaponGetDelayPointer()
 {
 //	ALERT(at_console, "WeaponGetDelayPointer\n");
-	bot_fire_delay_t *pDelay = NULL;
+	bot_fire_delay_t *pDelay = nullptr;
 
 	if (mod_id == CRABBED_DLL || mod_id == VALVE_DLL)
 		pDelay = &valve_fire_delay[0];
@@ -56,7 +56,7 @@ bot_fire_delay_t *WeaponGetDelayPointer( void )
 int WeaponGetSelectIndex( int iId )
 {
 //	ALERT(at_console, "WeaponGetSelectIndex\n");
-	bot_weapon_select_t *pSelect = NULL;
+	bot_weapon_select_t *pSelect = nullptr;
 	pSelect = WeaponGetSelectPointer();
 
 	int select_index = 0;
@@ -72,12 +72,12 @@ int WeaponGetSelectIndex( int iId )
 	return -1;
 }
 
-int WeaponGetBest( void )
+int WeaponGetBest()
 {
 //	ALERT(at_console, "WeaponGetBest\n");
 	int weapon = -1;
 
-	bot_weapon_select_t *pSelect = NULL;
+	bot_weapon_select_t *pSelect = nullptr;
 	pSelect = WeaponGetSelectPointer();
 
 	int select_index = 0;
@@ -97,12 +97,12 @@ int WeaponGetBest( void )
 	return weapon;
 }
 
-int WeaponGetWorst( void )
+int WeaponGetWorst()
 {
 //	ALERT(at_console, "WeaponGetWorst\n");
 	int weapon = -1;
 
-	bot_weapon_select_t *pSelect = NULL;
+	bot_weapon_select_t *pSelect = nullptr;
 	pSelect = WeaponGetSelectPointer();
 
 	int select_index = 0;
@@ -127,7 +127,7 @@ int WeaponGetNextBest( int iId )
 //	ALERT(at_console, "WeaponGetNextBest\n");
 	int weapon = -1;
 
-	bot_weapon_select_t *pSelect = NULL;
+	bot_weapon_select_t *pSelect = nullptr;
 	pSelect = WeaponGetSelectPointer();
 
 	int select_index = 0;
@@ -149,7 +149,7 @@ int WeaponGetNextWorse( int iId )
 //	ALERT(at_console, "WeaponGetNextWorse\n");
 	int weapon = -1;
 
-	bot_weapon_select_t *pSelect = NULL;
+	bot_weapon_select_t *pSelect = nullptr;
 	pSelect = WeaponGetSelectPointer();
 
 	int select_index = 0;
@@ -276,20 +276,4 @@ float WeaponProjectileSpeed( int iId )
 				return 0;
 		}
 	}
-	else
-	{
-		switch (iId)
-		{
-			case VALVE_WEAPON_RPG:
-				return 2000;
-			case VALVE_WEAPON_HANDGRENADE:
-				return 500;
-			case VALVE_WEAPON_SATCHEL:
-				return 274;
-			default:
-				return 0;
-		}
-	}
-
-	return 0;
 }

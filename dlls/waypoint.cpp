@@ -74,13 +74,13 @@ Vector last_waypoint;
 float f_path_time = 0.0;
 
 unsigned int route_num_waypoints;
-unsigned short *shortest_path[4] = {NULL, NULL, NULL, NULL};
-unsigned short *from_to[4] = {NULL, NULL, NULL, NULL};
+unsigned short *shortest_path[4] = {nullptr, nullptr, nullptr, nullptr};
+unsigned short *from_to[4] = {nullptr, nullptr, nullptr, nullptr};
 
 static FILE *fp;
 
 
-void WaypointDebug(void)
+void WaypointDebug()
 {
 	int y = 1, x = 1;
 	
@@ -96,7 +96,7 @@ void WaypointDebug(void)
 
 
 // free the linked list of waypoint path nodes...
-void WaypointFree(void)
+void WaypointFree()
 {
 	for (int i=0; i < MAX_WAYPOINTS; i++)
 	{
@@ -119,14 +119,14 @@ void WaypointFree(void)
 #endif
 			}
 			
-			paths[i] = NULL;
+			paths[i] = nullptr;
 		}
 	}
 }
 
 
 // initialize the waypoint structures...
-void WaypointInit(void)
+void WaypointInit()
 {
 	int i;
 	
@@ -136,10 +136,10 @@ void WaypointInit(void)
 	
 	for (i=0; i < 4; i++)
 	{
-		if (shortest_path[i] != NULL)
+		if (shortest_path[i] != nullptr)
 			free(shortest_path[i]);
 		
-		if (from_to[i] != NULL)
+		if (from_to[i] != nullptr)
 			free(from_to[i]);
 	}
 	
@@ -150,7 +150,7 @@ void WaypointInit(void)
 		
 		wp_display_time[i] = 0.0;
 		
-		paths[i] = NULL;  // no paths allocated yet
+		paths[i] = nullptr;  // no paths allocated yet
 	}
 	
 	f_path_time = 0.0;  // reset waypoint path display time
@@ -161,8 +161,8 @@ void WaypointInit(void)
 	
 	for (i=0; i < 4; i++)
 	{
-		shortest_path[i] = NULL;
-		from_to[i] = NULL;
+		shortest_path[i] = nullptr;
+		from_to[i] = nullptr;
 	}
 }
 
@@ -175,10 +175,10 @@ void WaypointAddPath(short int add_index, short int path_index)
 	int count = 0;
 	
 	p = paths[add_index];
-	prev = NULL;
+	prev = nullptr;
 	
 	// find an empty slot for new path_index...
-	while (p != NULL)
+	while (p != nullptr)
 	{
 		i = 0;
 		
@@ -205,7 +205,7 @@ void WaypointAddPath(short int add_index, short int path_index)
 	
 	p = static_cast<PATH *>(malloc(sizeof(PATH)));
 	
-	if (p == NULL)
+	if (p == nullptr)
 	{
 		ALERT(at_error, "Grave Bot - Error allocating memory for path!");
 	}
@@ -214,12 +214,12 @@ void WaypointAddPath(short int add_index, short int path_index)
 	p->index[1] = -1;
 	p->index[2] = -1;
 	p->index[3] = -1;
-	p->next = NULL;
+	p->next = nullptr;
 	
-	if (prev != NULL)
+	if (prev != nullptr)
 		prev->next = p;  // link new node into existing list
 	
-	if (paths[add_index] == NULL)
+	if (paths[add_index] == nullptr)
 		paths[add_index] = p;  // save head point if necessary
 }
 
@@ -238,7 +238,7 @@ void WaypointDeletePath(short int del_index)
 		int count = 0;
 		
 		// search linked list for del_index...
-		while (p != NULL)
+		while (p != nullptr)
 		{
 			i = 0;
 			
@@ -274,7 +274,7 @@ void WaypointDeletePath(short int path_index, short int del_index)
 	p = paths[path_index];
 	
 	// search linked list for del_index...
-	while (p != NULL)
+	while (p != nullptr)
 	{
 		i = 0;
 		
@@ -305,7 +305,7 @@ int WaypointFindPath(PATH **pPath, int *path_index, int waypoint_index, int team
 	int index;
 	int count = 0;
 	
-	if (*pPath == NULL)
+	if (*pPath == nullptr)
 	{
 		*pPath = paths[waypoint_index];
 		*path_index = 0;
@@ -318,7 +318,7 @@ int WaypointFindPath(PATH **pPath, int *path_index, int waypoint_index, int team
 		*pPath = (*pPath)->next;  // go to next node in linked list
 	}
 	
-	while (*pPath != NULL)
+	while (*pPath != nullptr)
 	{
 		while (*path_index < MAX_PATH_INDEX)
 		{
@@ -368,7 +368,7 @@ int WaypointFindNearest(edict_t *pEntity, float range, int team)
 	TraceResult tr;
 	Vector vecOrigin;
 
-	if (num_waypoints < 1 || pEntity == NULL)
+	if (num_waypoints < 1 || pEntity == nullptr)
 		return -1;
 	
 	vecOrigin = UTIL_GetOrigin(pEntity);
@@ -471,7 +471,7 @@ int WaypointFindNearest(edict_t *pEntity, float range, int team, int exclude[])
 	TraceResult tr;
 	Vector vecOrigin;
 
-	if (num_waypoints < 1 || pEntity == NULL)
+	if (num_waypoints < 1 || pEntity == nullptr)
 		return -1;
 	
 	vecOrigin = UTIL_GetOrigin(pEntity);
@@ -596,7 +596,7 @@ int WaypointFindNearestGoal(edict_t *pEntity, int src, int team, int flags)
 	edict_t *wpt_item;
 	Vector vecOrigin;
 
-	if (num_waypoints < 1 || pEntity == NULL)
+	if (num_waypoints < 1 || pEntity == nullptr)
 		return -1;
 	
 	vecOrigin = UTIL_GetOrigin(pEntity);
@@ -628,7 +628,7 @@ int WaypointFindNearestGoal(edict_t *pEntity, int src, int team, int flags)
 		if (waypoints[index].item[0])
 		{
 			wpt_item = WaypointFindItem(index);	
-			if ((wpt_item == NULL) || (wpt_item->v.effects & EF_NODRAW) || (wpt_item->v.frame > 0) ||
+			if ((wpt_item == nullptr) || (wpt_item->v.effects & EF_NODRAW) || (wpt_item->v.frame > 0) ||
 				((team != -1) && (UTIL_GetTeam(wpt_item) != team)))
 				continue;
 		}
@@ -696,7 +696,7 @@ int WaypointFindNearestGoal(edict_t *pEntity, int src, int team, int flags, int 
 		if (waypoints[index].item[0])
 		{
 			wpt_item = WaypointFindItem(index);	
-			if ((wpt_item == NULL) || (wpt_item->v.effects & EF_NODRAW) || (wpt_item->v.frame > 0) ||
+			if ((wpt_item == nullptr) || (wpt_item->v.effects & EF_NODRAW) || (wpt_item->v.frame > 0) ||
 				((team != -1) && (UTIL_GetTeam(wpt_item) != team)))
 				continue;
 		}
@@ -756,7 +756,7 @@ int WaypointFindNearestGoal(edict_t *pEntity, int src, int team, int flags, char
 		if (waypoints[index].item[0])
 		{
 			wpt_item = WaypointFindItem(index);	
-			if ((wpt_item == NULL) || (wpt_item->v.effects & EF_NODRAW) || (wpt_item->v.frame > 0) ||
+			if ((wpt_item == nullptr) || (wpt_item->v.effects & EF_NODRAW) || (wpt_item->v.frame > 0) ||
 				((team != -1) && (UTIL_GetTeam(wpt_item) != team)))
 				continue;
 		}
@@ -808,7 +808,7 @@ int WaypointFindNearestGoal(Vector v_src, edict_t *pEntity, float range, int tea
 		if (waypoints[index].item[0])
 		{
 			wpt_item = WaypointFindItem(index);	
-			if ((wpt_item == NULL) || (wpt_item->v.effects & EF_NODRAW) || (wpt_item->v.frame > 0) ||
+			if ((wpt_item == nullptr) || (wpt_item->v.effects & EF_NODRAW) || (wpt_item->v.frame > 0) ||
 				((team != -1) && (UTIL_GetTeam(wpt_item) != team)))
 				continue;
 		}
@@ -872,7 +872,7 @@ int WaypointFindNearestGoal(Vector v_src, edict_t *pEntity, float range, int tea
 		if (waypoints[index].item[0])
 		{
 			wpt_item = WaypointFindItem(index);	
-			if ((wpt_item == NULL) || (wpt_item->v.effects & EF_NODRAW) || (wpt_item->v.frame > 0) ||
+			if ((wpt_item == nullptr) || (wpt_item->v.effects & EF_NODRAW) || (wpt_item->v.frame > 0) ||
 				((team != -1) && (UTIL_GetTeam(wpt_item) != team)))
 				continue;
 		}
@@ -922,7 +922,7 @@ int WaypointFindRandomGoal(edict_t *pEntity, int team, int flags)
 		if (waypoints[index].item[0])
 		{
 			wpt_item = WaypointFindItem(index);	
-			if ((wpt_item == NULL) || (wpt_item->v.effects & EF_NODRAW) || (wpt_item->v.frame > 0) ||
+			if ((wpt_item == nullptr) || (wpt_item->v.effects & EF_NODRAW) || (wpt_item->v.frame > 0) ||
 				((team != -1) && (UTIL_GetTeam(wpt_item) != team)))
 				continue;
 		}
@@ -989,7 +989,7 @@ int WaypointFindRandomGoal(edict_t *pEntity, int team, int flags, int exclude[])
 		if (waypoints[index].item[0])
 		{
 			wpt_item = WaypointFindItem(index);	
-			if ((wpt_item == NULL) || (wpt_item->v.effects & EF_NODRAW) || (wpt_item->v.frame > 0) ||
+			if ((wpt_item == nullptr) || (wpt_item->v.effects & EF_NODRAW) || (wpt_item->v.frame > 0) ||
 				((team != -1) && (UTIL_GetTeam(wpt_item) != team)))
 				continue;
 		}
@@ -1047,7 +1047,7 @@ int WaypointFindRandomGoal(edict_t *pEntity, int team, int flags, char item[])
 		if (waypoints[index].item[0])
 		{
 			wpt_item = WaypointFindItem(index);	
-			if ((wpt_item == NULL) || (wpt_item->v.effects & EF_NODRAW) || (wpt_item->v.frame > 0) ||
+			if ((wpt_item == nullptr) || (wpt_item->v.effects & EF_NODRAW) || (wpt_item->v.frame > 0) ||
 				((team != -1) && (UTIL_GetTeam(wpt_item) != team)))
 				continue;
 		}
@@ -1102,7 +1102,7 @@ int WaypointFindRandomGoal(Vector v_src, edict_t *pEntity, float range, int team
 		if (waypoints[index].item[0])
 		{
 			wpt_item = WaypointFindItem(index);	
-			if ((wpt_item == NULL) || (wpt_item->v.effects & EF_NODRAW) || (wpt_item->v.frame > 0) ||
+			if ((wpt_item == nullptr) || (wpt_item->v.effects & EF_NODRAW) || (wpt_item->v.frame > 0) ||
 				((team != -1) && (UTIL_GetTeam(wpt_item) != team)))
 				continue;
 		}
@@ -1134,10 +1134,10 @@ int WaypointFindNearestWeapon(edict_t *pEntity, int src, int team, int flags, in
 	edict_t *wpt_item;
 	bool found = false;
 	// for weapon goals
-	bot_weapon_select_t *pSelect = NULL;
+	bot_weapon_select_t *pSelect = nullptr;
 	pSelect = WeaponGetSelectPointer();
 	
-	if (num_waypoints < 1 || pSelect == NULL)
+	if (num_waypoints < 1 || pSelect == nullptr)
 		return -1;
 	
 	// find the nearest waypoint with the matching flags...
@@ -1167,7 +1167,7 @@ int WaypointFindNearestWeapon(edict_t *pEntity, int src, int team, int flags, in
 		if (waypoints[index].item[0])
 		{
 			wpt_item = WaypointFindItem(index);	
-			if ((wpt_item == NULL) || (wpt_item->v.effects & EF_NODRAW) || (wpt_item->v.frame > 0 &&
+			if ((wpt_item == nullptr) || (wpt_item->v.effects & EF_NODRAW) || (wpt_item->v.frame > 0 &&
 				strncmp(STRING(wpt_item->v.classname), "func_", 5) == 0) ||
 				((team != -1) && (UTIL_GetTeam(wpt_item) != team)))
 				continue;
@@ -1178,7 +1178,7 @@ int WaypointFindNearestWeapon(edict_t *pEntity, int src, int team, int flags, in
 			{
 				if (pSelect[select_index].iId == weapon)
 				{	// does the weapon match?
-					if (strstr(STRING(wpt_item->v.model), pSelect[select_index].weapon_model) != NULL)
+					if (strstr(STRING(wpt_item->v.model), pSelect[select_index].weapon_model) != nullptr)
 					{
 						found = true;
 						break;
@@ -1240,7 +1240,7 @@ int WaypointFindNearestAiming(Vector v_origin)
 void WaypointDrawBeam(edict_t *pEntity, Vector start, Vector end, int width,
 					  int noise, int red, int green, int blue, int brightness, int speed)
 {
-	MESSAGE_BEGIN(MSG_ONE, SVC_TEMPENTITY, NULL, pEntity);
+	MESSAGE_BEGIN(MSG_ONE, SVC_TEMPENTITY, nullptr, pEntity);
 	WRITE_BYTE( TE_BEAMPOINTS);
 	WRITE_COORD(start.x);
 	WRITE_COORD(start.y);
@@ -1266,7 +1266,7 @@ void WaypointDrawBeam(edict_t *pEntity, Vector start, Vector end, int width,
 
 void WaypointSearchItems(edict_t *pEntity, Vector origin, int wpt_index)
 {
-	edict_t *pent = NULL;
+	edict_t *pent = nullptr;
 	float radius = 40;
 	TraceResult tr;
 	float distance;
@@ -1277,7 +1277,7 @@ void WaypointSearchItems(edict_t *pEntity, Vector origin, int wpt_index)
 	edict_t *nearest_pent;
 	
 	nearest_name[0] = 0;      // null out nearest_name string
-	nearest_pent = NULL;
+	nearest_pent = nullptr;
 	
 	min_distance = 9999.0;
 	
@@ -1285,13 +1285,13 @@ void WaypointSearchItems(edict_t *pEntity, Vector origin, int wpt_index)
 	// look for the nearest health, armor, ammo, weapon, etc.
 	//********************************************************
 	
-	while ((pent = UTIL_FindEntityInSphere( pent, origin, radius )) != NULL)
+	while ((pent = UTIL_FindEntityInSphere( pent, origin, radius )) != nullptr)
 	{
 		if (pEntity)
 			UTIL_TraceLine( origin, pent->v.origin, ignore_monsters,
 			pEntity->v.pContainingEntity, &tr );
 		else
-			UTIL_TraceLine( origin, pent->v.origin, ignore_monsters, NULL, &tr );
+			UTIL_TraceLine( origin, pent->v.origin, ignore_monsters, nullptr, &tr );
 		
 		// make sure entity is visible...
 		if ((tr.flFraction >= 1.0) || (strcmp("func_healthcharger", STRING(pent->v.classname)) == 0) ||
@@ -1306,7 +1306,7 @@ void WaypointSearchItems(edict_t *pEntity, Vector origin, int wpt_index)
 				(strcmp("item_longjump", item_name) == 0) ||
 				(strncmp("ammo_", item_name, 5) == 0) ||
 				((strncmp("weapon_", item_name, 7) == 0) &&
-				(pent->v.owner == NULL)))
+				(pent->v.owner == nullptr)))
 			{
 				distance = (pent->v.origin - origin).Length();
 				
@@ -1359,7 +1359,7 @@ void WaypointSearchItems(edict_t *pEntity, Vector origin, int wpt_index)
 		}
 		
 		else if ((strncmp("weapon_", nearest_name, 7) == 0) &&
-			(nearest_pent->v.owner == NULL))
+			(nearest_pent->v.owner == nullptr))
 		{
 			if (pEntity)
 			{
@@ -1383,17 +1383,17 @@ void WaypointSearchItems(edict_t *pEntity, Vector origin, int wpt_index)
 
 edict_t *WaypointFindItem( int wpt_index )
 {
-	edict_t *pent = NULL;
+	edict_t *pent = nullptr;
 	float radius = 40;
 	TraceResult tr;
 	float distance;
 	float min_distance;
 	char item_name[64];
 	char nearest_name[64];
-	edict_t *nearest_pent = NULL;
+	edict_t *nearest_pent = nullptr;
 	
 	nearest_name[0] = 0;      // null out nearest_name string
-	nearest_pent = NULL;
+	nearest_pent = nullptr;
 	
 	min_distance = 9999.0;
 	
@@ -1401,9 +1401,9 @@ edict_t *WaypointFindItem( int wpt_index )
 	//********************************************************
 	// look for the nearest health, armor, ammo, weapon, etc.
 	//********************************************************
-	while ((pent = UTIL_FindEntityInSphere( pent, origin, radius )) != NULL)
+	while ((pent = UTIL_FindEntityInSphere( pent, origin, radius )) != nullptr)
 	{
-		UTIL_TraceLine( origin, pent->v.origin, ignore_monsters, NULL, &tr );
+		UTIL_TraceLine( origin, pent->v.origin, ignore_monsters, nullptr, &tr );
 		
 		// make sure entity is visible...
 		if ((tr.flFraction >= 1.0) || (tr.pHit == pent))
@@ -1411,7 +1411,7 @@ edict_t *WaypointFindItem( int wpt_index )
 			strcpy(item_name, STRING(pent->v.classname));
 			
 			if ((strcmp(waypoints[wpt_index].item, item_name) == 0) &&
-				(pent->v.owner == NULL))
+				(pent->v.owner == nullptr))
 			{
 				distance = (pent->v.origin - origin).Length();
 				
@@ -1430,7 +1430,7 @@ edict_t *WaypointFindItem( int wpt_index )
 void WaypointAdd(edict_t *pEntity)
 {
 	int index;
-	edict_t *pent = NULL;
+	edict_t *pent = nullptr;
 	float radius = 40;
 	
 	if (num_waypoints >= MAX_WAYPOINTS)
@@ -1515,7 +1515,7 @@ void WaypointAdd(edict_t *pEntity)
 void WaypointAddAiming(edict_t *pEntity)
 {
 	int index;
-	edict_t *pent = NULL;
+	edict_t *pent = nullptr;
 	
 	if (num_waypoints >= MAX_WAYPOINTS)
 		return;
@@ -1615,7 +1615,7 @@ void WaypointDelete(edict_t *pEntity)
 	
 	// free the path for this index...
 	
-	if (paths[index] != NULL)
+	if (paths[index] != nullptr)
 	{
 		PATH *p = paths[index];
 		PATH *p_next;
@@ -1632,7 +1632,7 @@ void WaypointDelete(edict_t *pEntity)
 #endif
 		}
 		
-		paths[index] = NULL;
+		paths[index] = nullptr;
 	}
 	
 	waypoints[index].flags = W_FL_DELETED;  // not being used
@@ -1655,7 +1655,7 @@ void WaypointUpdate(edict_t *pEntity)
 	{
 		waypoints[index].flags &= ~mask;  // clear the mask bits
 		
-		WaypointSearchItems(NULL, waypoints[index].origin, index);
+		WaypointSearchItems(nullptr, waypoints[index].origin, index);
 	}
 }
 
@@ -1776,7 +1776,7 @@ bool WaypointLoad(edict_t *pEntity, char *ext)
 	FILE *bfp = fopen(filename, "rb");
 	
 	// if file exists, read the waypoint structure from it
-	if (bfp != NULL)
+	if (bfp != nullptr)
 	{
 		fread(&header, sizeof(header), 1, bfp);
 		
@@ -1925,7 +1925,7 @@ bool WaypointLoad(edict_t *pEntity, char *ext)
 }
 
 
-void WaypointSave(void)
+void WaypointSave()
 {
 	char filename[256];
 	char mapname[64];
@@ -1971,7 +1971,7 @@ void WaypointSave(void)
 		p = paths[index];
 		num = 0;
 		
-		while (p != NULL)
+		while (p != nullptr)
 		{
 			i = 0;
 			
@@ -1992,7 +1992,7 @@ void WaypointSave(void)
 		
 		p = paths[index];
 		
-		while (p != NULL)
+		while (p != nullptr)
 		{
 			i = 0;
 			
@@ -2110,7 +2110,7 @@ bool WaypointReachable(Vector v_src, Vector v_dest, edict_t *pEntity)
 // find the nearest reachable waypoint
 int WaypointFindReachable(edict_t *pEntity, float range, int team)
 {
-	int i, min_index;
+	int i, min_index = 0;
 	float distance;
 	float min_distance;
 	TraceResult tr;
@@ -2395,7 +2395,7 @@ void WaypointThink(edict_t *pEntity)
 				
 				p = paths[index];
 				
-				while (p != NULL)
+				while (p != nullptr)
 				{
 					i = 0;
 					
@@ -2487,7 +2487,7 @@ void WaypointFloyds(unsigned short *shortest_path, unsigned short *from_to)
 
 // load the waypoint route files (.gb1, .gb2, etc.) or generate them if
 // they don't exist...
-void WaypointRouteInit(void)
+void WaypointRouteInit()
 {
 	unsigned int index;
 	bool build_matrix[4];
@@ -2572,17 +2572,17 @@ void WaypointRouteInit(void)
 					
 					shortest_path[matrix] = static_cast<unsigned short *>(malloc(sizeof(unsigned short) * array_size));
 					
-					if (shortest_path[matrix] == NULL)
+					if (shortest_path[matrix] == nullptr)
 						ALERT(at_error, "Grave Bot - Error allocating memory for shortest path!");
 					
 					from_to[matrix] = static_cast<unsigned short *>(malloc(sizeof(unsigned short) * array_size));
 					
-					if (from_to[matrix] == NULL)
+					if (from_to[matrix] == nullptr)
 						ALERT(at_error, "Grave Bot - Error allocating memory for from to matrix!");
 					
 					bfp = fopen(filename2, "rb");
 					
-					if (bfp != NULL)
+					if (bfp != nullptr)
 					{
 						num_items = fread(shortest_path[matrix], sizeof(unsigned short), array_size, bfp);
 						
@@ -2593,10 +2593,10 @@ void WaypointRouteInit(void)
 							SERVER_PRINT( "error reading enough path items, recalculating...\n");
 							
 							free(shortest_path[matrix]);
-							shortest_path[matrix] = NULL;
+							shortest_path[matrix] = nullptr;
 							
 							free(from_to[matrix]);
-							from_to[matrix] = NULL;
+							from_to[matrix] = nullptr;
 						}
 						else
 						{
@@ -2609,10 +2609,10 @@ void WaypointRouteInit(void)
 								SERVER_PRINT( "error reading enough path items, recalculating...\n");
 								
 								free(shortest_path[matrix]);
-								shortest_path[matrix] = NULL;
+								shortest_path[matrix] = nullptr;
 								
 								free(from_to[matrix]);
-								from_to[matrix] = NULL;
+								from_to[matrix] = nullptr;
 							}
 						}
 					}
@@ -2621,29 +2621,29 @@ void WaypointRouteInit(void)
 						SERVER_PRINT( "Grave Bot - Error reading waypoint paths!\n");
 						
 						free(shortest_path[matrix]);
-						shortest_path[matrix] = NULL;
+						shortest_path[matrix] = nullptr;
 						
 						free(from_to[matrix]);
-						from_to[matrix] = NULL;
+						from_to[matrix] = nullptr;
 					}
 					
 					fclose(bfp);
 				}
 			}
 			
-			if (shortest_path[matrix] == NULL)
+			if (shortest_path[matrix] == nullptr)
 			{
 				sprintf(msg, "calculating Grave Bot waypoint paths for team %d...\n", matrix+1);
 				SERVER_PRINT( msg);
 				
 				shortest_path[matrix] = static_cast<unsigned short *>(malloc(sizeof(unsigned short) * array_size));
 				
-				if (shortest_path[matrix] == NULL)
+				if (shortest_path[matrix] == nullptr)
 					ALERT(at_error, "Grave Bot - Error allocating memory for shortest path!");
 				
 				from_to[matrix] = static_cast<unsigned short *>(malloc(sizeof(unsigned short) * array_size));
 				
-				if (from_to[matrix] == NULL)
+				if (from_to[matrix] == nullptr)
 					ALERT(at_error, "Grave Bot - Error allocating memory for from to matrix!");
 				
 				pShortestPath = shortest_path[matrix];
@@ -2657,7 +2657,7 @@ void WaypointRouteInit(void)
 				
 				for (row=0; row < route_num_waypoints; row++)
 				{
-					if (paths[row] != NULL)
+					if (paths[row] != nullptr)
 					{
 						PATH *p = paths[row];
 						
@@ -2715,7 +2715,7 @@ void WaypointRouteInit(void)
 				
 				bfp = fopen(filename2, "wb");
 				
-				if (bfp != NULL)
+				if (bfp != nullptr)
 				{
 					num_items = fwrite(shortest_path[matrix], sizeof(unsigned short), array_size, bfp);
 					
@@ -2774,10 +2774,10 @@ unsigned short WaypointRouteFromTo(int src, int dest, int team)
 	if (team == -1)  // -1 means non-team play
 		team = 0;
 	
-	if (from_to[team] == NULL)  // if no team specific waypoints use team 0
+	if (from_to[team] == nullptr)  // if no team specific waypoints use team 0
 		team = 0;
 	
-	if (from_to[team] == NULL)  // if no route information just return
+	if (from_to[team] == nullptr)  // if no route information just return
 		return -1;
 	
 	pFromTo = from_to[team];
@@ -2808,10 +2808,10 @@ int WaypointDistanceFromTo(int src, int dest, int team)
 	if (team == -1)	// -1 means non-team play
 		team = 0;
 	
-	if (from_to[team] == NULL)  // if no team specific waypoints use team 0
+	if (from_to[team] == nullptr)  // if no team specific waypoints use team 0
 		team = 0;
 	
-	if (from_to[team] == NULL)  // if no route information just return
+	if (from_to[team] == nullptr)  // if no route information just return
 		return -1;
 	
 	pShortestPath = shortest_path[team];
