@@ -30,6 +30,9 @@ jobs:
     - name: Install headers
       run: sudo apt-get install gcc-4.8-multilib g++-4.8-multilib -y
 
+    - name: Install modern headers
+      run: sudo apt-get install gcc-multilib g++-multilib -y
+
     - name: Build gravebot.so
       working-directory: ./dlls
       run: make distclean CFG=${{env.BUILD_CONFIGURATION}} && make CFG=${{env.BUILD_CONFIGURATION}}
