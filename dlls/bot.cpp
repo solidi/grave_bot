@@ -518,7 +518,7 @@ void BotCreate( edict_t *pPlayer, const char *arg1, const char *arg2,
    
 	int  max_skin_index;
 	
-	max_skin_index = VALVE_MAX_SKINS;
+	max_skin_index = ICE_MAX_SKINS;
 	
 	strcpy(c_skin, "");
 	strcpy(c_name, "");
@@ -533,7 +533,7 @@ void BotCreate( edict_t *pPlayer, const char *arg1, const char *arg2,
 			bool *pSkinUsed;
 			
 			// pick a random skin
-			index = RANDOM_LONG(0, VALVE_MAX_SKINS-1);
+			index = RANDOM_LONG(0, ICE_MAX_SKINS-1);
 			pSkinUsed = &valve_skin_used[0];
 			
 			// check if this skin has already been used...
