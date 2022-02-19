@@ -948,7 +948,7 @@ bot_weapon_select_t valve_weapon_select[] =
 	{
 		VALVE_WEAPON_DUAL_DEAGLE,	// id
 		"weapon_dual_deagle",	// classname
-		"357",					// third person model
+		"dual_deagle",					// third person model
 		{						// primary ammo pickup classnames
 			"ammo_357",
 			"",
@@ -979,7 +979,7 @@ bot_weapon_select_t valve_weapon_select[] =
 	{
 		VALVE_WEAPON_DUAL_RPG,		// id
 		"weapon_dual_rpg",			// classname
-		"rpg",					// third person model
+		"dual_rpg",					// third person model
 		{						// primary ammo pickup classnames
 			"ammo_rpgclip",
 			"",
@@ -1010,7 +1010,7 @@ bot_weapon_select_t valve_weapon_select[] =
 	{
 		VALVE_WEAPON_DUAL_SMG,		// id
 		"weapon_dual_smg",			// classname
-		"smg",				// third person model
+		"dual_smg",				// third person model
 		{						// primary ammo pickup classnames
 			"ammo_9mmclip",
 			"ammo_9mmAR",
@@ -1041,7 +1041,7 @@ bot_weapon_select_t valve_weapon_select[] =
 	{
 		VALVE_WEAPON_DUAL_WRENCH,	// id
 		"weapon_dual_wrench",		// classname
-		"wrench",				// third person model
+		"dual_wrench",				// third person model
 		{						// primary ammo pickup classnames
 			"",
 			"",
