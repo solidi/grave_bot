@@ -499,7 +499,7 @@ bot_weapon_select_t valve_weapon_select[] =
 		9999.0,					// max primary distance
 		0.0,					// min secondary distance
 		0.0,					// max secondary distance
-		TRUE,					// can use underwater?
+		FALSE,					// can use underwater?
 		4.5,					// how long does this weapon take to reload?
 		100,					// times out of 100 to use primary fire
 		1,						// minimum ammout of primary ammo needed to fire
@@ -592,7 +592,7 @@ bot_weapon_select_t valve_weapon_select[] =
 		9999.0,					// max primary distance
 		0.0,					// min secondary distance
 		256.0,					// max secondary distance
-		TRUE,					// can use underwater?
+		FALSE,					// can use underwater?
 		1.5,					// how long does this weapon take to reload?
 		70,						// times out of 100 to use primary fire
 		1,						// minimum ammout of primary ammo needed to fire
@@ -808,7 +808,7 @@ bot_weapon_select_t valve_weapon_select[] =
 		750.0,					// max primary distance
 		0.0,					// min secondary distance
 		0.0,					// max secondary distance
-		TRUE,					// can use underwater?
+		FALSE,					// can use underwater?
 		0,						// how long does this weapon take to reload?
 		90,					// times out of 100 to use primary fire
 		1,						// minimum ammout of primary ammo needed to fire
@@ -839,7 +839,7 @@ bot_weapon_select_t valve_weapon_select[] =
 		75.0,					// max primary distance
 		0.0,					// min secondary distance
 		75.0,					// max secondary distance
-		TRUE,					// can use underwater?
+		FALSE,					// can use underwater?
 		0,						// how long does this weapon take to reload?
 		80,						// times out of 100 to use primary fire
 		0,						// minimum ammout of primary ammo needed to fire
@@ -975,7 +975,7 @@ bot_weapon_select_t valve_weapon_select[] =
 		0.0,					// time to charge weapon (primary)
 		0.0						// time to charge weapon (secondary)
 	},
-	// rpg
+	// dual rpg
 	{
 		VALVE_WEAPON_DUAL_RPG,		// id
 		"weapon_dual_rpg",			// classname
