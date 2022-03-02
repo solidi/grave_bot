@@ -283,6 +283,7 @@ float WeaponProjectileSpeed( int iId )
 			case VALVE_WEAPON_RPG:
 			case VALVE_WEAPON_DUAL_RPG:
 			case VALVE_WEAPON_NUKE:
+			case VALVE_WEAPON_FREEZEGUN:
 				return 2000;
 			case VALVE_WEAPON_CANNON:
 				return 1500;
