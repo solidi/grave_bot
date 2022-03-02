@@ -454,6 +454,11 @@ bool BotFireWeapon(Vector v_enemy, bot_t *pBot, int weapon_choice, bool nofire)
 	bool use_primary[MAX_WEAPONS];
 	bool use_secondary[MAX_WEAPONS];
 
+	// Don't fire weapon if frozen
+	if (pBot->pEdict->v.flags & FL_FROZEN) {
+		return FALSE;
+	}
+
 	if (pSelect)
 	{
 		// are we charging the primary fire?
