@@ -742,7 +742,8 @@ bool BotHeadTowardWaypoint( bot_t *pBot )
 					prev_lj_wpt = final_lj_wpt;
 					lj_wpt = WaypointRouteFromTo(lj_wpt, nextwaypoint, team);
 					// make sure we can see AND get to the waypoint, this requires a hull trace
-					UTIL_TraceHull(UTIL_GetOrigin(pEdict), waypoints[lj_wpt].origin,
+					if (lj_wpt > 0 && lj_wpt < num_waypoints)
+						UTIL_TraceHull(UTIL_GetOrigin(pEdict), waypoints[lj_wpt].origin,
 						dont_ignore_monsters, head_hull, pEdict, &tr);
 					// is this new waypoint visisble?  Is it further away than the previous waypoint?
 					if (lj_wpt != -1 && (tr.flFraction < 1 ||

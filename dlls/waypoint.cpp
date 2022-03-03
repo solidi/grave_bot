@@ -2781,8 +2781,10 @@ unsigned short WaypointRouteFromTo(int src, int dest, int team)
 		return -1;
 	
 	pFromTo = from_to[team];
-	
-	return pFromTo[src * route_num_waypoints + dest];
+
+	unsigned short result = pFromTo[src * route_num_waypoints + dest];
+
+	return (result >= MAX_WAYPOINTS) ? -1 : result;
 }
 
 
