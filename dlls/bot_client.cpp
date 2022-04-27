@@ -427,9 +427,11 @@ void BotClient_Valve_WeapPickup(void *p, edict_t *pEdict)
 		return;
 
 	int weaponId = *static_cast<int *>(p);
+#ifdef _DEBUG
 	char msg[80];
 	sprintf(msg, ">>> %s picked up %d!\n", STRING(pBot->pEdict->v.netname), weaponId);
 	SERVER_PRINT(msg);
+#endif
 
 	if (weaponId > 31)
 		pBot->weapons2 |= (1<<(weaponId - 32));
