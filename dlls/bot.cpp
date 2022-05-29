@@ -71,6 +71,7 @@ bot_t bots[32];   // max of 32 bots in a game
 bool b_observer_mode = FALSE;
 bool b_chat_debug = FALSE;
 bool b_botdontshoot = FALSE;
+bool b_botpause = FALSE;
 extern bool b_random_color;
 extern bot_weapon_t weapon_defs[MAX_WEAPONS];
 extern bot_weapon_select_t valve_weapon_select[];
@@ -1742,7 +1743,7 @@ void BotThink( bot_t *pBot )
 			pBot->f_pause_time = 0;  // dont't pause if enemy exists
 		}
 
-		else if (pBot->f_pause_time > gpGlobals->time)	// is bot "paused"?
+		else if (b_botpause || pBot->f_pause_time > gpGlobals->time)	// is bot "paused"?
 		{
 			// you could make the bot look left then right, or look up
 			// and down, to make it appear that the bot is hunting for
@@ -2421,7 +2422,7 @@ void BotThink( bot_t *pBot )
 		pBot->f_strafe_speed *= -1;
 	}
 	// is the bot "paused"? or longjumping?
-	if (pBot->f_pause_time > gpGlobals->time || pBot->f_longjump_time > gpGlobals->time)
+	if (b_botpause || pBot->f_pause_time > gpGlobals->time || pBot->f_longjump_time > gpGlobals->time)
 		pBot->f_move_speed = pBot->f_strafe_speed = 0;	// don't move while pausing
 	
 	// set the body angles the same way the bot is looking/aiming
