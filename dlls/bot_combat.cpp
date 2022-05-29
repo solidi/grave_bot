@@ -459,6 +459,13 @@ bool BotFireWeapon(Vector v_enemy, bot_t *pBot, int weapon_choice, bool nofire)
 		return FALSE;
 	}
 
+	// Kick or punch this grenade!
+	if (pBot->b_hasgrenade) {
+		// ALERT(at_aiconsole, "Kick or punch time!");
+		pEdict->v.impulse = 206 + RANDOM_LONG(0, 1);
+		pBot->b_hasgrenade = FALSE;
+	}
+
 	if (pSelect)
 	{
 		// are we charging the primary fire?
@@ -777,8 +784,8 @@ bool BotFireWeapon(Vector v_enemy, bot_t *pBot, int weapon_choice, bool nofire)
 				pEdict->v.button |= IN_ATTACK2;
 
 			if (distance < 100) {
-				// ALERT(at_aiconsole, "Kick time!");
-				pEdict->v.impulse = 206;
+				// ALERT(at_aiconsole, "Kick or punch time!");
+				pEdict->v.impulse = 206 + RANDOM_LONG(0, 1);
 			}
 
 			if (pSelect[final_index].primary_fire_charge)

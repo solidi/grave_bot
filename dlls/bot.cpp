@@ -303,6 +303,7 @@ void BotSpawnInit( bot_t *pBot )
 	pBot->respawn_time = 0;
 	pBot->respawn_set = FALSE;
 	pBot->weapons2 = 0;
+	pBot->b_hasgrenade = FALSE;
 
 	if (mod_id == SI_DLL)
 	{	// get longjump
@@ -1343,6 +1344,13 @@ void BotFindItem( bot_t *pBot )
 				else if (strcmp("laser_spot", item_name) == 0)
 				{
 				}
+
+				else if (strcmp("grenade", item_name) == 0)
+				{
+					can_pickup = TRUE;
+				}
+
+				/** Runes? **/
 				
 			}	// end if object is visible
 		}  // end else not "func_" entity
@@ -1825,6 +1833,33 @@ void BotThink( bot_t *pBot )
 					// is this charger still active? Do we have full armor?
 					if (pBot->pBotPickupItem->v.frame != 0 || pEdict->v.armorvalue >= pBot->max_armor)
 						pBot->pBotPickupItem = nullptr;
+				}
+				else if (FStrEq(STRING(pBot->pBotPickupItem->v.classname), "grenade"))
+				{	
+					if (!pBot->b_hasgrenade) {
+						// check if we can use the grenade
+						int angle_to_entity = BotInFieldOfView(pBot, UTIL_GetOrigin(pBot->pBotPickupItem));
+						float distance = (UTIL_GetOrigin(pBot->pBotPickupItem) - UTIL_GetOrigin(pEdict)).Length();
+						if (distance <= 64 && angle_to_entity <= 20 &&
+							pBot->pBotPickupItem->v.frame == 0)
+						{
+							pBot->f_pause_time = gpGlobals->time + 0.5;
+							pEdict->v.button |= IN_USE;
+							pBot->b_hasgrenade = TRUE;
+						}
+
+						Vector v_direction = UTIL_GetOrigin(pBot->pBotPickupItem) - UTIL_GetOrigin(pEdict);
+						Vector v_angles = UTIL_VecToAngles(v_direction);
+
+						// if the bot is NOT on a ladder, change the yaw...
+						if (pEdict->v.movetype != MOVETYPE_FLY)
+						{
+							pEdict->v.ideal_yaw = v_angles.y;
+							BotFixIdealYaw(pEdict);
+						}
+
+						pBot->pBotPickupItem = nullptr;
+					}
 				}
 			}
 			/*
