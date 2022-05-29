@@ -1346,9 +1346,12 @@ void BotFindItem( bot_t *pBot )
 				{
 				}
 
-				else if (strcmp("grenade", item_name) == 0)
+				else if (strcmp("grenade", item_name) == 0 || strcmp("monster_satchel", item_name) == 0)
 				{
-					can_pickup = TRUE;
+					if (!pBot->b_hasgrenade)
+					{
+						can_pickup = TRUE;
+					}
 				}
 
 				/** Runes? **/
@@ -1835,16 +1838,16 @@ void BotThink( bot_t *pBot )
 					if (pBot->pBotPickupItem->v.frame != 0 || pEdict->v.armorvalue >= pBot->max_armor)
 						pBot->pBotPickupItem = nullptr;
 				}
-				else if (FStrEq(STRING(pBot->pBotPickupItem->v.classname), "grenade"))
+				else if (FStrEq(STRING(pBot->pBotPickupItem->v.classname), "grenade") ||
+						 FStrEq(STRING(pBot->pBotPickupItem->v.classname), "monster_satchel"))
 				{	
 					if (!pBot->b_hasgrenade) {
 						// check if we can use the grenade
 						int angle_to_entity = BotInFieldOfView(pBot, UTIL_GetOrigin(pBot->pBotPickupItem));
 						float distance = (UTIL_GetOrigin(pBot->pBotPickupItem) - UTIL_GetOrigin(pEdict)).Length();
-						if (distance <= 64 && angle_to_entity <= 20 &&
-							pBot->pBotPickupItem->v.frame == 0)
+						if (distance <= 64 && angle_to_entity <= 20)
 						{
-							pBot->f_pause_time = gpGlobals->time + 0.5;
+							pBot->f_pause_time = gpGlobals->time + 0.25;
 							pEdict->v.button |= IN_USE;
 							pBot->b_hasgrenade = TRUE;
 						}

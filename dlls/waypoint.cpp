@@ -1307,6 +1307,7 @@ void WaypointSearchItems(edict_t *pEntity, Vector origin, int wpt_index)
 				(strcmp("func_recharge", item_name) == 0) ||
 				(strcmp("item_longjump", item_name) == 0) ||
 				(strcmp("grenade", item_name) == 0) ||
+				(strcmp("monster_satchel", item_name) == 0) ||
 				(strncmp("ammo_", item_name, 5) == 0) ||
 				((strncmp("weapon_", item_name, 7) == 0) &&
 				(pent->v.owner == nullptr)))
@@ -1387,6 +1388,16 @@ void WaypointSearchItems(edict_t *pEntity, Vector origin, int wpt_index)
 			if (pEntity)
 			{
 				sprintf(msg, "Found a grenade at waypoint %i!\n", wpt_index);
+				SERVER_PRINT( msg);
+			}
+			waypoints[wpt_index].flags |= W_FL_ITEM;
+		}
+
+		else if (strcmp("monster_satchel", nearest_name) == 0)
+		{
+			if (pEntity)
+			{
+				sprintf(msg, "Found a satchel at waypoint %i!\n", wpt_index);
 				SERVER_PRINT( msg);
 			}
 			waypoints[wpt_index].flags |= W_FL_ITEM;
