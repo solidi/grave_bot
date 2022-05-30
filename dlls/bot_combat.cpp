@@ -74,6 +74,12 @@ edict_t *BotFindEnemy( bot_t *pBot )
 	
 	edict_t *pEdict = pBot->pEdict;
 
+	// Priorize live grenade over everything else
+	if (mod_id == VALVE_DLL && pBot->pBotEnemy && FStrEq(STRING(pBot->pBotEnemy->v.classname), "grenade")
+		&& ((pBot->pBotEnemy->v.origin - pEdict->v.origin).Length() < 192)
+		&& pBot->pBotEnemy->v.dmgtime > gpGlobals->time + 2.0)
+		return pBot->pBotEnemy;
+
 	if (pBot->pBotEnemy != nullptr)  // does the bot already have an enemy?
 	{
 		vecEnd = UTIL_GetOrigin(pBot->pBotEnemy) + pBot->pBotEnemy->v.view_ofs;
