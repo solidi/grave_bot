@@ -73,15 +73,7 @@ edict_t *BotFindEnemy( bot_t *pBot )
 	int i;
 	
 	edict_t *pEdict = pBot->pEdict;
-	
-	if (pEdict->v.flags & FL_GODMODE)
-		return nullptr;
 
-	// Cannot see transparent player (with rune)
-	if (pEdict->v.rendermode == kRenderTransAlpha && pEdict->v.renderamt < 60) {
-		return nullptr;
-	}
-	
 	if (pBot->pBotEnemy != nullptr)  // does the bot already have an enemy?
 	{
 		vecEnd = UTIL_GetOrigin(pBot->pBotEnemy) + pBot->pBotEnemy->v.view_ofs;
@@ -94,6 +86,14 @@ edict_t *BotFindEnemy( bot_t *pBot )
 			//	pEdict->v.button |= IN_JUMP;
 			
 			// don't have an enemy anymore so null out the pointer...
+			pBot->pBotEnemy = nullptr;
+		}
+		else if (pBot->pBotEnemy->v.flags & FL_GODMODE)
+		{
+			pBot->pBotEnemy = nullptr;
+		// Cannot see transparent player (with rune)
+		}
+		else if (pBot->pBotEnemy->v.rendermode == kRenderTransAlpha && pBot->pBotEnemy->v.renderamt < 60) {
 			pBot->pBotEnemy = nullptr;
 		}
 		else if (FInViewCone( &vecEnd, pEdict ) &&
