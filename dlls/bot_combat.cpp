@@ -1004,6 +1004,34 @@ void BotShootAtEnemy( bot_t *pBot )
 		return;
 	}
 
+	if (pBot->pBotEnemy && mod_id == VALVE_DLL &&
+		FStrEq(STRING(pBot->pBotEnemy->v.classname), "grenade"))
+	{
+		// Kick it now
+		if (pBot->b_hasgrenade && pBot->f_shoot_time <= gpGlobals->time) {
+			pBot->pEdict->v.impulse = 206;
+			pBot->b_hasgrenade = FALSE;
+			ALERT(at_console, "Kicking grenade. [distance=%.2f]\n", f_distance);
+			pBot->f_shoot_time = gpGlobals->time + 0.25;
+			return;
+		}
+
+		pBot->f_move_speed = pBot->f_max_speed;
+		pBot->f_ignore_wpt_time = gpGlobals->time + 0.2;
+
+		if (FInViewCone(&v_enemy_origin, pEdict) && FVisible(v_enemy_origin, pEdict))
+		{
+			if (pBot->f_shoot_time <= gpGlobals->time && f_distance <= 128.0) {
+				ALERT(at_console, "Picking up grenade. [distance=%.2f]\n", f_distance);
+				pBot->pEdict->v.button |= IN_USE;
+				pBot->b_hasgrenade = TRUE;
+				pBot->f_shoot_time = gpGlobals->time + 0.25;
+			}
+		}
+
+		return;
+	}
+
 	if (pBot->f_engage_enemy_check <= gpGlobals->time)
 		pBot->b_last_engage = BotShouldEngageEnemy(pBot, pBot->pBotEnemy);
 
@@ -1211,7 +1239,8 @@ void BotAssessGrenades( bot_t *pBot )
 		else
 		{
 			if ((strcmp("monster_tripmine", STRING(pGrenade->v.classname)) != 0) && 
-				(strcmp("monster_snark", STRING(pGrenade->v.classname)) != 0))
+				(strcmp("monster_snark", STRING(pGrenade->v.classname)) != 0) &&
+				(strcmp("grenade", STRING(pGrenade->v.classname)) != 0) )
 				continue;
 
 		}
@@ -1220,18 +1249,18 @@ void BotAssessGrenades( bot_t *pBot )
             continue;
 
 		// don't shoot our teams grenades on S&I
-		if (UTIL_GetTeam(pGrenade) == UTIL_GetTeam(pEdict))
-            continue;
+		// if (UTIL_GetTeam(pGrenade) == UTIL_GetTeam(pEdict))
+        //    continue;
 
 		// see if bot can't see the grenade...
 		if (!FInViewCone( &vecEnd, pEdict ) ||
 			!FVisible( vecEnd, pEdict ))
             continue;
 		
-		mindistance = 256;
+		//mindistance = 256;
 		// we don't care how close snarks are, but the others explode
-		if (strcmp("monster_snark", STRING(pGrenade->v.classname)) == 0)
-			mindistance = 0;
+		//if (strcmp("monster_snark", STRING(pGrenade->v.classname)) == 0)
+		mindistance = 0;
 		
 		float distance = (pGrenade->v.origin - pEdict->v.origin).Length();
 		// our current enemy is closer, forget the grenade
