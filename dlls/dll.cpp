@@ -2052,7 +2052,7 @@ bool ProcessCommand( edict_t *pEntity, const char *pcmd, const char *arg1, const
 				if ((pPlayer) && (!pPlayer->free) && (pPlayer->v.flags & FL_CLIENT) &&
 					(pPlayer->v.flags & FL_FAKECLIENT))
 				{
-					sprintf(msg, "kick %s\n", STRING(pPlayer->v.netname));
+					sprintf(msg, "kick \"%s\"\n", STRING(pPlayer->v.netname));
 					SERVER_COMMAND(msg);
 				}
 			}
