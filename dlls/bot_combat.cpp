@@ -1013,7 +1013,8 @@ void BotShootAtEnemy( bot_t *pBot )
 	if (pBot->pBotEnemy && mod_id == VALVE_DLL &&
 		FStrEq(STRING(pBot->pBotEnemy->v.classname), "grenade"))
 	{
-		// Kick it now
+		// Remove the need to kick the grenade later, bot will kick on the spot.
+		/*
 		if (pBot->b_hasgrenade && pBot->f_shoot_time <= gpGlobals->time) {
 			pBot->pEdict->v.impulse = 206;
 			pBot->b_hasgrenade = FALSE;
@@ -1021,17 +1022,23 @@ void BotShootAtEnemy( bot_t *pBot )
 			pBot->f_shoot_time = gpGlobals->time + 0.25;
 			return;
 		}
+		*/
 
 		pBot->f_move_speed = pBot->f_max_speed;
 		pBot->f_ignore_wpt_time = gpGlobals->time + 0.2;
 
 		if (FInViewCone(&v_enemy_origin, pEdict) && FVisible(v_enemy_origin, pEdict))
 		{
-			if (pBot->f_shoot_time <= gpGlobals->time && f_distance <= 128.0) {
-				ALERT(at_console, "Picking up grenade. [distance=%.2f]\n", f_distance);
-				pBot->pEdict->v.button |= IN_USE;
-				pBot->b_hasgrenade = TRUE;
-				pBot->f_shoot_time = gpGlobals->time + 0.25;
+			if (pBot->f_shoot_time <= gpGlobals->time && f_distance <= 192.0) {
+#ifdef _DEBUG
+				ALERT(at_console, "Kicking grenade. [distance=%.2f]\n", f_distance);
+#endif
+				// If the bot picks up the grenade first
+				//pBot->pEdict->v.button |= IN_USE;
+				//pBot->b_hasgrenade = TRUE;
+				// Otherwse, just kick it
+				pBot->pEdict->v.impulse = 206;
+				pBot->f_shoot_time = gpGlobals->time + 0.2;
 			}
 		}
 
