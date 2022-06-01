@@ -360,6 +360,7 @@ typedef struct
 	float respawn_time;
 	BOOL respawn_set;
 	int weapons2;
+	bool b_hasgrenade;
 
 } bot_t;
 

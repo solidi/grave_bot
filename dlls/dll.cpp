@@ -60,6 +60,7 @@ extern bot_t bots[32];
 extern bool b_observer_mode;
 extern bool b_chat_debug;
 extern bool b_botdontshoot;
+extern bool b_botpause;
 char welcome_msg[] = "Grave Bot by Ghoul - Based on HPB Bot template 4 by botman and Pierre-Marie Baty\n";
 
 extern float g_flVomiting[32];
@@ -1971,6 +1972,24 @@ bool ProcessCommand( edict_t *pEntity, const char *pcmd, const char *arg1, const
 			
 			return TRUE;
 		}
+		else if (FStrEq(pcmd, "botpause"))
+		{
+			if ((arg1 != nullptr) && (*arg1 != 0))
+			{
+				int temp = atoi(arg1);
+				if (temp)
+					b_botpause = TRUE;
+				else
+					b_botpause = FALSE;
+			}
+			
+			if (b_botpause)
+				SERVER_PRINT( "b_botpause ENABLED\n");
+			else
+				SERVER_PRINT( "b_botpause DISABLED\n");
+			
+			return TRUE;
+		}
 		else if (FStrEq(pcmd, "botrole"))
 		{
 			sprintf(msg, "Bot (Team) - (Role) : (Subrole)\n");
@@ -2033,7 +2052,7 @@ bool ProcessCommand( edict_t *pEntity, const char *pcmd, const char *arg1, const
 				if ((pPlayer) && (!pPlayer->free) && (pPlayer->v.flags & FL_CLIENT) &&
 					(pPlayer->v.flags & FL_FAKECLIENT))
 				{
-					sprintf(msg, "kick %s\n", STRING(pPlayer->v.netname));
+					sprintf(msg, "kick \"%s\"\n", STRING(pPlayer->v.netname));
 					SERVER_COMMAND(msg);
 				}
 			}

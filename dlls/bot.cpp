@@ -71,6 +71,7 @@ bot_t bots[32];   // max of 32 bots in a game
 bool b_observer_mode = FALSE;
 bool b_chat_debug = FALSE;
 bool b_botdontshoot = FALSE;
+bool b_botpause = FALSE;
 extern bool b_random_color;
 extern bot_weapon_t weapon_defs[MAX_WEAPONS];
 extern bot_weapon_select_t valve_weapon_select[];
@@ -303,6 +304,7 @@ void BotSpawnInit( bot_t *pBot )
 	pBot->respawn_time = 0;
 	pBot->respawn_set = FALSE;
 	pBot->weapons2 = 0;
+	pBot->b_hasgrenade = FALSE;
 
 	if (mod_id == SI_DLL)
 	{	// get longjump
@@ -1343,6 +1345,16 @@ void BotFindItem( bot_t *pBot )
 				else if (strcmp("laser_spot", item_name) == 0)
 				{
 				}
+
+				else if (strcmp("grenade", item_name) == 0 || strcmp("monster_satchel", item_name) == 0)
+				{
+					if (!pBot->b_hasgrenade)
+					{
+						can_pickup = TRUE;
+					}
+				}
+
+				/** Runes? **/
 				
 			}	// end if object is visible
 		}  // end else not "func_" entity
@@ -1734,7 +1746,7 @@ void BotThink( bot_t *pBot )
 			pBot->f_pause_time = 0;  // dont't pause if enemy exists
 		}
 
-		else if (pBot->f_pause_time > gpGlobals->time)	// is bot "paused"?
+		else if (b_botpause || pBot->f_pause_time > gpGlobals->time)	// is bot "paused"?
 		{
 			// you could make the bot look left then right, or look up
 			// and down, to make it appear that the bot is hunting for
@@ -1825,6 +1837,33 @@ void BotThink( bot_t *pBot )
 					// is this charger still active? Do we have full armor?
 					if (pBot->pBotPickupItem->v.frame != 0 || pEdict->v.armorvalue >= pBot->max_armor)
 						pBot->pBotPickupItem = nullptr;
+				}
+				else if (FStrEq(STRING(pBot->pBotPickupItem->v.classname), "grenade") ||
+						 FStrEq(STRING(pBot->pBotPickupItem->v.classname), "monster_satchel"))
+				{	
+					if (!pBot->b_hasgrenade) {
+						// check if we can use the grenade
+						int angle_to_entity = BotInFieldOfView(pBot, UTIL_GetOrigin(pBot->pBotPickupItem));
+						float distance = (UTIL_GetOrigin(pBot->pBotPickupItem) - UTIL_GetOrigin(pEdict)).Length();
+						if (distance <= 64 && angle_to_entity <= 20)
+						{
+							pBot->f_pause_time = gpGlobals->time + 0.25;
+							pEdict->v.button |= IN_USE;
+							pBot->b_hasgrenade = TRUE;
+						}
+
+						Vector v_direction = UTIL_GetOrigin(pBot->pBotPickupItem) - UTIL_GetOrigin(pEdict);
+						Vector v_angles = UTIL_VecToAngles(v_direction);
+
+						// if the bot is NOT on a ladder, change the yaw...
+						if (pEdict->v.movetype != MOVETYPE_FLY)
+						{
+							pEdict->v.ideal_yaw = v_angles.y;
+							BotFixIdealYaw(pEdict);
+						}
+
+						pBot->pBotPickupItem = nullptr;
+					}
 				}
 			}
 			/*
@@ -2386,7 +2425,7 @@ void BotThink( bot_t *pBot )
 		pBot->f_strafe_speed *= -1;
 	}
 	// is the bot "paused"? or longjumping?
-	if (pBot->f_pause_time > gpGlobals->time || pBot->f_longjump_time > gpGlobals->time)
+	if (b_botpause || pBot->f_pause_time > gpGlobals->time || pBot->f_longjump_time > gpGlobals->time)
 		pBot->f_move_speed = pBot->f_strafe_speed = 0;	// don't move while pausing
 	
 	// set the body angles the same way the bot is looking/aiming

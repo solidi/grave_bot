@@ -73,15 +73,13 @@ edict_t *BotFindEnemy( bot_t *pBot )
 	int i;
 	
 	edict_t *pEdict = pBot->pEdict;
-	
-	if (pEdict->v.flags & FL_GODMODE)
-		return nullptr;
 
-	// Cannot see transparent player (with rune)
-	if (pEdict->v.rendermode == kRenderTransAlpha && pEdict->v.renderamt < 60) {
-		return nullptr;
-	}
-	
+	// Priorize live grenade over everything else
+	if (mod_id == VALVE_DLL && pBot->pBotEnemy && FStrEq(STRING(pBot->pBotEnemy->v.classname), "grenade")
+		&& ((pBot->pBotEnemy->v.origin - pEdict->v.origin).Length() < 192)
+		&& pBot->pBotEnemy->v.dmgtime > gpGlobals->time + 2.0)
+		return pBot->pBotEnemy;
+
 	if (pBot->pBotEnemy != nullptr)  // does the bot already have an enemy?
 	{
 		vecEnd = UTIL_GetOrigin(pBot->pBotEnemy) + pBot->pBotEnemy->v.view_ofs;
@@ -94,6 +92,14 @@ edict_t *BotFindEnemy( bot_t *pBot )
 			//	pEdict->v.button |= IN_JUMP;
 			
 			// don't have an enemy anymore so null out the pointer...
+			pBot->pBotEnemy = nullptr;
+		}
+		else if (pBot->pBotEnemy->v.flags & FL_GODMODE)
+		{
+			pBot->pBotEnemy = nullptr;
+		// Cannot see transparent player (with rune)
+		}
+		else if (pBot->pBotEnemy->v.rendermode == kRenderTransAlpha && pBot->pBotEnemy->v.renderamt < 60) {
 			pBot->pBotEnemy = nullptr;
 		}
 		else if (FInViewCone( &vecEnd, pEdict ) &&
@@ -459,6 +465,13 @@ bool BotFireWeapon(Vector v_enemy, bot_t *pBot, int weapon_choice, bool nofire)
 		return FALSE;
 	}
 
+	// Kick or punch this grenade!
+	if (pBot->b_hasgrenade) {
+		// ALERT(at_aiconsole, "Kick or punch time!");
+		pEdict->v.impulse = 206 + RANDOM_LONG(0, 1);
+		pBot->b_hasgrenade = FALSE;
+	}
+
 	if (pSelect)
 	{
 		// are we charging the primary fire?
@@ -777,8 +790,8 @@ bool BotFireWeapon(Vector v_enemy, bot_t *pBot, int weapon_choice, bool nofire)
 				pEdict->v.button |= IN_ATTACK2;
 
 			if (distance < 100) {
-				// ALERT(at_aiconsole, "Kick time!");
-				pEdict->v.impulse = 206;
+				// ALERT(at_aiconsole, "Kick or punch time!");
+				pEdict->v.impulse = 206 + RANDOM_LONG(0, 1);
 			}
 
 			if (pSelect[final_index].primary_fire_charge)
@@ -997,6 +1010,41 @@ void BotShootAtEnemy( bot_t *pBot )
 		return;
 	}
 
+	if (pBot->pBotEnemy && mod_id == VALVE_DLL &&
+		FStrEq(STRING(pBot->pBotEnemy->v.classname), "grenade"))
+	{
+		// Remove the need to kick the grenade later, bot will kick on the spot.
+		/*
+		if (pBot->b_hasgrenade && pBot->f_shoot_time <= gpGlobals->time) {
+			pBot->pEdict->v.impulse = 206;
+			pBot->b_hasgrenade = FALSE;
+			ALERT(at_console, "Kicking grenade. [distance=%.2f]\n", f_distance);
+			pBot->f_shoot_time = gpGlobals->time + 0.25;
+			return;
+		}
+		*/
+
+		pBot->f_move_speed = pBot->f_max_speed;
+		pBot->f_ignore_wpt_time = gpGlobals->time + 0.2;
+
+		if (FInViewCone(&v_enemy_origin, pEdict) && FVisible(v_enemy_origin, pEdict))
+		{
+			if (pBot->f_shoot_time <= gpGlobals->time && f_distance <= 192.0) {
+#ifdef _DEBUG
+				ALERT(at_console, "Kicking grenade. [distance=%.2f]\n", f_distance);
+#endif
+				// If the bot picks up the grenade first
+				//pBot->pEdict->v.button |= IN_USE;
+				//pBot->b_hasgrenade = TRUE;
+				// Otherwse, just kick it
+				pBot->pEdict->v.impulse = 206;
+				pBot->f_shoot_time = gpGlobals->time + 0.2;
+			}
+		}
+
+		return;
+	}
+
 	if (pBot->f_engage_enemy_check <= gpGlobals->time)
 		pBot->b_last_engage = BotShouldEngageEnemy(pBot, pBot->pBotEnemy);
 
@@ -1204,7 +1252,8 @@ void BotAssessGrenades( bot_t *pBot )
 		else
 		{
 			if ((strcmp("monster_tripmine", STRING(pGrenade->v.classname)) != 0) && 
-				(strcmp("monster_snark", STRING(pGrenade->v.classname)) != 0))
+				(strcmp("monster_snark", STRING(pGrenade->v.classname)) != 0) &&
+				(strcmp("grenade", STRING(pGrenade->v.classname)) != 0) )
 				continue;
 
 		}
@@ -1213,18 +1262,18 @@ void BotAssessGrenades( bot_t *pBot )
             continue;
 
 		// don't shoot our teams grenades on S&I
-		if (UTIL_GetTeam(pGrenade) == UTIL_GetTeam(pEdict))
-            continue;
+		// if (UTIL_GetTeam(pGrenade) == UTIL_GetTeam(pEdict))
+        //    continue;
 
 		// see if bot can't see the grenade...
 		if (!FInViewCone( &vecEnd, pEdict ) ||
 			!FVisible( vecEnd, pEdict ))
             continue;
 		
-		mindistance = 256;
+		//mindistance = 256;
 		// we don't care how close snarks are, but the others explode
-		if (strcmp("monster_snark", STRING(pGrenade->v.classname)) == 0)
-			mindistance = 0;
+		//if (strcmp("monster_snark", STRING(pGrenade->v.classname)) == 0)
+		mindistance = 0;
 		
 		float distance = (pGrenade->v.origin - pEdict->v.origin).Length();
 		// our current enemy is closer, forget the grenade

@@ -1583,6 +1583,8 @@ int BotFindWaypointGoal( bot_t *pBot )
 			}
 		}
 
+		/** Get Cold Ice rune? **/
+
 		select_index = WeaponGetSelectIndex(iId);
 		// our first priority is to check if our current weapon has low ammo
 		float primary_assess = BotAssessPrimaryAmmo(pBot, iId);
