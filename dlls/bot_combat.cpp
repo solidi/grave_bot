@@ -1253,7 +1253,8 @@ void BotAssessGrenades( bot_t *pBot )
 		{
 			if ((strcmp("monster_tripmine", STRING(pGrenade->v.classname)) != 0) && 
 				(strcmp("monster_snark", STRING(pGrenade->v.classname)) != 0) &&
-				(strcmp("grenade", STRING(pGrenade->v.classname)) != 0) )
+				(strcmp("grenade", STRING(pGrenade->v.classname)) != 0) &&
+				(strcmp("monster_chumtoad", STRING(pGrenade->v.classname)) != 0))
 				continue;
 
 		}
