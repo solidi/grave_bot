@@ -96,7 +96,7 @@ int num_bots = 0;
 int prev_num_bots = 0;
 bool g_GameRules = FALSE;
 edict_t *clients[32];
-edict_t *listenserver_edict = nullptr;
+edict_t *listenserver_edict = NULL;
 float welcome_time = 0.0;
 bool welcome_sent = FALSE;
 int g_menu_waypoint;
@@ -106,10 +106,10 @@ float is_team_play = 0.0;
 char team_names[MAX_TEAMS][MAX_TEAMNAME_LENGTH];
 int num_teams = 0;
 bool checked_teamplay = FALSE;
-edict_t *pent_info_tfdetect = nullptr;
-edict_t *pent_info_ctfdetect = nullptr;
-edict_t *pent_info_frontline = nullptr;
-edict_t *pent_item_tfgoal = nullptr;
+edict_t *pent_info_tfdetect = NULL;
+edict_t *pent_info_ctfdetect = NULL;
+edict_t *pent_info_frontline = NULL;
+edict_t *pent_item_tfgoal = NULL;
 int max_team_players[4];  // for TFC
 int team_class_limits[4];  // for TFC
 int team_allies[4];  // TFC bit mapped allies BLUE, RED, YELLOW, and GREEN
@@ -120,7 +120,7 @@ int num_flags = 0;  // for TFC
 Vector g_vecPoint1 = g_vecZero;
 Vector g_vecPoint2 = g_vecZero;
 
-FILE *bot_cfg_fp = nullptr;
+FILE *bot_cfg_fp = NULL;
 bool need_to_open_cfg = TRUE;
 float bot_cfg_pause_time = 0.0;
 float respawn_time = 0.0;
@@ -171,14 +171,14 @@ meta_globals_t *gpMetaGlobals;
 
 META_FUNCTIONS gMetaFunctionTable =
 {
-	nullptr, // pfnGetEntityAPI()
-	nullptr, // pfnGetEntityAPI_Post()
+	NULL, // pfnGetEntityAPI()
+	NULL, // pfnGetEntityAPI_Post()
    GetEntityAPI2, // pfnGetEntityAPI2()
-	nullptr, // pfnGetEntityAPI2_Post()
-	nullptr, // pfnGetNewDLLFunctions()
-	nullptr, // pfnGetNewDLLFunctions_Post()
+	NULL, // pfnGetEntityAPI2_Post()
+	NULL, // pfnGetNewDLLFunctions()
+	NULL, // pfnGetNewDLLFunctions_Post()
    GetEngineFunctions, // pfnGetEngineFunctions()
-	nullptr, // pfnGetEngineFunctions_Post()
+	NULL, // pfnGetEngineFunctions_Post()
 };
 
 plugin_info_t Plugin_info = {
@@ -295,7 +295,7 @@ void GameDLLInit()
    #endif
 	
 	for (i=0; i<32; i++)
-		clients[i] = nullptr;
+		clients[i] = NULL;
 	
 	// initialize the bots array of structures...
 	memset(bots, 0, sizeof(bots));
@@ -331,12 +331,12 @@ int DispatchSpawn( edict_t *pent )
 			// do level initialization stuff here...
 			
 			WaypointInit();
-			WaypointLoad(nullptr, ".gbw");
+			WaypointLoad(NULL, ".gbw");
 			
-			pent_info_tfdetect = nullptr;
-			pent_info_ctfdetect = nullptr;
-			pent_info_frontline = nullptr;
-			pent_item_tfgoal = nullptr;
+			pent_info_tfdetect = NULL;
+			pent_info_ctfdetect = NULL;
+			pent_info_frontline = NULL;
+			pent_item_tfgoal = NULL;
 			
 			for (index=0; index < 4; index++)
 			{
@@ -566,7 +566,7 @@ void ClientDisconnect( edict_t *pEntity )
 			i++;
 		
 		if (i < 32)
-			clients[i] = nullptr;		
+			clients[i] = NULL;		
 		
 		for (i = 0; i < 32; i++)
 		{
@@ -601,7 +601,7 @@ void ClientPutInServer( edict_t *pEntity )
 	
 	int i = 0;
 	
-	while ((i < 32) && (clients[i] != nullptr))
+	while ((i < 32) && (clients[i] != NULL))
 		i++;
 	
 	if (i < 32)
@@ -708,7 +708,7 @@ void StartFrame()
 			
 			UTIL_BuildFileName(filename, "maps", mapname);
 			
-			if ((bot_cfg_fp = fopen(filename, "r")) != nullptr)
+			if ((bot_cfg_fp = fopen(filename, "r")) != NULL)
 			{
 				sprintf(msg, "Executing %s\n", filename);
 				SERVER_PRINT( msg );
@@ -769,7 +769,7 @@ void StartFrame()
 
 		if (!IS_DEDICATED_SERVER())
 		{
-			if ((listenserver_edict != nullptr) && (welcome_sent == FALSE) &&
+			if ((listenserver_edict != NULL) && (welcome_sent == FALSE) &&
 				(welcome_time < 1.0))
 			{
 				// are they out of observer mode yet?
@@ -855,7 +855,7 @@ void StartFrame()
 				sprintf(c_topcolor, "%d", bots[index].top_color);
 				sprintf(c_bottomcolor, "%d", bots[index].bottom_color);
 				
-				BotCreate(nullptr, bots[index].skin, bots[index].name, c_skill, c_topcolor, c_bottomcolor);
+				BotCreate(NULL, bots[index].skin, bots[index].name, c_skill, c_topcolor, c_bottomcolor);
 				
 				respawn_time = gpGlobals->time + 2;  // set next respawn time
 				
@@ -883,21 +883,21 @@ void StartFrame()
 				
 				UTIL_BuildFileName(filename, "maps", mapname);
 				
-				if ((bot_cfg_fp = fopen(filename, "r")) != nullptr)
+				if ((bot_cfg_fp = fopen(filename, "r")) != NULL)
 				{
 					sprintf(msg, "Executing %s\n", filename);
 					SERVER_PRINT( msg );
 				}
 				else
 				{
-					UTIL_BuildFileName(filename, "grave_bot.cfg", nullptr);
+					UTIL_BuildFileName(filename, "grave_bot.cfg", NULL);
 					
 					sprintf(msg, "Executing %s\n", filename);
 					SERVER_PRINT( msg );
 					
 					bot_cfg_fp = fopen(filename, "r");
 					
-					if (bot_cfg_fp == nullptr)
+					if (bot_cfg_fp == NULL)
 						SERVER_PRINT( "grave_bot.cfg file not found\n" );
 				}
 				
@@ -909,7 +909,7 @@ void StartFrame()
 			
 			if (!IS_DEDICATED_SERVER() && !spawn_time_reset)
 			{
-				if (listenserver_edict != nullptr)
+				if (listenserver_edict != NULL)
 				{
 					if (IsAlive(listenserver_edict))
 					{
@@ -948,7 +948,7 @@ void StartFrame()
 				
 				index = 0;
 				cmd = cmd_line;
-				arg1 = arg2 = arg3 = arg4 = arg5 = nullptr;
+				arg1 = arg2 = arg3 = arg4 = arg5 = NULL;
 
 				// skip to blank or end of string...
 				while ((cmd_line[index] != ' ') && (cmd_line[index] != 0))
@@ -990,7 +990,7 @@ void StartFrame()
 					}
 				}
 				// run the command
-				ProcessCommand(nullptr, cmd, arg1, arg2, arg3, arg4, arg5);
+				ProcessCommand(NULL, cmd, arg1, arg2, arg3, arg4, arg5);
 	
 				CVAR_SET_STRING("gravebot", "");
 			}
@@ -1005,7 +1005,7 @@ void StartFrame()
 			
 			for (i = 0; i < 32; i++)
 			{
-				if (clients[i] != nullptr)
+				if (clients[i] != NULL)
 					count++;
 			}
 			
@@ -1013,7 +1013,7 @@ void StartFrame()
 			// then add another bot using the default skill level...
 			if ((count < max_bots) && (max_bots != -1))
 			{
-				BotCreate(nullptr, nullptr, nullptr, nullptr, nullptr, nullptr);
+				BotCreate(NULL, NULL, NULL, NULL, NULL, NULL);
 			}
 		}
 
@@ -1174,15 +1174,15 @@ void FakeClientCommand(edict_t *pBot, char *arg1, char *arg2, char *arg3)
 	
 	isFakeClientCommand = 1;
 	
-	if ((arg1 == nullptr) || (*arg1 == 0))
+	if ((arg1 == NULL) || (*arg1 == 0))
 		return;
 	
-	if ((arg2 == nullptr) || (*arg2 == 0))
+	if ((arg2 == NULL) || (*arg2 == 0))
 	{
 		length = sprintf(&g_argv[0], "%s", arg1);
 		fake_arg_count = 1;
 	}
-	else if ((arg3 == nullptr) || (*arg3 == 0))
+	else if ((arg3 == NULL) || (*arg3 == 0))
 	{
 		length = sprintf(&g_argv[0], "%s %s", arg1, arg2);
 		fake_arg_count = 2;
@@ -1227,7 +1227,7 @@ void ProcessBotCfgFile()
 	if (bot_cfg_pause_time > gpGlobals->time)
 		return;
 	
-	if (bot_cfg_fp == nullptr)
+	if (bot_cfg_fp == NULL)
 		return;
 	
 	cmd_index = 0;
@@ -1266,7 +1266,7 @@ void ProcessBotCfgFile()
 	{
 		fclose(bot_cfg_fp);
 		
-		bot_cfg_fp = nullptr;
+		bot_cfg_fp = NULL;
 		
 		bot_cfg_pause_time = 0.0;
 	}
@@ -1279,7 +1279,7 @@ void ProcessBotCfgFile()
 	
 	cmd_index = 0;
 	cmd = cmd_line;
-	arg1 = arg2 = arg3 = arg4 = arg5 = nullptr;
+	arg1 = arg2 = arg3 = arg4 = arg5 = NULL;
 	
 	// skip to blank or end of string...
 	while ((cmd_line[cmd_index] != ' ') && (cmd_line[cmd_index] != 0))
@@ -1334,7 +1334,7 @@ void ProcessBotCfgFile()
 	if ((cmd_line[0] == '#') || (cmd_line[0] == 0))
 		return;  // return if comment or blank line
 
-	if (ProcessCommand(nullptr, cmd, arg1, arg2, arg3, arg4, arg5))
+	if (ProcessCommand(NULL, cmd, arg1, arg2, arg3, arg4, arg5))
 		return;
 
 	sprintf(msg, "executing server command: %s\n", server_cmd);
@@ -1351,22 +1351,22 @@ bool ProcessCommand( edict_t *pEntity, const char *pcmd, const char *arg1, const
 	// only allow custom commands if deathmatch mode
 	if (gpGlobals->deathmatch)
 	{
-		bot_weapon_select_t *pSelect = nullptr;
+		bot_weapon_select_t *pSelect = NULL;
 		pSelect = WeaponGetSelectPointer();
 		char msg[80];
 		
 		if (debug_engine)
 		{
 			fp=fopen("bot.txt","a"); fprintf(fp,"ProcessCommand: %s",pcmd);
-			if ((arg1 != nullptr) && (*arg1 != 0))
+			if ((arg1 != NULL) && (*arg1 != 0))
 				fprintf(fp," %s", arg1);
-			if ((arg2 != nullptr) && (*arg2 != 0))
+			if ((arg2 != NULL) && (*arg2 != 0))
 				fprintf(fp," %s", arg2);
-			if ((arg3 != nullptr) && (*arg3 != 0))
+			if ((arg3 != NULL) && (*arg3 != 0))
 				fprintf(fp," %s", arg3);
-			if ((arg4 != nullptr) && (*arg4 != 0))
+			if ((arg4 != NULL) && (*arg4 != 0))
 				fprintf(fp," %s", arg4);
-			if ((arg4 != nullptr) && (*arg5 != 0))
+			if ((arg4 != NULL) && (*arg5 != 0))
 				fprintf(fp," %s", arg5);
 			fprintf(fp, "\n");
 			fclose(fp);
@@ -1387,7 +1387,7 @@ bool ProcessCommand( edict_t *pEntity, const char *pcmd, const char *arg1, const
 		}
 		else if (FStrEq(pcmd, "botcam"))
 		{
-			if ((arg1 != nullptr) && (*arg1 != 0) )
+			if ((arg1 != NULL) && (*arg1 != 0) )
 			{	// set our view to a bot
 				for (int i = 1; i <= gpGlobals->maxClients; i++)
 				{
@@ -1427,8 +1427,8 @@ bool ProcessCommand( edict_t *pEntity, const char *pcmd, const char *arg1, const
 			}
 			else
 			{	// return our view
-				edict_t *pCCamera = nullptr;
-				while ((pCCamera = FIND_ENTITY_BY_CLASSNAME( pCCamera, "botcam" )) != nullptr &&
+				edict_t *pCCamera = NULL;
+				while ((pCCamera = FIND_ENTITY_BY_CLASSNAME( pCCamera, "botcam" )) != NULL &&
 						  (!FNullEnt(pCCamera)))
 				{
     				if(pCCamera->v.owner == pEntity)
@@ -1443,7 +1443,7 @@ bool ProcessCommand( edict_t *pEntity, const char *pcmd, const char *arg1, const
 		}
 		else if (FStrEq(pcmd, "botinfo"))
 		{
-			if ((arg1 != nullptr) && (*arg1 != 0))
+			if ((arg1 != NULL) && (*arg1 != 0))
 			{
 				sprintf(msg, "Couldn't find a bot by the name \"%s\"\n", arg1);
 
@@ -1487,10 +1487,10 @@ bool ProcessCommand( edict_t *pEntity, const char *pcmd, const char *arg1, const
 							sprintf(msg, "Item Wpt: %i\n\n", pBot->item_waypoint);
 							SERVER_PRINT( msg);
 
-							sprintf(msg, "Item: %s (%.2f, %.2f, %.2f)\n\n", pBot->pBotPickupItem != nullptr ? STRING(pBot->pBotPickupItem->v.classname) : "None",
-								pBot->pBotPickupItem != nullptr ? UTIL_GetOrigin(pBot->pBotPickupItem).x : 0,
-								pBot->pBotPickupItem != nullptr ? UTIL_GetOrigin(pBot->pBotPickupItem).y : 0,
-								pBot->pBotPickupItem != nullptr ? UTIL_GetOrigin(pBot->pBotPickupItem).z : 0);
+							sprintf(msg, "Item: %s (%.2f, %.2f, %.2f)\n\n", pBot->pBotPickupItem != NULL ? STRING(pBot->pBotPickupItem->v.classname) : "None",
+								pBot->pBotPickupItem != NULL ? UTIL_GetOrigin(pBot->pBotPickupItem).x : 0,
+								pBot->pBotPickupItem != NULL ? UTIL_GetOrigin(pBot->pBotPickupItem).y : 0,
+								pBot->pBotPickupItem != NULL ? UTIL_GetOrigin(pBot->pBotPickupItem).z : 0);
 							SERVER_PRINT( msg);
 
 							sprintf(msg, "(Has it?) Weapon : Primary : Secondary\n");
@@ -1522,7 +1522,7 @@ bool ProcessCommand( edict_t *pEntity, const char *pcmd, const char *arg1, const
 		}
 		else if (FStrEq(pcmd, "observer"))
 		{
-			if ((arg1 != nullptr) && (*arg1 != 0))
+			if ((arg1 != NULL) && (*arg1 != 0))
 			{
 				int temp = atoi(arg1);
 				if (temp)
@@ -1540,7 +1540,7 @@ bool ProcessCommand( edict_t *pEntity, const char *pcmd, const char *arg1, const
 		}
 		else if (FStrEq(pcmd, "bot_chat_debug"))
 		{
-			if ((arg1 != nullptr) && (*arg1 != 0))
+			if ((arg1 != NULL) && (*arg1 != 0))
 			{
 				int temp = atoi(arg1);
 				if (temp)
@@ -1558,7 +1558,7 @@ bool ProcessCommand( edict_t *pEntity, const char *pcmd, const char *arg1, const
 		}
 		else if (FStrEq(pcmd, "botskill"))
 		{
-			if ((arg1 != nullptr) && (*arg1 != 0))
+			if ((arg1 != NULL) && (*arg1 != 0))
 			{
 				int temp = atoi(arg1);
 				
@@ -1577,7 +1577,7 @@ bool ProcessCommand( edict_t *pEntity, const char *pcmd, const char *arg1, const
 		{
 			sprintf(msg, "bot_speed command failed\n");
 
-			if ((arg1 != nullptr) && (*arg1 != 0) && (arg2 != nullptr) && (*arg2 != 0))
+			if ((arg1 != NULL) && (*arg1 != 0) && (arg2 != NULL) && (*arg2 != 0))
 			{
 				int skill = atoi(arg1);
 				
@@ -1595,11 +1595,11 @@ bool ProcessCommand( edict_t *pEntity, const char *pcmd, const char *arg1, const
 			
 			return TRUE;
 		}
-		else if (FStrEq(pcmd, "vector") && (pEntity != nullptr))
+		else if (FStrEq(pcmd, "vector") && (pEntity != NULL))
 		{
 			sprintf(msg, "Command failed!\n");
 
-			if ((arg1 != nullptr) && (*arg1 != 0))
+			if ((arg1 != NULL) && (*arg1 != 0))
 			{
 				if (FStrEq(arg1, "set1"))
 				{
@@ -1647,9 +1647,9 @@ bool ProcessCommand( edict_t *pEntity, const char *pcmd, const char *arg1, const
 		{	// this command allows editing of weapon information
 			sprintf(msg, "Could not complete request!\n");
 
-			if ((arg1 != nullptr) && (*arg1 != 0))
+			if ((arg1 != NULL) && (*arg1 != 0))
 			{
-				if ((arg2 != nullptr) && (*arg2 != 0))
+				if ((arg2 != NULL) && (*arg2 != 0))
 				{
 					bool found = FALSE;
 					int select_index = 0;
@@ -1668,7 +1668,7 @@ bool ProcessCommand( edict_t *pEntity, const char *pcmd, const char *arg1, const
 					{
 						if (strcmp(arg2, "priority") == 0)
 						{	// INTEGER
-							if ((arg3 != nullptr) && (*arg3 != 0))
+							if ((arg3 != NULL) && (*arg3 != 0))
 							{
 								int temp = atoi(arg3);
 								pSelect[select_index].priority = temp;
@@ -1677,7 +1677,7 @@ bool ProcessCommand( edict_t *pEntity, const char *pcmd, const char *arg1, const
 						}
 						else if (strcmp(arg2, "skill") == 0)
 						{	// INTEGER
-							if ((arg3 != nullptr) && (*arg3 != 0))
+							if ((arg3 != NULL) && (*arg3 != 0))
 							{
 								int temp = atoi(arg3);
 								pSelect[select_index].skill_level = temp;
@@ -1686,7 +1686,7 @@ bool ProcessCommand( edict_t *pEntity, const char *pcmd, const char *arg1, const
 						}
 						else if (strcmp(arg2, "primary_min_distance") == 0)
 						{	// FLOAT
-							if ((arg3 != nullptr) && (*arg3 != 0))
+							if ((arg3 != NULL) && (*arg3 != 0))
 							{
 								float temp = atof(arg3);
 								pSelect[select_index].primary_min_distance = temp;
@@ -1695,7 +1695,7 @@ bool ProcessCommand( edict_t *pEntity, const char *pcmd, const char *arg1, const
 						}
 						else if (strcmp(arg2, "primary_max_distance") == 0)
 						{	// FLOAT
-							if ((arg3 != nullptr) && (*arg3 != 0))
+							if ((arg3 != NULL) && (*arg3 != 0))
 							{
 								float temp = atof(arg3);
 								pSelect[select_index].primary_max_distance = temp;
@@ -1704,7 +1704,7 @@ bool ProcessCommand( edict_t *pEntity, const char *pcmd, const char *arg1, const
 						}
 						else if (strcmp(arg2, "secondary_min_distance") == 0)
 						{	// FLOAT
-							if ((arg3 != nullptr) && (*arg3 != 0))
+							if ((arg3 != NULL) && (*arg3 != 0))
 							{
 								float temp = atof(arg3);
 								pSelect[select_index].secondary_min_distance = temp;
@@ -1713,7 +1713,7 @@ bool ProcessCommand( edict_t *pEntity, const char *pcmd, const char *arg1, const
 						}
 						else if (strcmp(arg2, "secondary_max_distance") == 0)
 						{	// FLOAT
-							if ((arg3 != nullptr) && (*arg3 != 0))
+							if ((arg3 != NULL) && (*arg3 != 0))
 							{
 								float temp = atof(arg3);
 								pSelect[select_index].secondary_max_distance = temp;
@@ -1722,7 +1722,7 @@ bool ProcessCommand( edict_t *pEntity, const char *pcmd, const char *arg1, const
 						}
 						else if (strcmp(arg2, "can_use_underwater") == 0)
 						{	// BOOLEAN
-							if ((arg3 != nullptr) && (*arg3 != 0))
+							if ((arg3 != NULL) && (*arg3 != 0))
 							{
 								bool temp = atoi(arg3) ? TRUE : FALSE;
 								pSelect[select_index].can_use_underwater = temp;
@@ -1731,7 +1731,7 @@ bool ProcessCommand( edict_t *pEntity, const char *pcmd, const char *arg1, const
 						}
 						else if (strcmp(arg2, "reload_delay") == 0)
 						{	// FLOAT
-							if ((arg3 != nullptr) && (*arg3 != 0))
+							if ((arg3 != NULL) && (*arg3 != 0))
 							{
 								float temp = atof(arg3);
 								pSelect[select_index].reload_delay = temp;
@@ -1740,7 +1740,7 @@ bool ProcessCommand( edict_t *pEntity, const char *pcmd, const char *arg1, const
 						}
 						else if (strcmp(arg2, "primary_fire_percent") == 0)
 						{	// INTEGER
-							if ((arg3 != nullptr) && (*arg3 != 0))
+							if ((arg3 != NULL) && (*arg3 != 0))
 							{
 								int temp = atoi(arg3);
 								pSelect[select_index].primary_fire_percent = temp;
@@ -1749,7 +1749,7 @@ bool ProcessCommand( edict_t *pEntity, const char *pcmd, const char *arg1, const
 						}
 						else if (strcmp(arg2, "min_primary_ammo") == 0)
 						{	// INTEGER
-							if ((arg3 != nullptr) && (*arg3 != 0))
+							if ((arg3 != NULL) && (*arg3 != 0))
 							{
 								int temp = atoi(arg3);
 								pSelect[select_index].min_primary_ammo = temp;
@@ -1758,7 +1758,7 @@ bool ProcessCommand( edict_t *pEntity, const char *pcmd, const char *arg1, const
 						}
 						else if (strcmp(arg2, "min_secondary_ammo") == 0)
 						{	// INTEGER
-							if ((arg3 != nullptr) && (*arg3 != 0))
+							if ((arg3 != NULL) && (*arg3 != 0))
 							{
 								int temp = atoi(arg3);
 								pSelect[select_index].min_secondary_ammo = temp;
@@ -1767,7 +1767,7 @@ bool ProcessCommand( edict_t *pEntity, const char *pcmd, const char *arg1, const
 						}
 						else if (strcmp(arg2, "primary_fire_hold") == 0)
 						{	// BOOLEAN
-							if ((arg3 != nullptr) && (*arg3 != 0))
+							if ((arg3 != NULL) && (*arg3 != 0))
 							{
 								bool temp = atoi(arg3) ? TRUE : FALSE;
 								pSelect[select_index].primary_fire_hold = temp;
@@ -1776,7 +1776,7 @@ bool ProcessCommand( edict_t *pEntity, const char *pcmd, const char *arg1, const
 						}
 						else if (strcmp(arg2, "secondary_fire_hold") == 0)
 						{	// BOOLEAN
-							if ((arg3 != nullptr) && (*arg3 != 0))
+							if ((arg3 != NULL) && (*arg3 != 0))
 							{
 								bool temp = atoi(arg3) ? TRUE : FALSE;
 								pSelect[select_index].secondary_fire_hold = temp;
@@ -1785,7 +1785,7 @@ bool ProcessCommand( edict_t *pEntity, const char *pcmd, const char *arg1, const
 						}
 						else if (strcmp(arg2, "primary_fire_charge") == 0)
 						{	// BOOLEAN
-							if ((arg3 != nullptr) && (*arg3 != 0))
+							if ((arg3 != NULL) && (*arg3 != 0))
 							{
 								bool temp = atoi(arg3) ? TRUE : FALSE;
 								pSelect[select_index].primary_fire_charge = temp;
@@ -1794,7 +1794,7 @@ bool ProcessCommand( edict_t *pEntity, const char *pcmd, const char *arg1, const
 						}
 						else if (strcmp(arg2, "secondary_fire_charge") == 0)
 						{	// BOOLEAN
-							if ((arg3 != nullptr) && (*arg3 != 0))
+							if ((arg3 != NULL) && (*arg3 != 0))
 							{
 								bool temp = atoi(arg3) ? TRUE : FALSE;
 								pSelect[select_index].secondary_fire_charge = temp;
@@ -1803,7 +1803,7 @@ bool ProcessCommand( edict_t *pEntity, const char *pcmd, const char *arg1, const
 						}
 						else if (strcmp(arg2, "primary_charge_delay") == 0)
 						{	// FLOAT
-							if ((arg3 != nullptr) && (*arg3 != 0))
+							if ((arg3 != NULL) && (*arg3 != 0))
 							{
 								float temp = atof(arg3);
 								pSelect[select_index].primary_charge_delay = temp;
@@ -1812,7 +1812,7 @@ bool ProcessCommand( edict_t *pEntity, const char *pcmd, const char *arg1, const
 						}
 						else if (strcmp(arg2, "secondary_charge_delay") == 0)
 						{	// FLOAT
-							if ((arg3 != nullptr) && (*arg3 != 0))
+							if ((arg3 != NULL) && (*arg3 != 0))
 							{
 								float temp = atof(arg3);
 								pSelect[select_index].secondary_charge_delay = temp;
@@ -1829,7 +1829,7 @@ bool ProcessCommand( edict_t *pEntity, const char *pcmd, const char *arg1, const
 		}
 		else if (FStrEq(pcmd, "bot_reaction_time"))
 		{
-			if ((arg1 != nullptr) && (*arg1 != 0))
+			if ((arg1 != NULL) && (*arg1 != 0))
 			{
 				float temp = atof(arg1);
 				
@@ -1852,7 +1852,7 @@ bool ProcessCommand( edict_t *pEntity, const char *pcmd, const char *arg1, const
 		{
 			sprintf(msg, "Command failed!\n");
 
-			if ((arg1 != nullptr) && (*arg1 != 0) && (arg2 != nullptr) && (*arg2 != 0))
+			if ((arg1 != NULL) && (*arg1 != 0) && (arg2 != NULL) && (*arg2 != 0))
 			{
 				int skill = atoi(arg1);
 				float time = atof(arg2);
@@ -1874,7 +1874,7 @@ bool ProcessCommand( edict_t *pEntity, const char *pcmd, const char *arg1, const
 		{
 			sprintf(msg, "Command failed!\n");
 
-			if ((arg1 != nullptr) && (*arg1 != 0) && (arg2 != nullptr) && (*arg2 != 0))
+			if ((arg1 != NULL) && (*arg1 != 0) && (arg2 != NULL) && (*arg2 != 0))
 			{
 				int skill = atoi(arg1);
 				float time = atof(arg2);
@@ -1894,7 +1894,7 @@ bool ProcessCommand( edict_t *pEntity, const char *pcmd, const char *arg1, const
 		}
 		else if (FStrEq(pcmd, "bot_random_color"))
 		{
-			if ((arg1 != nullptr) && (*arg1 != 0))
+			if ((arg1 != NULL) && (*arg1 != 0))
 			{
 				int temp = atoi(arg1);
 				
@@ -1915,7 +1915,7 @@ bool ProcessCommand( edict_t *pEntity, const char *pcmd, const char *arg1, const
 		{
 			sprintf(msg, "Command failed!\n");
 
-			if ((arg1 != nullptr) && (*arg1 != 0))
+			if ((arg1 != NULL) && (*arg1 != 0))
 			{
 				sprintf(msg, "Couldn't find a player by the name \"%s\"\n", arg1);
 
@@ -1943,7 +1943,7 @@ bool ProcessCommand( edict_t *pEntity, const char *pcmd, const char *arg1, const
 		{
 			sprintf(msg, "Command failed!\n");
 
-			if ((arg1 != nullptr) && (*arg1 != 0))
+			if ((arg1 != NULL) && (*arg1 != 0))
 			{
 				int team = atoi(arg1);
 				int players = UTIL_PlayersOnTeam(team);
@@ -1956,7 +1956,7 @@ bool ProcessCommand( edict_t *pEntity, const char *pcmd, const char *arg1, const
 		}
 		else if (FStrEq(pcmd, "botdontshoot"))
 		{
-			if ((arg1 != nullptr) && (*arg1 != 0))
+			if ((arg1 != NULL) && (*arg1 != 0))
 			{
 				int temp = atoi(arg1);
 				if (temp)
@@ -1974,7 +1974,7 @@ bool ProcessCommand( edict_t *pEntity, const char *pcmd, const char *arg1, const
 		}
 		else if (FStrEq(pcmd, "botpause"))
 		{
-			if ((arg1 != nullptr) && (*arg1 != 0))
+			if ((arg1 != NULL) && (*arg1 != 0))
 			{
 				int temp = atoi(arg1);
 				if (temp)
@@ -2006,7 +2006,7 @@ bool ProcessCommand( edict_t *pEntity, const char *pcmd, const char *arg1, const
 						continue; // has to be a bot
 					
 					// was a name specified?
-					if ((arg1 != nullptr) && (*arg1 != 0) && (strcmp(STRING(pPlayer->v.netname), arg1) != 0))
+					if ((arg1 != NULL) && (*arg1 != 0) && (strcmp(STRING(pPlayer->v.netname), arg1) != 0))
 						continue;
 
 					bot_t *pBot = UTIL_GetBotPointer(pPlayer);
@@ -2027,8 +2027,8 @@ bool ProcessCommand( edict_t *pEntity, const char *pcmd, const char *arg1, const
 		}
 		else if (FStrEq(pcmd, "bot_si_defend"))
 		{
-			if ((arg1 != nullptr) && (*arg1 != 0) &&
-				(arg2 != nullptr) && (*arg2 != 0))
+			if ((arg1 != NULL) && (*arg1 != 0) &&
+				(arg2 != NULL) && (*arg2 != 0))
 			{	// manually set this teams defend percent
 				if (atoi(arg1) >= 1 && atoi(arg1) <= 2)
 					g_fl_si_defend[atoi(arg1)-1] = atof(arg2) / 100;
@@ -2061,7 +2061,7 @@ bool ProcessCommand( edict_t *pEntity, const char *pcmd, const char *arg1, const
 		}
 		else if (FStrEq(pcmd, "debug_engine"))
 		{
-			if ((arg1 != nullptr) && (*arg1 != 0))
+			if ((arg1 != NULL) && (*arg1 != 0))
 				debug_engine = atoi(arg1);
 			
 			time_t rawtime;
@@ -2087,7 +2087,7 @@ bool ProcessCommand( edict_t *pEntity, const char *pcmd, const char *arg1, const
 			
 			return TRUE;
 		}
-		else if (FStrEq(pcmd, "waypoint") && (pEntity != nullptr))
+		else if (FStrEq(pcmd, "waypoint") && (pEntity != NULL))
 		{
 			if (FStrEq(arg1, "on"))
 			{
@@ -2130,8 +2130,8 @@ bool ProcessCommand( edict_t *pEntity, const char *pcmd, const char *arg1, const
 			{
 				sprintf(msg, "Command failed!\n");
 
-				if ((arg2 != nullptr) && (*arg2 != 0) && (arg3 != nullptr) && (*arg3 != 0) &&
-					(arg4 != nullptr) && (*arg4 != 0))
+				if ((arg2 != NULL) && (*arg2 != 0) && (arg3 != NULL) && (*arg3 != 0) &&
+					(arg4 != NULL) && (*arg4 != 0))
 				{
 					int src = atoi(arg2);
 					int dest = atoi(arg3);
@@ -2460,7 +2460,7 @@ bool ProcessCommand( edict_t *pEntity, const char *pcmd, const char *arg1, const
 					else
 					{
 						waypoints[g_menu_waypoint].flags |= W_FL_WEAPON;  // on
-						WaypointSearchItems(nullptr, waypoints[g_menu_waypoint].origin, g_menu_waypoint);
+						WaypointSearchItems(NULL, waypoints[g_menu_waypoint].origin, g_menu_waypoint);
 					}
 				}
 				else if (FStrEq(arg1, "4"))  // ammo
@@ -2473,7 +2473,7 @@ bool ProcessCommand( edict_t *pEntity, const char *pcmd, const char *arg1, const
 					else
 					{
 						waypoints[g_menu_waypoint].flags |= W_FL_AMMO;  // on
-						WaypointSearchItems(nullptr, waypoints[g_menu_waypoint].origin, g_menu_waypoint);
+						WaypointSearchItems(NULL, waypoints[g_menu_waypoint].origin, g_menu_waypoint);
 					}
 				}
 				else if (FStrEq(arg1, "5"))  // more...
@@ -2497,7 +2497,7 @@ bool ProcessCommand( edict_t *pEntity, const char *pcmd, const char *arg1, const
 					else
 					{
 						waypoints[g_menu_waypoint].flags |= W_FL_HEALTH;  // on
-						WaypointSearchItems(nullptr, waypoints[g_menu_waypoint].origin, g_menu_waypoint);
+						WaypointSearchItems(NULL, waypoints[g_menu_waypoint].origin, g_menu_waypoint);
 					}
 				}
 				else if (FStrEq(arg1, "2"))  // armor
@@ -2510,7 +2510,7 @@ bool ProcessCommand( edict_t *pEntity, const char *pcmd, const char *arg1, const
 					else
 					{
 						waypoints[g_menu_waypoint].flags |= W_FL_ARMOR;  // on
-						WaypointSearchItems(nullptr, waypoints[g_menu_waypoint].origin, g_menu_waypoint);
+						WaypointSearchItems(NULL, waypoints[g_menu_waypoint].origin, g_menu_waypoint);
 					}
 				}
 				else if (FStrEq(arg1, "3"))  // long jump
@@ -2523,7 +2523,7 @@ bool ProcessCommand( edict_t *pEntity, const char *pcmd, const char *arg1, const
 					else
 					{
 						waypoints[g_menu_waypoint].flags |= W_FL_ITEM;  // on
-						WaypointSearchItems(nullptr, waypoints[g_menu_waypoint].origin, g_menu_waypoint);
+						WaypointSearchItems(NULL, waypoints[g_menu_waypoint].origin, g_menu_waypoint);
 					}
 				}
 				else if (FStrEq(arg1, "4"))  // duck jump
@@ -2565,22 +2565,22 @@ bool ProcessCommand( edict_t *pEntity, const char *pcmd, const char *arg1, const
 		}
 		else if (FStrEq(pcmd, "search"))
 		{
-			edict_t *pent = nullptr;
+			edict_t *pent = NULL;
 			float radius = 50;
-			if ((arg1 != nullptr) && (*arg1 != 0))
+			if ((arg1 != NULL) && (*arg1 != 0))
 				radius = atof(arg1);
 			char str[256];
 			
 			SERVER_PRINT( "searching...\n");
 			
-			while ((pent = UTIL_FindEntityInSphere( pent, pEntity->v.origin, radius )) != nullptr)
+			while ((pent = UTIL_FindEntityInSphere( pent, pEntity->v.origin, radius )) != NULL)
 			{
 				sprintf(str, "Found %s at %5.2f %5.2f %5.2f owned by %s following %s, model %s\n",
 					STRING(pent->v.classname),
 					pent->v.origin.x, pent->v.origin.y,
 					pent->v.origin.z,
-					(pent->v.owner != nullptr) ? STRING(pent->v.owner->v.netname) : "nobody",
-					(pent->v.aiment != nullptr) ? STRING(pent->v.aiment->v.netname) : "nobody",
+					(pent->v.owner != NULL) ? STRING(pent->v.owner->v.netname) : "nobody",
+					(pent->v.aiment != NULL) ? STRING(pent->v.aiment->v.netname) : "nobody",
 					STRING(pent->v.model));
 				SERVER_PRINT( str);
 				
@@ -2598,7 +2598,7 @@ bool ProcessCommand( edict_t *pEntity, const char *pcmd, const char *arg1, const
 void RoleDetermine()
 {
 	// important entities (scis, resource, breakables)
-	edict_t *pEntity = nullptr;
+	edict_t *pEntity = NULL;
 	int team = 0;
 	// for looping
 	int i = 0;
@@ -2618,7 +2618,7 @@ void RoleDetermine()
 	{
 		g_iSciCount[myteam] = 0;
 		// find alive team scientists
-		while ((pEntity = UTIL_FindEntityByClassname(pEntity, "monster_scientist")) != nullptr)
+		while ((pEntity = UTIL_FindEntityByClassname(pEntity, "monster_scientist")) != NULL)
 		{
 			team = UTIL_GetTeam(pEntity);
 			// skip enemy scientists
@@ -2638,7 +2638,7 @@ void RoleDetermine()
 	{
 		int plrtotal = UTIL_PlayersOnTeam(myteam);
 
-		edict_t *pEntity = nullptr;
+		edict_t *pEntity = NULL;
 
 		if (myteam == 0) enemyteam = 1;
 		else if (myteam == 1) enemyteam = 0;
@@ -2717,11 +2717,11 @@ void RoleDetermine()
 void RoleCount()
 {
 	// ally players
-	edict_t *pPlayer = nullptr;
+	edict_t *pPlayer = NULL;
 	// important entities (scis, resource, breakables)
-	edict_t *pEntity = nullptr;
+	edict_t *pEntity = NULL;
 	// closest important entity
-	edict_t *pClosest = nullptr;
+	edict_t *pClosest = NULL;
 
 	int t = 0;
 	int team = -1;
@@ -2738,8 +2738,8 @@ void RoleCount()
 		// loop through all players on the same team
 		for (i = 1; i <= gpGlobals->maxClients; i++)
 		{
-			pClosest = nullptr;
-			pEntity = nullptr;
+			pClosest = NULL;
+			pEntity = NULL;
 			distance = 0;
 			mindistance = 9999;
 			
@@ -2763,7 +2763,7 @@ void RoleCount()
 					*/
 					temp_index = WaypointFindNearest(pPlayer, 512, team);
 					
-					while ((pEntity = UTIL_FindEntityInSphere( pEntity, pPlayer->v.origin, 512 )) != nullptr)
+					while ((pEntity = UTIL_FindEntityInSphere( pEntity, pPlayer->v.origin, 512 )) != NULL)
 					{	// only consider goal entities (scis, resources, breakables)
 						if ((strcmp("monster_scientist", STRING(pEntity->v.classname)) != 0) &&
 							(strcmp("carry_scientist", STRING(pEntity->v.classname)) != 0) &&
@@ -2787,7 +2787,7 @@ void RoleCount()
 					}
 
 					// we found something!
-					if (pClosest != nullptr)
+					if (pClosest != NULL)
 					{	// same team? assume they're defending
 						if (team == UTIL_GetTeam(pClosest))
 							g_iDefendCount[t]++;
@@ -2801,7 +2801,7 @@ void RoleCount()
 				{	// FAKE CLIENTS (BOTS)
 					bot_t *pAllyBot = UTIL_GetBotPointer(pPlayer);
 
-					if (pAllyBot != nullptr)
+					if (pAllyBot != NULL)
 					{
 						if (pAllyBot->role == ROLE_ATTACK)
 							g_iAttackCount[t]++;
@@ -2957,12 +2957,12 @@ void ClearEdict(edict_t *pEdict)
 	pEdict->v.button = 0;
 	pEdict->v.impulse = 0;
 
-	pEdict->v.chain = nullptr;			// Entity pointer when linked into a linked list
-	pEdict->v.dmg_inflictor = nullptr;
-	pEdict->v.enemy = nullptr;
-	pEdict->v.aiment = nullptr;		// entity pointer when MOVETYPE_FOLLOW
-	pEdict->v.owner = nullptr;
-	pEdict->v.groundentity = nullptr;
+	pEdict->v.chain = NULL;			// Entity pointer when linked into a linked list
+	pEdict->v.dmg_inflictor = NULL;
+	pEdict->v.enemy = NULL;
+	pEdict->v.aiment = NULL;		// entity pointer when MOVETYPE_FOLLOW
+	pEdict->v.owner = NULL;
+	pEdict->v.groundentity = NULL;
 
 	pEdict->v.spawnflags = 0;
 	pEdict->v.flags = 0;
@@ -3034,8 +3034,8 @@ void ClearEdict(edict_t *pEdict)
 	pEdict->v.vuser2 = Vector(0,0,0);
 	pEdict->v.vuser3 = Vector(0,0,0);
 	pEdict->v.vuser4 = Vector(0,0,0);
-	pEdict->v.euser1 = nullptr;
-	pEdict->v.euser2 = nullptr;
-	pEdict->v.euser3 = nullptr;
-	pEdict->v.euser4 = nullptr;
+	pEdict->v.euser1 = NULL;
+	pEdict->v.euser2 = NULL;
+	pEdict->v.euser3 = NULL;
+	pEdict->v.euser4 = NULL;
 }

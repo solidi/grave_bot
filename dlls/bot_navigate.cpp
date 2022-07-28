@@ -270,7 +270,7 @@ bool BotFindWaypoint( bot_t *pBot )
 //	ALERT(at_console, "BotFindWaypoint\n");
 	int index, select_index;
 	int team;
-	PATH *pPath = nullptr;
+	PATH *pPath = NULL;
 	int path_index;
 	float distance, min_distance[3];
 	int min_index[3];
@@ -530,7 +530,7 @@ bool BotHeadTowardWaypoint( bot_t *pBot )
 		pBot->f_waypoint_goal_time < gpGlobals->time)
 	{
 		// tracking something, pick goal much more often
-		if (pBot->b_engaging_enemy || pBot->pGoalEnt != nullptr || pBot->v_defend != g_vecZero ||
+		if (pBot->b_engaging_enemy || pBot->pGoalEnt != NULL || pBot->v_defend != g_vecZero ||
 			pBot->defend_wpt != -1)
 			pBot->f_waypoint_goal_time = gpGlobals->time + 0.5;
 		else // don't pick a goal more often than every 120 seconds...
@@ -661,7 +661,7 @@ bool BotHeadTowardWaypoint( bot_t *pBot )
 			}
 			*/
 
-			if ((pBot->b_engaging_enemy) || (pBot->pGoalEnt != nullptr) || (pBot->v_defend != g_vecZero) ||
+			if ((pBot->b_engaging_enemy) || (pBot->pGoalEnt != NULL) || (pBot->v_defend != g_vecZero) ||
 				(pBot->defend_wpt != -1))
 				pBot->f_waypoint_goal_time = gpGlobals->time;
 			else	// a little delay time, since we'll touch the waypoint before we actually get what it has
@@ -719,7 +719,7 @@ bool BotHeadTowardWaypoint( bot_t *pBot )
 			int nextwaypoint = -1;
 
 			// get the next waypoint to reach item...
-			if (pBot->pBotPickupItem != nullptr && pBot->item_waypoint > -1)
+			if (pBot->pBotPickupItem != NULL && pBot->item_waypoint > -1)
 				nextwaypoint = pBot->item_waypoint;
 			else // get the next waypoint to reach goal...
 				nextwaypoint = pBot->waypoint_goal;
@@ -894,8 +894,8 @@ void BotEvaluateGoalSI( bot_t *pBot )
 	int temp_index = -1;
 	int team = -1;
 	// search entities
-	edict_t *pGoal = nullptr;
-	edict_t *pEntity = nullptr;
+	edict_t *pGoal = NULL;
+	edict_t *pEntity = NULL;
 	// make code smaller :P
 	edict_t *pEdict = pBot->pEdict;
 	// used in for/while loops
@@ -912,7 +912,7 @@ void BotEvaluateGoalSI( bot_t *pBot )
 
 	// forget about what we're defending since we
 	// figure out what to defend in this function
-	pBot->pGoalEnt = nullptr;
+	pBot->pGoalEnt = NULL;
 	pBot->v_defend = g_vecZero;
 	pBot->defend_wpt = -1;
 	pBot->b_defend_patrol = false;
@@ -952,7 +952,7 @@ void BotEvaluateGoalSI( bot_t *pBot )
 				{	// find closest waypoint
 					temp_index = WaypointFindNearest(pPlayer, 256, team);
 					// look for nearby scientists, tech breakables, and resources
-					while ((pEntity = UTIL_FindEntityInSphere(pEntity, pPlayer->v.origin, 512)) != nullptr)
+					while ((pEntity = UTIL_FindEntityInSphere(pEntity, pPlayer->v.origin, 512)) != NULL)
 					{
 						if (UTIL_GetTeam(pEntity) != team)
 							continue;
@@ -993,7 +993,7 @@ void BotEvaluateGoalSI( bot_t *pBot )
 				else
 				{	// loop through bots and look at their values
 					bot_t *pAllyBot = UTIL_GetBotPointer(pPlayer);
-					if (pAllyBot != nullptr)
+					if (pAllyBot != NULL)
 					{	// must be defending
 						if (pAllyBot->role == ROLE_DEFEND)
 						{	// check out our subrole
@@ -1054,7 +1054,7 @@ void BotEvaluateGoalSI( bot_t *pBot )
 			//iDefenders = 0;
 			///iMinDefenders = 32;
 			// loop through and find our goals!
-			while ((pGoal = UTIL_FindEntityByClassname(pGoal, szSearchEnts[i])) != nullptr)
+			while ((pGoal = UTIL_FindEntityByClassname(pGoal, szSearchEnts[i])) != NULL)
 			{	// must be on our team
 				if (UTIL_GetTeam(pGoal) != team && team != -1)
 					continue;
@@ -1067,7 +1067,7 @@ void BotEvaluateGoalSI( bot_t *pBot )
 				vecOrigin = UTIL_GetOrigin(pGoal);
 
 				// look around the entity we found (for non-bots)
-				while ((pEntity = UTIL_FindEntityInSphere(pEntity, vecOrigin, 512)) != nullptr)
+				while ((pEntity = UTIL_FindEntityInSphere(pEntity, vecOrigin, 512)) != NULL)
 				{
 					// non players and non team members are skipped
 					if (!(pEntity->v.flags & FL_CLIENT) || (pEntity->v.flags & FL_FAKECLIENT) ||
@@ -1111,7 +1111,7 @@ void BotEvaluateGoalSI( bot_t *pBot )
 		}
 
 		// couldn't find a scientist, breakable, or resource to defend
-		if (pBot->pGoalEnt == nullptr)
+		if (pBot->pGoalEnt == NULL)
 		{	// reset these
 			temp_index = -1;
 			iDefenders = 0;
@@ -1135,7 +1135,7 @@ void BotEvaluateGoalSI( bot_t *pBot )
 
 					iDefenders = 0;
 					// look around the waypoint we found for non-bots
-					while ((pEntity = UTIL_FindEntityInSphere(pEntity, waypoints[temp_index].origin, 128)) != nullptr)
+					while ((pEntity = UTIL_FindEntityInSphere(pEntity, waypoints[temp_index].origin, 128)) != NULL)
 					{
 						// non players and non team members are skipped
 						if (!(pEntity->v.flags & FL_CLIENT) ||
@@ -1207,7 +1207,7 @@ void BotEvaluateGoalSI( bot_t *pBot )
 				if (!(pPlayer->v.flags & FL_FAKECLIENT))
 				{
 					// look for nearby scientists, tech breakables, resources, and players
-					while ((pEntity = UTIL_FindEntityInSphere(pEntity, pPlayer->v.origin, 512)) != nullptr)
+					while ((pEntity = UTIL_FindEntityInSphere(pEntity, pPlayer->v.origin, 512)) != NULL)
 					{
 						if (pEntity == pPlayer)
 							continue;
@@ -1257,7 +1257,7 @@ void BotEvaluateGoalSI( bot_t *pBot )
 				else
 				{	// loop through bots and look at their values
 					bot_t *pAllyBot = UTIL_GetBotPointer(pPlayer);
-					if (pAllyBot != nullptr)
+					if (pAllyBot != NULL)
 					{	// must be attacking
 						if (pAllyBot->role == ROLE_ATTACK)
 						{	// check out our subrole
@@ -1302,7 +1302,7 @@ void BotEvaluateGoalSI( bot_t *pBot )
 		if (pBot->i_carry_type != CARRY_NONE)
 		{
 			// find our goal
-			while ((pGoal = UTIL_FindEntityByClassname(pGoal, "info_administrator")) != nullptr)
+			while ((pGoal = UTIL_FindEntityByClassname(pGoal, "info_administrator")) != NULL)
 			{
 				// skip enemy admin
 				if (UTIL_GetTeam(pGoal) != team)
@@ -1325,7 +1325,7 @@ void BotEvaluateGoalSI( bot_t *pBot )
 		{
 			// start at 0
 			i = 0;
-			while (i < 6 && pBot->pGoalEnt == nullptr)
+			while (i < 6 && pBot->pGoalEnt == NULL)
 			{
 				// this is long
 				// our search ent is sci and percent is over 40 OR
@@ -1352,7 +1352,7 @@ void BotEvaluateGoalSI( bot_t *pBot )
 				distance = 0;
 				mindistance = 9999;
 				// loop through and find our goals!
-				while ((pGoal = UTIL_FindEntityByClassname(pGoal, szSearchEnts[i])) != nullptr)
+				while ((pGoal = UTIL_FindEntityByClassname(pGoal, szSearchEnts[i])) != NULL)
 				{	// so we don't defend ourselves
 					if (pGoal == pEdict)
 						continue;
@@ -1378,7 +1378,7 @@ void BotEvaluateGoalSI( bot_t *pBot )
 					vecOrigin = UTIL_GetOrigin(pGoal);
 
 					// look around the entity we found (for non-bots)
-					while ((pEntity = UTIL_FindEntityInSphere(pEntity, vecOrigin, 512)) != nullptr)
+					while ((pEntity = UTIL_FindEntityInSphere(pEntity, vecOrigin, 512)) != NULL)
 					{
 						// non players and non team members are skipped
 						if (!(pEntity->v.flags & FL_CLIENT) || (pEntity->v.flags & FL_FAKECLIENT) ||
@@ -1458,7 +1458,7 @@ int BotFindWaypointGoal( bot_t *pBot )
 	edict_t *pEdict = pBot->pEdict;
 	// for ammo info
 	int select_index = 0;
-	bot_weapon_select_t *pSelect = nullptr;
+	bot_weapon_select_t *pSelect = NULL;
 	pSelect = WeaponGetSelectPointer();
 	// for looping and finding the closest waypoint
 	float distance;
@@ -1468,7 +1468,7 @@ int BotFindWaypointGoal( bot_t *pBot )
 	// current weapon
 	int iId = pBot->current_weapon.iId;
 
-	if (pSelect == nullptr)
+	if (pSelect == NULL)
 		return -1;
 
 	if (!checked_teamplay)  // check for team play...
@@ -1789,14 +1789,14 @@ int BotFindWaypointGoalSI( bot_t *pBot )
 	int team = -1;
 	int count = 0;
 	// search ents
-	edict_t *pEntity = nullptr;
+	edict_t *pEntity = NULL;
 	// make code smaller :P
 	edict_t *pEdict = pBot->pEdict;
 	// distance checks
 	float distance = 0;
 	float mindistance = 9999;
 	// for weapon goals
-	bot_weapon_select_t *pSelect = nullptr;
+	bot_weapon_select_t *pSelect = NULL;
 	pSelect = WeaponGetSelectPointer();
 
 	if (!checked_teamplay)  // check for team play...
@@ -1849,7 +1849,7 @@ int BotFindWaypointGoalSI( bot_t *pBot )
 			
 			// these subroles all have specific entities for the bot to defend
 			if (((pBot->subrole == ROLE_SUB_DEF_SCIS) || (pBot->subrole == ROLE_SUB_DEF_RSRC) ||
-				(pBot->subrole == ROLE_SUB_DEF_BREAK)) && (pBot->pGoalEnt != nullptr))
+				(pBot->subrole == ROLE_SUB_DEF_BREAK)) && (pBot->pGoalEnt != NULL))
 			{	// find the closest waypoint to our defense entity
 				index = WaypointFindNearest(pBot->pGoalEnt, 512, team, pBot->exclude_points);
 				//index = WaypointFindNearestGoal(pEdict, temp_index, team, 0, pBot->exclude_points);
@@ -1878,7 +1878,7 @@ int BotFindWaypointGoalSI( bot_t *pBot )
 		///////////////
 		else if (pBot->role == ROLE_ATTACK)
 		{
-			if (pBot->pGoalEnt != nullptr)
+			if (pBot->pGoalEnt != NULL)
 			{	// find the closest waypoint to our attack entity
 				index = WaypointFindNearest(pBot->pGoalEnt, 512, team, pBot->exclude_points);
 				//index = WaypointFindNearestGoal(pEdict, temp_index, team, 0, pBot->exclude_points);
@@ -2842,7 +2842,7 @@ bool BotFollowUser( bot_t *pBot )
    if (!IsAlive( pBot->pBotUser ))
    {
       // the bot's user is dead!
-      pBot->pBotUser = nullptr;
+      pBot->pBotUser = NULL;
       return FALSE;
    }
 
@@ -2879,7 +2879,7 @@ bool BotFollowUser( bot_t *pBot )
    else
    {
       // person to follow has gone out of sight...
-      pBot->pBotUser = nullptr;
+      pBot->pBotUser = NULL;
 
       return FALSE;
    }
@@ -2951,7 +2951,7 @@ extern int m_spriteTexture;
 void BotAvoidContact( bot_t *pBot )
 {
 //	ALERT(at_console, "BotAvoidContact\n");
-	edict_t *pEnt = nullptr;
+	edict_t *pEnt = NULL;
 	float flMaxDist = 128;
 	Vector vecDir, vecBotDir;
 	TraceResult tr;
@@ -3030,7 +3030,7 @@ void BotAvoidContact( bot_t *pBot )
 	}
 	*/
 	// did we find a monster/player/thing
-	if (pBot->pAvoid != nullptr)
+	if (pBot->pAvoid != NULL)
 	{
 		vecDir = (pBot->pAvoid->v.origin + pBot->pAvoid->v.view_ofs) - 
 			(pBot->pEdict->v.origin + pBot->pEdict->v.view_ofs);
@@ -3069,12 +3069,12 @@ void BotAvoidContact( bot_t *pBot )
 void BotDodgeCrabs( bot_t *pBot )
 {
 //	ALERT(at_console, "BotDodgeCrabs\n");
-	edict_t *pEnt = nullptr;
+	edict_t *pEnt = NULL;
 	float flMaxDist = 512;
 	Vector vecDir;
 	TraceResult tr;
 
-	while ((pEnt = UTIL_FindEntityInSphere( pEnt, pBot->pEdict->v.origin, 512 )) != nullptr)
+	while ((pEnt = UTIL_FindEntityInSphere( pEnt, pBot->pEdict->v.origin, 512 )) != NULL)
 	{
 		// only think about headcrabs
 		if (strcmp("monster_headcrab", STRING(pEnt->v.classname)) != 0)
@@ -3100,7 +3100,7 @@ void BotDodgeCrabs( bot_t *pBot )
 	}
 	
 	// did we find a crab?
-	if (pBot->pAvoid != nullptr)
+	if (pBot->pAvoid != NULL)
 	{
 		vecDir = (pBot->pEdict->v.origin + pBot->pEdict->v.view_ofs) - 
 			(pBot->pAvoid->v.origin + pBot->pAvoid->v.view_ofs);

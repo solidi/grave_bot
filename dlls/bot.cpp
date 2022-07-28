@@ -180,7 +180,7 @@ void BotSpawnInit( bot_t *pBot )
 	pBot->v_prev_origin = Vector(9999.0, 9999.0, 9999.0);
 	pBot->prev_time = gpGlobals->time;
 	
-	pBot->pBotPickupItem = nullptr;
+	pBot->pBotPickupItem = NULL;
 
 	strcpy(pBot->debugchat, "\0");
 
@@ -248,13 +248,13 @@ void BotSpawnInit( bot_t *pBot )
 	pBot->dmg_origin = g_vecZero;
 	pBot->f_dmg_time = 0.0;
 
-	pBot->pAvoid = nullptr;
+	pBot->pAvoid = NULL;
 	pBot->f_avoid_time = 0.0;
 	pBot->f_do_avoid_time = 0.0;
 	pBot->avoid_dir = g_vecZero;
 
 	pBot->b_last_engage = FALSE;
-	pBot->pBotEnemy = nullptr;
+	pBot->pBotEnemy = NULL;
 	pBot->f_bot_see_enemy_time = gpGlobals->time;
 	pBot->f_bot_find_enemy_time = gpGlobals->time;
 	pBot->f_aim_tracking_time = 0.0;
@@ -270,7 +270,7 @@ void BotSpawnInit( bot_t *pBot )
 
 	pBot->f_mindray_regen_time = 0.0;
 
-	pBot->pBotUser = nullptr;
+	pBot->pBotUser = NULL;
 	pBot->f_bot_use_time = 0.0;
 	pBot->f_sniper_aim_time = 0.0;
 	
@@ -350,7 +350,7 @@ void BotSpawnInit( bot_t *pBot )
 	memset(&(pBot->current_weapon), 0, sizeof(pBot->current_weapon));
 	memset(&(pBot->m_rgAmmo), 0, sizeof(pBot->m_rgAmmo));
 
-	pBot->pGoalEnt = nullptr;
+	pBot->pGoalEnt = NULL;
 	pBot->v_defend = g_vecZero;
 	pBot->b_defend_patrol = false;
 	pBot->defend_wpt = -1;
@@ -387,14 +387,14 @@ void BotNameInit()
 	char name_buffer[80];
 	int length, index;
 	
-	UTIL_BuildFileName(bot_name_filename, "grave_bot_names.txt", nullptr);
+	UTIL_BuildFileName(bot_name_filename, "grave_bot_names.txt", NULL);
 	
 	bot_name_fp = fopen(bot_name_filename, "r");
 	
-	if (bot_name_fp != nullptr)
+	if (bot_name_fp != NULL)
 	{
 		while ((number_names < MAX_BOT_NAMES) &&
-			(fgets(name_buffer, 80, bot_name_fp) != nullptr))
+			(fgets(name_buffer, 80, bot_name_fp) != NULL))
 		{
 			length = strlen(name_buffer);
 			
@@ -530,7 +530,7 @@ void BotCreate( edict_t *pPlayer, const char *arg1, const char *arg2,
 
 	if (mod_id == CRABBED_DLL || mod_id == VALVE_DLL)
 	{	
-		if ((arg1 == nullptr) || (*arg1 == 0) || (strcmp(arg1, "NULL") == 0))
+		if ((arg1 == NULL) || (*arg1 == 0) || (strcmp(arg1, "NULL") == 0))
 		{
 			bool *pSkinUsed;
 			
@@ -585,7 +585,7 @@ void BotCreate( edict_t *pPlayer, const char *arg1, const char *arg2,
 		
 		if (found == TRUE)
 		{
-			if ((arg2 != nullptr) && (*arg2 != 0) && (strcmp(arg2, "NULL") != 0))
+			if ((arg2 != NULL) && (*arg2 != 0) && (strcmp(arg2, "NULL") != 0))
 			{
 				strncpy( c_name, arg2, BOT_SKIN_LEN-1 );
 				c_name[BOT_SKIN_LEN] = 0;  // make sure c_name is null terminated
@@ -626,7 +626,7 @@ void BotCreate( edict_t *pPlayer, const char *arg1, const char *arg2,
 				}
 			}
 			
-			if ((arg2 != nullptr) && (*arg2 != 0) && (strcmp(arg2, "NULL") != 0))
+			if ((arg2 != NULL) && (*arg2 != 0) && (strcmp(arg2, "NULL") != 0))
 			{
 				strncpy( c_name, arg2, BOT_NAME_LEN-1 );
 				c_name[BOT_NAME_LEN] = 0;  // make sure c_name is null terminated
@@ -646,13 +646,13 @@ void BotCreate( edict_t *pPlayer, const char *arg1, const char *arg2,
 			
 		skill = 0;
 		
-		if ((arg3 != nullptr) && (*arg3 != 0))
+		if ((arg3 != NULL) && (*arg3 != 0))
 			skill = atoi(arg3);
 			
 		if ((skill < 1) || (skill > 5))
 			skill = default_bot_skill;
 
-		if ((arg4 != nullptr) && (*arg4 != 0))
+		if ((arg4 != NULL) && (*arg4 != 0))
 			top_color = atoi(arg4);
 			
 		if ((top_color < 0) || (top_color > 255))
@@ -660,7 +660,7 @@ void BotCreate( edict_t *pPlayer, const char *arg1, const char *arg2,
 		else
 			sprintf(c_topcolor, "%d", top_color);
 			
-		if ((arg5 != nullptr) && (*arg5 != 0))
+		if ((arg5 != NULL) && (*arg5 != 0))
 			bottom_color = atoi(arg5);
 			
 		if ((bottom_color < 0) || (bottom_color > 255))
@@ -679,7 +679,7 @@ void BotCreate( edict_t *pPlayer, const char *arg1, const char *arg2,
 	}
 	else if (mod_id == SI_DLL)
 	{
-		if ((arg1 != nullptr) && (*arg1 != 0) && (strcmp(arg1, "NULL") != 0))
+		if ((arg1 != NULL) && (*arg1 != 0) && (strcmp(arg1, "NULL") != 0))
 		{
 			strncpy( c_name, arg1, BOT_NAME_LEN-1 );
 			c_name[BOT_NAME_LEN] = 0;  // make sure c_name is null terminated
@@ -694,7 +694,7 @@ void BotCreate( edict_t *pPlayer, const char *arg1, const char *arg2,
 		
 		skill = 0;
 		
-		if ((arg2 != nullptr) && (*arg2 != 0))
+		if ((arg2 != NULL) && (*arg2 != 0))
 			skill = atoi(arg2);
 		
 		if ((skill < 1) || (skill > 5))
@@ -779,7 +779,7 @@ void BotCreate( edict_t *pPlayer, const char *arg1, const char *arg2,
 		// function calls directly the gamedll one, and not ours. You are allowed to call this
 		// an "awful hack".
 
-		while ((i < 32) && (clients[i] != nullptr))
+		while ((i < 32) && (clients[i] != NULL))
 			i++;
 
 		if (i < 32)
@@ -848,10 +848,10 @@ void BotCreate( edict_t *pPlayer, const char *arg1, const char *arg2,
 
 		if (mod_id == SI_DLL)
 		{	// let creator assign a team
-			if ((arg3 != nullptr) && (*arg3 != 0) && (strcmp(arg3, "NULL") != 0))
+			if ((arg3 != NULL) && (*arg3 != 0) && (strcmp(arg3, "NULL") != 0))
 				pBot->bot_team = atoi(arg3);
 			// let creator assign a class (model for S&I)
-			if ((arg4 != nullptr) && (*arg4 != 0) && (strcmp(arg4, "NULL") != 0))
+			if ((arg4 != NULL) && (*arg4 != 0) && (strcmp(arg4, "NULL") != 0))
 				pBot->bot_class = atoi(arg4);
 		}
 
@@ -955,8 +955,8 @@ bool BotEntityIsNotBlocked( bot_t *pBot, Vector dest )
 void BotFindItem( bot_t *pBot )
 {
 //	ALERT(at_console, "BotFindItem\n");
-	edict_t *pent = nullptr;
-	edict_t *pPickupEntity = nullptr;
+	edict_t *pent = NULL;
+	edict_t *pPickupEntity = NULL;
 	Vector pickup_origin;
 	Vector entity_origin;
 	float radius = 500;
@@ -983,7 +983,7 @@ void BotFindItem( bot_t *pBot )
 		}
 		pBot->f_find_item = gpGlobals->time + 2.0;
 		pBot->f_last_item_found = -1;
-		pBot->pBotPickupItem = nullptr;
+		pBot->pBotPickupItem = NULL;
 		pBot->item_waypoint = -1;
 	}
 
@@ -997,7 +997,7 @@ void BotFindItem( bot_t *pBot )
 			UTIL_HostSay(pBot->pEdict, 0, pBot->debugchat);
 		}
 		pBot->f_last_item_found = -1;
-		pBot->pBotPickupItem = nullptr;
+		pBot->pBotPickupItem = NULL;
 		pBot->item_waypoint = -1;
 	}
 
@@ -1005,10 +1005,10 @@ void BotFindItem( bot_t *pBot )
 	if (pBot->f_find_item > gpGlobals->time || pBot->pBotPickupItem)
 		return;
 
-	bot_weapon_select_t *pSelect = nullptr;
+	bot_weapon_select_t *pSelect = NULL;
 	pSelect = WeaponGetSelectPointer();
 
-	if (pSelect == nullptr)
+	if (pSelect == NULL)
 		return;
 
 	if (!checked_teamplay)  // check for team play...
@@ -1026,7 +1026,7 @@ void BotFindItem( bot_t *pBot )
 	
 	min_distance = radius + 1.0;
 	
-	while ((pent = UTIL_FindEntityInSphere( pent, pEdict->v.origin, radius )) != nullptr)
+	while ((pent = UTIL_FindEntityInSphere( pent, pEdict->v.origin, radius )) != NULL)
 	{
 		can_pickup = FALSE;  // assume can't use it until known otherwise
 		entteam = UTIL_GetTeam(pent);
@@ -1373,7 +1373,7 @@ void BotFindItem( bot_t *pBot )
 		}
 	}  // end while loop
 	
-	if (pPickupEntity != nullptr && pPickupEntity != pBot->pBotPickupItem)
+	if (pPickupEntity != NULL && pPickupEntity != pBot->pBotPickupItem)
 	{
 		if (!pBot->pBotEnemy && pBot->f_dmg_time < gpGlobals->time && pBot->curr_waypoint_index == -1)
 		{
@@ -1464,7 +1464,7 @@ void BotCheckRole( bot_t *pBot)
 		pBot->role = newrole;
 		pBot->subrole = ROLE_SUB_NONE;
 		// forget about what we're defending
-		pBot->pGoalEnt = nullptr;
+		pBot->pGoalEnt = NULL;
 		pBot->v_defend = g_vecZero;
 		pBot->defend_wpt = -1;
 		// recalc count and determiner
@@ -1637,7 +1637,7 @@ void BotThink( bot_t *pBot )
 		pBot->idle_angle = pEdict->v.v_angle.y;
 	}
 
-	if (pBot->pBotEnemy == nullptr && pBot->f_sound_update_time <= gpGlobals->time)
+	if (pBot->pBotEnemy == NULL && pBot->f_sound_update_time <= gpGlobals->time)
 	{
 		pBot->f_sound_update_time = gpGlobals->time + 0.5;
 		BotListenForFakeSound(pBot);
@@ -1735,10 +1735,10 @@ void BotThink( bot_t *pBot )
 			pBot->pBotEnemy = BotFindEnemy( pBot );
 		}
 		else
-			pBot->pBotEnemy = nullptr;  // clear enemy pointer (no ememy for you!)
+			pBot->pBotEnemy = NULL;  // clear enemy pointer (no ememy for you!)
 		
 		// does an enemy exist and we're not on a ladder
-		if (pBot->pBotEnemy != nullptr && pEdict->v.movetype != MOVETYPE_FLY &&
+		if (pBot->pBotEnemy != NULL && pEdict->v.movetype != MOVETYPE_FLY &&
 			pBot->f_bot_spawn_time + 1.0 < gpGlobals->time)
 		{
 			BotShootAtEnemy( pBot );  // shoot at the enemy
@@ -1754,7 +1754,7 @@ void BotThink( bot_t *pBot )
 		}
 		
 		// is bot being "used" and can still follow "user"?
-		else if ((pBot->pBotUser != nullptr) && BotFollowUser( pBot ))
+		else if ((pBot->pBotUser != NULL) && BotFollowUser( pBot ))
 		{
 			// do nothing here!
 		}
@@ -1812,7 +1812,7 @@ void BotThink( bot_t *pBot )
 					}
 					// is this charger still active? Do we have full health?
 					if (pBot->pBotPickupItem->v.frame != 0 || pEdict->v.health >= pBot->max_health)
-						pBot->pBotPickupItem = nullptr;
+						pBot->pBotPickupItem = NULL;
 				}
 				else if (FStrEq(STRING(pBot->pBotPickupItem->v.classname), "func_recharge"))
 				{	// check if we can use the charger
@@ -1836,7 +1836,7 @@ void BotThink( bot_t *pBot )
 					}
 					// is this charger still active? Do we have full armor?
 					if (pBot->pBotPickupItem->v.frame != 0 || pEdict->v.armorvalue >= pBot->max_armor)
-						pBot->pBotPickupItem = nullptr;
+						pBot->pBotPickupItem = NULL;
 				}
 				else if (FStrEq(STRING(pBot->pBotPickupItem->v.classname), "grenade") ||
 						 FStrEq(STRING(pBot->pBotPickupItem->v.classname), "monster_satchel"))
@@ -1862,7 +1862,7 @@ void BotThink( bot_t *pBot )
 							BotFixIdealYaw(pEdict);
 						}
 
-						pBot->pBotPickupItem = nullptr;
+						pBot->pBotPickupItem = NULL;
 					}
 				}
 			}
@@ -2080,7 +2080,7 @@ void BotThink( bot_t *pBot )
 						BotRandomTurn(pBot);
 						
 						// is the bot trying to get to an item?...
-						if (pBot->pBotPickupItem != nullptr)
+						if (pBot->pBotPickupItem != NULL)
 						{
 							// don't look for items for a while since the bot
 							// could be stuck trying to get to an item
@@ -2109,7 +2109,7 @@ void BotThink( bot_t *pBot )
 	if (pBot->f_do_duck_time > gpGlobals->time && pBot->f_delay_duck_time < gpGlobals->time)
 		pEdict->v.button |= IN_DUCK;
 
-	if (pBot->pBotEnemy == nullptr && pBot->f_switch_weapon_time < gpGlobals->time)
+	if (pBot->pBotEnemy == NULL && pBot->f_switch_weapon_time < gpGlobals->time)
 	{	// try to select our best weapon
 		pBot->f_switch_weapon_time = gpGlobals->time + 1.0;
 		MAKE_VECTORS( pEdict->v.v_angle );
@@ -2180,7 +2180,7 @@ void BotThink( bot_t *pBot )
 		// bot isn't currently aiming at an ememy...
 		if ((waypoints[pBot->waypoint_goal].flags & W_FL_SNIPER) &&
 			(waypoints[pBot->curr_waypoint_index].flags & W_FL_SNIPER) &&
-			(pBot->pBotEnemy == nullptr))
+			(pBot->pBotEnemy == NULL))
 		{
 			{
 				// check if it's time to adjust aim yet...
@@ -2210,7 +2210,7 @@ void BotThink( bot_t *pBot )
 		}
 	}
 	// someone shot at us, take a look over there (sound also uses this code)
-	if ((pBot->pBotEnemy == nullptr) && (pBot->f_dmg_time >= gpGlobals->time))
+	if ((pBot->pBotEnemy == NULL) && (pBot->f_dmg_time >= gpGlobals->time))
 	{
 		Vector v_direction = pBot->dmg_origin - pEdict->v.origin;
 		Vector v_angles = UTIL_VecToAngles(v_direction);
@@ -2229,14 +2229,14 @@ void BotThink( bot_t *pBot )
 	// always forget goal
 	pBot->v_goal = g_vecZero;
 	// is our goal ent still around?
-	if (pBot->pGoalEnt != nullptr)
+	if (pBot->pGoalEnt != NULL)
 	{
 		if (FStrEq(STRING(pBot->pGoalEnt->v.classname), "monster_scientist") && !IsAlive(pBot->pGoalEnt))
-			pBot->pGoalEnt = nullptr;
+			pBot->pGoalEnt = NULL;
 		if (pBot->pGoalEnt && pBot->pGoalEnt->v.effects & EF_NODRAW)
-			pBot->pGoalEnt = nullptr;
+			pBot->pGoalEnt = NULL;
 
-		if (pBot->pGoalEnt == nullptr)
+		if (pBot->pGoalEnt == NULL)
 		{	// reset our goal point and current waypoint index
 			pBot->f_waypoint_goal_time = gpGlobals->time;
 			pBot->waypoint_goal = pBot->curr_waypoint_index = -1;
@@ -2246,7 +2246,7 @@ void BotThink( bot_t *pBot )
 	if ((pBot->role == ROLE_DEFEND && !pBot->b_defend_patrol) ||
 		(pBot->role == ROLE_ATTACK))
 	{	// defend entity?
-		if (pBot->pGoalEnt != nullptr)
+		if (pBot->pGoalEnt != NULL)
 		{
 			pBot->v_goal = UTIL_GetOrigin(pBot->pGoalEnt);
 			// if we're defending an ally or defending a dropped sci/rsrc, our goal proximity
@@ -2347,7 +2347,7 @@ void BotThink( bot_t *pBot )
 	if (pBot->pAvoid && pBot->f_do_avoid_time <= gpGlobals->time)
 	{
 		pBot->avoid_dir = g_vecZero;
-		pBot->pAvoid = nullptr;
+		pBot->pAvoid = NULL;
 	}
 /*
 	// head toward a waypoint if they're in the level, we have one, and aren't trying to get an item
@@ -2366,13 +2366,13 @@ void BotThink( bot_t *pBot )
 
 		Vector direction;
 
-		if (num_waypoints != 0 && pBot->curr_waypoint_index != -1 && (pBot->pBotPickupItem == nullptr || 
+		if (num_waypoints != 0 && pBot->curr_waypoint_index != -1 && (pBot->pBotPickupItem == NULL || 
 			(pBot->pBotPickupItem && pBot->item_waypoint > -1)) &&
 			pBot->avoid_dir == g_vecZero && !bGoGoal)
 		{	
 			direction = waypoints[pBot->curr_waypoint_index].origin - pEdict->v.origin;
 		}
-		else if (pBot->pBotPickupItem != nullptr && pBot->avoid_dir == g_vecZero && !bGoGoal &&
+		else if (pBot->pBotPickupItem != NULL && pBot->avoid_dir == g_vecZero && !bGoGoal &&
 			pBot->item_waypoint == -1)
 		{	// head toward item instead
 			direction = UTIL_GetOrigin(pBot->pBotPickupItem) - pEdict->v.origin;
@@ -2508,7 +2508,7 @@ void BotListenForFakeSound( bot_t *pBot )
 			if (distance < (pBot->f_sound_sensitivity * fVolume) && bHearingSound)
 			{
 				bHearingSound = FALSE;
-				if (pBot->pBotEnemy == nullptr && pPlayer != pEdict && pPlayer->v.owner != pEdict &&
+				if (pBot->pBotEnemy == NULL && pPlayer != pEdict && pPlayer->v.owner != pEdict &&
 					UTIL_GetTeam(pEdict) != UTIL_GetTeam(pPlayer) && (!pBot->pBotPickupItem ||
 					(pBot->pBotPickupItem &&
 					!(FStrEq(STRING(pBot->pBotPickupItem->v.classname), "func_healthcharger") ||
@@ -2561,7 +2561,7 @@ void BotListenForSound(edict_t *pEntity, const char *pszSample, float fVolume)
 			!(FStrEq(STRING(pBot->pBotPickupItem->v.classname), "func_healthcharger") ||
 			FStrEq(STRING(pBot->pBotPickupItem->v.classname), "func_recharge")))))
 			{
-				if (pBot->pBotEnemy == nullptr && pEntity != pEdict && pEntity->v.owner != pEdict &&
+				if (pBot->pBotEnemy == NULL && pEntity != pEdict && pEntity->v.owner != pEdict &&
 					UTIL_GetTeam(pEdict) != UTIL_GetTeam(pEntity))
 				{
 					// just use dmg time, does the same thing
