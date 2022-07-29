@@ -81,7 +81,7 @@ extern void RoleDetermine();
 extern char *RoleToString(int role);
 extern char *SubroleToString(int subrole);
 
-int number_names = 0;
+static int number_names = 0;
 
 #define MAX_BOT_NAMES 100
 
@@ -1562,7 +1562,7 @@ void BotThink( bot_t *pBot )
 		}
 
 #ifdef _DEBUG
-		ALERT(at_console, "%d? %.1f <= %.1f\n", pBot->respawn_time <= gpGlobals->time, pBot->respawn_time,gpGlobals->time );
+		//ALERT(at_console, "%d? %.1f <= %.1f\n", pBot->respawn_time <= gpGlobals->time, pBot->respawn_time,gpGlobals->time );
 #endif
 
 		// Something went wrong. Reset.
