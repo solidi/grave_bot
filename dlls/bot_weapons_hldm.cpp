@@ -404,7 +404,7 @@ bot_weapon_select_t valve_weapon_select[] =
 		5,						// skill level
 		1,						// priority
 		0.0,					// min primary distance
-		300.0,					// max primary distance
+		400.0,					// max primary distance
 		0.0,					// min secondary distance
 		0.0,					// max secondary distance
 		TRUE,					// can use underwater?
