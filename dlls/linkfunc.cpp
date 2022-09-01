@@ -338,6 +338,8 @@
    LINK_ENTITY_TO_FUNC(weapon_dual_mag60);
    LINK_ENTITY_TO_FUNC(weapon_freezegun);
    LINK_ENTITY_TO_FUNC(plasma);
+   LINK_ENTITY_TO_FUNC(weapon_rocketcrowbar);
+   LINK_ENTITY_TO_FUNC(drunk_rocket);
    LINK_ENTITY_TO_FUNC(rune_frag);
    LINK_ENTITY_TO_FUNC(rune_vampire);
    LINK_ENTITY_TO_FUNC(rune_protect);
