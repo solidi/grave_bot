@@ -533,8 +533,8 @@ bot_weapon_select_t valve_weapon_select[] =
 		FALSE,					// can use underwater?
 		0,						// how long does this weapon take to reload?
 		100,						// times out of 100 to use primary fire
-		1,						// minimum ammout of primary ammo needed to fire
-		1,						// minimum ammout of seconday ammo needed to fire
+		2,						// minimum ammout of primary ammo needed to fire
+		0,						// minimum ammout of seconday ammo needed to fire
 		FALSE,					// hold down primary fire button to use?
 		FALSE,					// hold down secondary fire button to use?
 		FALSE,					// charge weapon using primary fire?
@@ -1189,6 +1189,37 @@ bot_weapon_select_t valve_weapon_select[] =
 		FALSE,					// hold down secondary fire button to use?
 		FALSE,					// charge weapon using primary fire?
 		FALSE,					// charge weapon using secondary fire?
+		0.0,					// time to charge weapon (primary)
+		0.0						// time to charge weapon (secondary)
+	},
+	// railgun
+	{
+		VALVE_WEAPON_DUAL_RAILGUN,		// id
+		"weapon_dual_railgun",			// classname
+		"dual_railgun",				// third person model
+		{						// primary ammo pickup classnames
+			"ammo_gaussclip",
+			"",
+		},
+		{						// secondary ammo pickup classnames
+			"",
+			"",
+		},
+		5,						// skill level
+		3,						// priority
+		0.0,					// min primary distance
+		9999.0,					// max primary distance
+		0.0,					// min secondary distance
+		9999.0,					// max secondary distance
+		FALSE,					// can use underwater?
+		0,						// how long does this weapon take to reload?
+		50,						// times out of 100 to use primary fire
+		2,						// minimum ammout of primary ammo needed to fire
+		0,						// minimum ammout of seconday ammo needed to fire
+		FALSE,					// hold down primary fire button to use?
+		FALSE,					// hold down secondary fire button to use?
+		FALSE,					// charge weapon using primary fire?
+		TRUE,					// charge weapon using secondary fire?
 		0.0,					// time to charge weapon (primary)
 		0.0						// time to charge weapon (secondary)
 	},
@@ -2482,6 +2513,39 @@ bot_fire_delay_t valve_fire_delay[] =
 			0.5,
 			0.7,
 			1.0
+		}
+	},
+	{
+		VALVE_WEAPON_DUAL_RAILGUN,
+		0.2,
+		{
+			0.0,
+			0.0,
+			0.3,
+			0.5,
+			1.0
+		},
+		{
+			0.0,
+			0.1,
+			0.5,
+			0.8,
+			1.2
+		},
+		1.0,
+		{
+			0.0,
+			0.0,
+			0.5,
+			0.8,
+			1.2
+		},
+		{
+			0.0,
+			0.7,
+			1.0,
+			1.5,
+			2.0
 		}
 	},
 	// terminator 
