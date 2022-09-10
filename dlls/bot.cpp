@@ -108,7 +108,7 @@ char *valve_bot_names[VALVE_MAX_SKINS] = {
 	"H-Grunt", "Recon", "Robo", "Scientist", "Zombie"};
 
 char *ice_bot_names[ICE_MAX_SKINS] = {
-   "Army", "Assassin", "Alpina", "Baer", Commando", "Grunt", "HHev", "Holo", "HotFire",
+   "Army", "Assassin", "Alpina", "Baer", "Commando", "Grunt", "HHev", "Holo", "HotFire",
    "Iceman", "Navy", "Recon", "Santa", "Snowman", "Stormtrooper", "Swat"};
 						
 char bot_names[MAX_BOT_NAMES][BOT_NAME_LEN+1];
