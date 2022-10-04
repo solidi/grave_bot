@@ -69,9 +69,9 @@ double pi = 3.1415926535897932384626433832795;
 
 bot_t bots[32];   // max of 32 bots in a game
 bool b_observer_mode = FALSE;
-bool b_chat_debug = FALSE;
-bool b_botdontshoot = FALSE;
-bool b_botpause = FALSE;
+extern bool b_chat_debug;
+extern bool b_botdontshoot;
+extern bool b_botpause;
 extern bool b_random_color;
 extern bot_weapon_t weapon_defs[MAX_WEAPONS];
 extern bot_weapon_select_t valve_weapon_select[];
@@ -975,7 +975,7 @@ void BotFindItem( bot_t *pBot )
 	// forget about item if it we picked it up
 	if (pBot->f_last_item_found > 0 && pBot->f_last_item_found < (gpGlobals->time - 5.0))
 	{
-		if (b_chat_debug)
+		if (b_chat_debug && pBot && pBot->pBotPickupItem)
 		{
 			sprintf(pBot->debugchat, "I tried to get to %s for too long!\n",
 				STRING(pBot->pBotPickupItem->v.classname));
@@ -990,7 +990,7 @@ void BotFindItem( bot_t *pBot )
 	if (pBot->pBotPickupItem && ((pBot->pBotPickupItem->v.effects & EF_NODRAW) ||
 		!BotEntityIsVisible(pBot, pBot->pBotPickupItem)))
 	{
-		if (b_chat_debug)
+		if (b_chat_debug && pBot && pBot->pBotPickupItem)
 		{
 			sprintf(pBot->debugchat, "I can't see %s anymore.\n",
 				STRING(pBot->pBotPickupItem->v.classname));
@@ -1389,7 +1389,7 @@ void BotFindItem( bot_t *pBot )
 		int item_wpt = WaypointFindNearest(pPickupEntity, 48, team);
 		if (item_wpt != pBot->curr_waypoint_index)
 			pBot->item_waypoint = WaypointFindNearest(pPickupEntity, 48, team);
-		if (b_chat_debug)
+		if (b_chat_debug && pPickupEntity && pBot)
 		{
 			sprintf(pBot->debugchat, "I found a(n) %s at %i\n", STRING(pPickupEntity->v.classname),
 				pBot->item_waypoint);
@@ -2514,7 +2514,7 @@ void BotListenForFakeSound( bot_t *pBot )
 					!(FStrEq(STRING(pBot->pBotPickupItem->v.classname), "func_healthcharger") ||
 					FStrEq(STRING(pBot->pBotPickupItem->v.classname), "func_recharge")))))
 				{
-					if (b_chat_debug)
+					if (b_chat_debug && pPlayer)
 					{
 						sprintf(pBot->debugchat, "I can hear %s!\n", STRING(pPlayer->v.netname));
 						UTIL_HostSay(pBot->pEdict, 0, pBot->debugchat);
@@ -2568,9 +2568,9 @@ void BotListenForSound(edict_t *pEntity, const char *pszSample, float fVolume)
 					pBot->dmg_origin = pEntity->v.origin;
 					pBot->f_dmg_time = gpGlobals->time + 1.0;
 
-					if (b_chat_debug)
+					if (b_chat_debug && pBot)
 					{
-						sprintf(pBot->debugchat, "I heard %s\n", pBot->name, pszSample);
+						sprintf(pBot->debugchat, "I heard %s\n", pBot->name);
 						UTIL_HostSay(pBot->pEdict, 0, pBot->debugchat);
 					}
 				}
