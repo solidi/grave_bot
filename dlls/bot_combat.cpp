@@ -1058,7 +1058,7 @@ void BotShootAtEnemy( bot_t *pBot )
 			pBot->old_waypoint_goal = pBot->waypoint_goal;
 
 		pBot->b_engaging_enemy = TRUE;
-		if (b_chat_debug)
+		if (b_chat_debug && pBot && pBot->pBotEnemy)
 		{
 			sprintf(pBot->debugchat, "I am going to engage %s...\n", STRING(pBot->pBotEnemy->v.netname));
 			UTIL_HostSay(pBot->pEdict, 0, pBot->debugchat);
@@ -1071,7 +1071,7 @@ void BotShootAtEnemy( bot_t *pBot )
 
 	if (pBot->b_engaging_enemy && !bShouldEngage)
 	{
-		if (b_chat_debug)
+		if (b_chat_debug && pBot && pBot->pBotEnemy)
 		{
 			sprintf(pBot->debugchat, "I gave up engaging %s!\n", STRING(pBot->pBotEnemy->v.netname));
 			UTIL_HostSay(pBot->pEdict, 0, pBot->debugchat);

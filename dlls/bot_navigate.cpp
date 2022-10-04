@@ -1435,7 +1435,7 @@ void BotEvaluateGoalSI( bot_t *pBot )
 		pBot->waypoint_goal = -1;
 		pBot->f_waypoint_goal_time = -1;
 
-		if (b_chat_debug)
+		if (b_chat_debug && pBot)
 		{
 			sprintf(szSub, "Changing role to %s...", SubroleToString(pBot->subrole));
 			// all teams for now (WILL CHANGE FOR PUBLIC RELEASE)
@@ -1725,7 +1725,7 @@ int BotFindWaypointGoal( bot_t *pBot )
 		{
 			if (b_chat_debug)
 			{
-				sprintf(pBot->debugchat, "I found a waypoint goal for enemy at %i!\n", int(pBot->name), index);
+				sprintf(pBot->debugchat, "I found a waypoint goal for enemy at %i!\n", index);
 				UTIL_HostSay(pBot->pEdict, 0, pBot->debugchat);
 			}
 			pBot->wpt_goal_type = WPT_GOAL_ENEMY;
@@ -1934,7 +1934,7 @@ int BotFindWaypointGoalSI( bot_t *pBot )
 				distance = WaypointDistanceFromTo(pBot->curr_waypoint_index, temp_index, team); 
 				if (distance < mindistance)
 				{
-					if (b_chat_debug)
+					if (b_chat_debug && select_index > -1)
 					{
 						sprintf(pBot->debugchat, "My goal is %s - %f\n", pSelect[select_index].weapon_name,
 							BotAssessPrimaryAmmo(pBot, pSelect[select_index].iId));

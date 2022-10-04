@@ -58,9 +58,9 @@ extern WAYPOINT waypoints[MAX_WAYPOINTS];
 extern float wp_display_time[MAX_WAYPOINTS];
 extern bot_t bots[32];
 extern bool b_observer_mode;
-extern bool b_chat_debug;
-extern bool b_botdontshoot;
-extern bool b_botpause;
+bool b_chat_debug = FALSE;
+bool b_botdontshoot = FALSE;
+bool b_botpause = FALSE;
 char welcome_msg[] = "Grave Bot by Ghoul - Based on HPB Bot template 4 by botman and Pierre-Marie Baty\n";
 
 extern float g_flVomiting[32];
