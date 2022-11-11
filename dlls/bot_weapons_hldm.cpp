@@ -1223,6 +1223,37 @@ bot_weapon_select_t valve_weapon_select[] =
 		0.0,					// time to charge weapon (primary)
 		0.0						// time to charge weapon (secondary)
 	},
+	// gravity gun
+	{
+		VALVE_WEAPON_GRAVITYGUN,	// id
+		"weapon_gravitygun",		// classname
+		"gauss",				// third person model
+		{						// primary ammo pickup classnames
+			"",
+			"",
+		},
+		{						// secondary ammo pickup classnames
+			"",
+			"",
+		},
+		5,						// skill level
+		9,						// priority
+		0.0,					// min primary distance
+		75.0,					// max primary distance
+		0.0,					// min secondary distance
+		1000.0,					// max secondary distance
+		TRUE,					// can use underwater?
+		0,						// how long does this weapon take to reload?
+		50,						// times out of 100 to use primary fire
+		0,						// minimum ammout of primary ammo needed to fire
+		0,						// minimum ammout of seconday ammo needed to fire
+		FALSE,					// hold down primary fire button to use?
+		FALSE,					// hold down secondary fire button to use?
+		FALSE,					// charge weapon using primary fire?
+		FALSE,					// charge weapon using secondary fire?
+		0.0,					// time to charge weapon (primary)
+		0.0						// time to charge weapon (secondary)
+	},
 	/* terminator */
 	{
 		0,
