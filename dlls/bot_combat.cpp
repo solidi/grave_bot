@@ -789,9 +789,18 @@ bool BotFireWeapon(Vector v_enemy, bot_t *pBot, int weapon_choice, bool nofire)
 			if (mod_id == SI_DLL && iId == SI_WEAPON_SNUZI)
 				pEdict->v.button |= IN_ATTACK2;
 
-			if (distance < 100) {
+			if (distance <= 80) {
 				// ALERT(at_aiconsole, "Kick or punch time!");
-				pEdict->v.impulse = 206 + RANDOM_LONG(0, 2);
+				pEdict->v.impulse = 206 + RANDOM_LONG(0, 1);
+			} else if (distance <= 120) {
+				// ALERT(at_aiconsole, "Flip!");
+				pEdict->v.impulse = 210 + RANDOM_LONG(0, 2);
+			} else if (distance <= 250) {
+				// ALERT(at_aiconsole, "Slide!");
+				pEdict->v.impulse = 208;
+			} else if (distance <= 450) {
+				// ALERT(at_aiconsole, "Throw grenade!");
+				pEdict->v.impulse = 209;
 			}
 
 			if (pSelect[final_index].primary_fire_charge)
