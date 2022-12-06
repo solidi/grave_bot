@@ -56,6 +56,9 @@ void BotCheckTeamplay()
 //	ALERT(at_console, "BotCheckTeamplay\n");
 
 	is_team_play = CVAR_GET_FLOAT("mp_teamplay");  // teamplay enabled?
+
+	if (strstr(CVAR_GET_STRING("mp_gamemode"), "iceman"))
+		is_team_play = TRUE;
 	
 	checked_teamplay = TRUE;
 }
