@@ -354,6 +354,7 @@
    LINK_ENTITY_TO_FUNC(func_snow);
    LINK_ENTITY_TO_FUNC(env_rain);
    LINK_ENTITY_TO_FUNC(func_rain);
+   LINK_ENTITY_TO_FUNC(monster_barrel);
 
    // Science and Industry
    LINK_ENTITY_TO_FUNC(ammo_rocketpistol);
