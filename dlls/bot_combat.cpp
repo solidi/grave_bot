@@ -102,7 +102,9 @@ edict_t *BotFindEnemy( bot_t *pBot )
 			pBot->pBotEnemy = NULL;
 		// Cannot see transparent player (with rune)
 		}
-		else if (pBot->pBotEnemy->v.rendermode == kRenderTransAlpha && pBot->pBotEnemy->v.renderamt < 60) {
+		else if (pBot->pBotEnemy->v.rendermode == kRenderTransAlpha &&
+				 pBot->pBotEnemy->v.renderamt < 60 &&
+				 (pBot->pBotEnemy->v.origin - pEdict->v.origin).Length() > 192) {
 			pBot->pBotEnemy = NULL;
 		}
 		else if (FInViewCone( &vecEnd, pEdict ) &&
