@@ -2806,6 +2806,9 @@ unsigned short WaypointRouteFromTo(int src, int dest, int team)
 	
 	pFromTo = from_to[team];
 
+	if (pFromTo[team] == 0)  // no info, return
+		return -1;
+
 	unsigned short result = pFromTo[src * route_num_waypoints + dest];
 
 	return (result >= MAX_WAYPOINTS) ? -1 : result;
@@ -2841,6 +2844,9 @@ int WaypointDistanceFromTo(int src, int dest, int team)
 		return -1;
 	
 	pShortestPath = shortest_path[team];
+
+	if (pShortestPath[team] == 0)  // no info, return
+		return -1;
 	
 	return (int)(pShortestPath[src * route_num_waypoints + dest]);
 }
