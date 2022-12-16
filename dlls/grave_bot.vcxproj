@@ -315,5 +315,6 @@
   </ImportGroup>
   <Target Name="AfterBuild">
     <Copy SourceFiles="%(Link.OutputFile)" DestinationFolder="..\..\libs\dlls" SkipUnchangedFiles="false" />
+    <Copy SourceFiles="$(OutDir)$(TargetName).pdb" DestinationFolder="..\..\libs\pdbs" SkipUnchangedFiles="false" />
   </Target>
 </Project>
