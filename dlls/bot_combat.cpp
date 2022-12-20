@@ -35,8 +35,8 @@ extern edict_t *listenserver_edict;
 extern bool b_chat_debug;
 FILE *fp;
 
-float aim_tracking_x_scale[5] = {0, 1.0, 2.0, 3.0, 4.0};
-float aim_tracking_y_scale[5] = {0, 1.0, 2.0, 3.0, 4.0};
+float aim_tracking_x_scale[5] = {1.0, 2.0, 4.0, 5.0, 6.0};
+float aim_tracking_y_scale[5] = {1.0, 2.0, 4.0, 5.0, 6.0};
 // who is vomiting?
 float g_flVomiting[32];
 // reaction time multiplier
