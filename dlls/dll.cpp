@@ -2967,7 +2967,7 @@ void ClearEdict(edict_t *pEdict)
 	pEdict->v.spawnflags = 0;
 	pEdict->v.flags = 0;
 	
-	pEdict->v.colormap = 0;		// lowbyte topcolor, highbyte bottomcolor
+	pEdict->v.colormap = ENTINDEX(pEdict);		// lowbyte topcolor, highbyte bottomcolor
 	pEdict->v.team = 0;
 
 	pEdict->v.max_health = 0.0;
@@ -3000,7 +3000,7 @@ void ClearEdict(edict_t *pEdict)
 	// disconnect needs this?
 	//pEdict->v.pContainingEntity = NULL;
 
-	pEdict->v.playerclass = 0;
+	pEdict->v.playerclass = 1;
 	pEdict->v.maxspeed = 0.0;
 
 	pEdict->v.fov = 0.0;
