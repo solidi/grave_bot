@@ -481,6 +481,7 @@ bot_weapon_select_t valve_weapon_select[] =
 		0.0,					// time to charge weapon (primary)
 		0.0						// time to charge weapon (secondary)
 	},
+	// sniper rifle
 	{
 		VALVE_WEAPON_SNIPER_RIFLE,	// id
 		"weapon_sniperrifle",		// classname
@@ -604,6 +605,7 @@ bot_weapon_select_t valve_weapon_select[] =
 		0.0,					// time to charge weapon (primary)
 		0.0						// time to charge weapon (secondary)
 	},
+	// chaingun
 	{
 		VALVE_WEAPON_CHAINGUN,		// id
 		"weapon_chaingun",			// classname
@@ -851,7 +853,7 @@ bot_weapon_select_t valve_weapon_select[] =
 		0.0,					// time to charge weapon (primary)
 		0.0						// time to charge weapon (secondary)
 	},
-	// shotgun
+	// 12 gauge
 	{
 		VALVE_WEAPON_12GAUGE,	// id
 		"weapon_12gauge",		// classname
@@ -1192,7 +1194,7 @@ bot_weapon_select_t valve_weapon_select[] =
 		0.0,					// time to charge weapon (primary)
 		0.0						// time to charge weapon (secondary)
 	},
-	// railgun
+	// dual railgun
 	{
 		VALVE_WEAPON_DUAL_RAILGUN,		// id
 		"weapon_dual_railgun",			// classname
@@ -1254,6 +1256,37 @@ bot_weapon_select_t valve_weapon_select[] =
 		0.0,					// time to charge weapon (primary)
 		0.0						// time to charge weapon (secondary)
 	},
+	// flame thrower
+	{
+		VALVE_WEAPON_FLAMETHROWER,		// id
+		"weapon_flamethrower",			// classname
+		"flamethrower",					// third person model
+		{						// primary ammo pickup classnames
+			"ammo_gaussclip",
+			"",
+		},
+		{						// secondary ammo pickup classnames
+			"",
+			"",
+		},
+		5,						// skill level
+		5,						// priority
+		32.0,					// min primary distance
+		1024.0,					// max primary distance
+		32.0,					// min secondary distance
+		1024.0,					// max secondary distance
+		FALSE,					// can use underwater?
+		3,						// how long does this weapon take to reload?
+		70,						// times out of 100 to use primary fire
+		1,						// minimum ammout of primary ammo needed to fire
+		1,						// minimum ammout of seconday ammo needed to fire
+		TRUE,					// hold down primary fire button to use?
+		TRUE,					// hold down secondary fire button to use?
+		FALSE,					// charge weapon using primary fire?
+		FALSE,					// charge weapon using secondary fire?
+		0.0,					// time to charge weapon (primary)
+		0.0						// time to charge weapon (secondary)
+	},
 	/* terminator */
 	{
 		0,
@@ -1292,6 +1325,7 @@ bot_weapon_select_t valve_weapon_select[] =
 
 bot_fire_delay_t valve_fire_delay[] =
 {
+	// crowbar
 	{
 		VALVE_WEAPON_CROWBAR,
 		0.0,
@@ -1325,6 +1359,7 @@ bot_fire_delay_t valve_fire_delay[] =
 			0.0
 		}
 	},
+	// egon
 	{
 		VALVE_WEAPON_EGON,
 		0.0,
@@ -1358,6 +1393,7 @@ bot_fire_delay_t valve_fire_delay[] =
 			0.0
 		}
 	},
+	// gauss
 	{
 		VALVE_WEAPON_GAUSS,
 		0.2,
@@ -1391,6 +1427,7 @@ bot_fire_delay_t valve_fire_delay[] =
 			2.0
 		}
 	},
+	// rpg
 	{
 		VALVE_WEAPON_RPG,
 		1.5,
@@ -1424,6 +1461,7 @@ bot_fire_delay_t valve_fire_delay[] =
 			0.0
 		}
 	},
+	// shotgun
 	{
 		VALVE_WEAPON_SHOTGUN,
 		0.75,
@@ -1457,6 +1495,7 @@ bot_fire_delay_t valve_fire_delay[] =
 			1.2
 		}
 	},
+	// crossbow
 	{
 		VALVE_WEAPON_CROSSBOW,
 		0.75,
@@ -1490,6 +1529,7 @@ bot_fire_delay_t valve_fire_delay[] =
 			0.0
 		}
 	},
+	// python
 	{
 		VALVE_WEAPON_PYTHON,
 		0.75,
@@ -1523,6 +1563,7 @@ bot_fire_delay_t valve_fire_delay[] =
 			0.0
 		}
 	},
+	// mp5
 	{
 		VALVE_WEAPON_MP5,
 		0.1,
@@ -1556,6 +1597,7 @@ bot_fire_delay_t valve_fire_delay[] =
 			2.0
 		}
 	},
+	// 9mm
 	{
 		VALVE_WEAPON_GLOCK,
 		0.2,
@@ -1589,6 +1631,7 @@ bot_fire_delay_t valve_fire_delay[] =
 			0.4
 		}
 	},
+	// hornetgun
 	{
 		VALVE_WEAPON_HORNETGUN,
 		0.25,
@@ -1622,6 +1665,7 @@ bot_fire_delay_t valve_fire_delay[] =
 			0.0
 		}
 	},
+	// handgrenade
 	{
 		VALVE_WEAPON_HANDGRENADE,
 		0.5,
@@ -1655,6 +1699,7 @@ bot_fire_delay_t valve_fire_delay[] =
 			0.0
 		}
 	},
+	// snark
 	{
 		VALVE_WEAPON_SNARK,
 		0.1,
@@ -1688,6 +1733,7 @@ bot_fire_delay_t valve_fire_delay[] =
 			0.0
 		}
 	},
+	// vest
 	{
 		VALVE_WEAPON_VEST,
 		0.0,
@@ -1721,6 +1767,7 @@ bot_fire_delay_t valve_fire_delay[] =
 			0.0
 		}
 	},
+	// knife
 	{
 		VALVE_WEAPON_KNIFE,
 		0.0,
@@ -1754,6 +1801,7 @@ bot_fire_delay_t valve_fire_delay[] =
 			0.0
 		}
 	},
+	// chumtoad
 	{
 		VALVE_WEAPON_CHUMTOAD,
 		0.1,
@@ -1787,6 +1835,7 @@ bot_fire_delay_t valve_fire_delay[] =
 			0.0
 		}
 	},
+	// sniper
 	{
 		VALVE_WEAPON_SNIPER_RIFLE,
 		0.75,
@@ -1820,6 +1869,7 @@ bot_fire_delay_t valve_fire_delay[] =
 			0.0
 		}
 	},
+	// railgun
 	{
 		VALVE_WEAPON_RAILGUN,
 		0.2,
@@ -1853,6 +1903,7 @@ bot_fire_delay_t valve_fire_delay[] =
 			2.0
 		}
 	},
+	// cannon
 	{
 		VALVE_WEAPON_CANNON,
 		1.5,
@@ -1886,6 +1937,7 @@ bot_fire_delay_t valve_fire_delay[] =
 			0.0
 		}
 	},
+	// mag60
 	{
 		VALVE_WEAPON_MAG60,
 		0.0,
@@ -1919,6 +1971,7 @@ bot_fire_delay_t valve_fire_delay[] =
 			0.4
 		}
 	},
+	// chaingun
 	{
 		VALVE_WEAPON_CHAINGUN,
 		0.0,
@@ -1952,6 +2005,7 @@ bot_fire_delay_t valve_fire_delay[] =
 			0.0
 		}
 	},
+	// glauncher
 	{
 		VALVE_WEAPON_GLAUNCHER,
 		0.1,
@@ -1985,6 +2039,7 @@ bot_fire_delay_t valve_fire_delay[] =
 			2.0
 		}
 	},
+	// smg
 	{
 		VALVE_WEAPON_SMG,
 		0.1,
@@ -2018,6 +2073,7 @@ bot_fire_delay_t valve_fire_delay[] =
 			2.0
 		}
 	},
+	// usas
 	{
 		VALVE_WEAPON_USAS,
 		0.75,
@@ -2051,6 +2107,7 @@ bot_fire_delay_t valve_fire_delay[] =
 			1.2
 		}
 	},
+	// fists
 	{
 		VALVE_WEAPON_FISTS,
 		0.0,
@@ -2084,6 +2141,7 @@ bot_fire_delay_t valve_fire_delay[] =
 			0.0
 		}
 	},
+	// wrench
 	{
 		VALVE_WEAPON_WRENCH,
 		0.0,
@@ -2117,6 +2175,7 @@ bot_fire_delay_t valve_fire_delay[] =
 			0.0
 		}
 	},
+	// snowball
 	{
 		VALVE_WEAPON_SNOWBALL,
 		0.5,
@@ -2150,6 +2209,7 @@ bot_fire_delay_t valve_fire_delay[] =
 			0.0
 		}
 	},
+	// chainsaw
 	{
 		VALVE_WEAPON_CHAINSAW,
 		0.0,
@@ -2183,6 +2243,7 @@ bot_fire_delay_t valve_fire_delay[] =
 			0.0
 		}
 	},
+	// 12 gauge
 	{
 		VALVE_WEAPON_12GAUGE,
 		0.75,
@@ -2216,6 +2277,7 @@ bot_fire_delay_t valve_fire_delay[] =
 			1.2
 		}
 	},
+	// nuke
 	{
 		VALVE_WEAPON_NUKE,
 		1.5,
@@ -2249,6 +2311,7 @@ bot_fire_delay_t valve_fire_delay[] =
 			0.0
 		}
 	},
+	// deagle
 	{
 		VALVE_WEAPON_DEAGLE,
 		0.75,
@@ -2282,6 +2345,7 @@ bot_fire_delay_t valve_fire_delay[] =
 			0.0
 		}
 	},
+	// dual deagle
 	{
 		VALVE_WEAPON_DUAL_DEAGLE,
 		0.75,
@@ -2315,6 +2379,7 @@ bot_fire_delay_t valve_fire_delay[] =
 			0.0
 		}
 	},
+	// dual rpg
 	{
 		VALVE_WEAPON_DUAL_RPG,
 		1.5,
@@ -2348,6 +2413,7 @@ bot_fire_delay_t valve_fire_delay[] =
 			0.0
 		}
 	},
+	// dual smg
 	{
 		VALVE_WEAPON_DUAL_SMG,
 		0.1,
@@ -2381,6 +2447,7 @@ bot_fire_delay_t valve_fire_delay[] =
 			2.0
 		}
 	},
+	// dual wrench
 	{
 		VALVE_WEAPON_DUAL_WRENCH,
 		0.0,
@@ -2414,6 +2481,7 @@ bot_fire_delay_t valve_fire_delay[] =
 			0.0
 		}
 	},
+	// dual usas
 	{
 		VALVE_WEAPON_DUAL_USAS,
 		0.75,
@@ -2447,6 +2515,7 @@ bot_fire_delay_t valve_fire_delay[] =
 			1.2
 		}
 	},
+	// freezegun
 	{
 		VALVE_WEAPON_FREEZEGUN,
 		0.2,
@@ -2480,6 +2549,7 @@ bot_fire_delay_t valve_fire_delay[] =
 			2.0
 		}
 	},
+	// dual mag60
 	{
 		VALVE_WEAPON_DUAL_MAG60,
 		0.1,
@@ -2513,6 +2583,7 @@ bot_fire_delay_t valve_fire_delay[] =
 			2.0
 		}
 	},
+	// rocket crowbar
 	{
 		VALVE_WEAPON_ROCKETCROWBAR,
 		0.0,
@@ -2546,6 +2617,7 @@ bot_fire_delay_t valve_fire_delay[] =
 			1.0
 		}
 	},
+	// dual railgun
 	{
 		VALVE_WEAPON_DUAL_RAILGUN,
 		0.2,
@@ -2577,6 +2649,74 @@ bot_fire_delay_t valve_fire_delay[] =
 			1.0,
 			1.5,
 			2.0
+		}
+	},
+	// gravitygun
+	{
+		VALVE_WEAPON_GRAVITYGUN,
+		0.0,
+		{
+			0.0,
+			0.0,
+			0.0,
+			0.0,
+			0.0
+		},
+		{
+			0.0,
+			0.0,
+			0.0,
+			0.0,
+			0.0
+		},
+		0.0,
+		{
+			0.0,
+			0.0,
+			0.0,
+			0.0,
+			0.0
+		},
+		{
+			0.0,
+			0.0,
+			0.0,
+			0.0,
+			0.0
+		}
+	},
+	// flamethrower
+	{
+		VALVE_WEAPON_FLAMETHROWER,
+		0.0,
+		{
+			0.0,
+			0.0,
+			0.0,
+			0.0,
+			0.0
+		},
+		{
+			0.0,
+			0.0,
+			0.0,
+			0.0,
+			0.0
+		},
+		0.0,
+		{
+			0.0,
+			0.0,
+			0.0,
+			0.0,
+			0.0
+		},
+		{
+			0.0,
+			0.0,
+			0.0,
+			0.0,
+			0.0
 		}
 	},
 	// terminator 
