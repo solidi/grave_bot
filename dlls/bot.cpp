@@ -179,6 +179,10 @@ void BotSpawnInit( bot_t *pBot )
 	pBot->v_curr_direction = g_vecZero;
 	pBot->v_prev_origin = Vector(9999.0, 9999.0, 9999.0);
 	pBot->prev_time = gpGlobals->time;
+
+	// Unstick move on every spawn, for map change
+	pBot->msecdel = gpGlobals->time;
+	// ---
 	
 	pBot->pBotPickupItem = NULL;
 
