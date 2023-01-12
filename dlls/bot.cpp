@@ -307,7 +307,6 @@ void BotSpawnInit( bot_t *pBot )
 
 	pBot->respawn_time = 0;
 	pBot->respawn_set = FALSE;
-	pBot->weapons2 = 0;
 	pBot->b_hasgrenade = FALSE;
 
 	if (mod_id == SI_DLL)
@@ -744,6 +743,7 @@ void BotCreate( edict_t *pPlayer, const char *arg1, const char *arg2,
 
 		pBot = &bots[index];
 		pBot->pEdict = BotEnt;
+		pBot->weapons2 = 0;
 
 		// create the player entity by calling MOD's player function
 		// (from LINK_ENTITY_TO_CLASS for player object)
@@ -1552,6 +1552,7 @@ void BotThink( bot_t *pBot )
 	{
 		if (pBot->need_to_initialize)
 		{
+			pBot->weapons2 = 0;
 			BotSpawnInit(pBot);
 
 			pBot->need_to_initialize = FALSE;
