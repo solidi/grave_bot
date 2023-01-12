@@ -2966,6 +2966,7 @@ void ClearEdict(edict_t *pEdict)
 
 	pEdict->v.spawnflags = 0;
 	pEdict->v.flags = 0;
+	pEdict->v.flags |= FL_FAKECLIENT; // server messages were getting through, so set immediately
 	
 	pEdict->v.colormap = ENTINDEX(pEdict);		// lowbyte topcolor, highbyte bottomcolor
 	pEdict->v.team = 0;

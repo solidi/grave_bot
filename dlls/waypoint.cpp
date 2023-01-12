@@ -1240,6 +1240,9 @@ int WaypointFindNearestAiming(Vector v_origin)
 void WaypointDrawBeam(edict_t *pEntity, Vector start, Vector end, int width,
 					  int noise, int red, int green, int blue, int brightness, int speed)
 {
+	if ( pEntity->v.flags & FL_FAKECLIENT ) // No bots
+		return;
+
 	MESSAGE_BEGIN(MSG_ONE, SVC_TEMPENTITY, NULL, pEntity);
 	WRITE_BYTE( TE_BEAMPOINTS);
 	WRITE_COORD(start.x);
