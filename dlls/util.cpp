@@ -589,7 +589,7 @@ void UTIL_ShowMenu( edict_t *pEdict, int slots, int displaytime, bool needmore, 
 void UTIL_BuildFileName(char *filename, char *arg1, char *arg2)
 {
 	if (mod_id == VALVE_DLL)
-		strcpy(filename, "ice_beta3/");
+		strcpy(filename, "ice_beta4/");
 	else if (mod_id == CRABBED_DLL)
 		strcpy(filename, "crabbed/");
 	else if (mod_id == SI_DLL)
