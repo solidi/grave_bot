@@ -3,12 +3,17 @@ CFG=release
 endif
 BUILD_DIR=$(CFG)
 
+DEBUG_CFLAGS=
+ifeq "$(CFG)" "debug"
+	DEBUG_CFLAGS=-D_DEBUG -DDEBUG
+endif
+
 CPP = g++-4.8 -m32
 TARGET = gravebot
 ARCHFLAG = i686
 BASEFLAGS = -Dstricmp=strcasecmp -Dstrcmpi=strcasecmp
 OPTFLAGS = 
-CPPFLAGS = ${BASEFLAGS} ${OPTFLAGS} -march=${ARCHFLAG} -mtune=generic -msse2 -O2 -m32 -mfpmath=sse -finline-functions -pipe -w -I"../metamod" -I"../common" -I"../dlls" -I"../engine" -I"../pm_shared"
+CPPFLAGS = ${BASEFLAGS} ${OPTFLAGS} ${DEBUG_CFLAGS} -march=${ARCHFLAG} -mtune=generic -msse2 -O2 -m32 -mfpmath=sse -finline-functions -pipe -w -I"../metamod" -I"../common" -I"../dlls" -I"../engine" -I"../pm_shared"
 
 OBJ = 	bot.o \
 	bot_client.o \
