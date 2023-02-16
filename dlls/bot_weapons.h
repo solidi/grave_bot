@@ -56,6 +56,7 @@
 #define VALVE_WEAPON_DUAL_RAILGUN	43
 #define VALVE_WEAPON_GRAVITYGUN		44
 #define VALVE_WEAPON_FLAMETHROWER	45
+#define VALVE_WEAPON_DUAL_FLAMETHROWER	46
 
 #define VALVE_MAX_NORMAL_BATTERY   100
 
@@ -236,7 +237,7 @@ typedef struct
 
 typedef struct
 {
-	char	szClassname[24];		// classname (weapon_whatever)
+	char	szClassname[32];		// classname (weapon_whatever)
 	int		iAmmo1;					// ammo index for primary ammo
 	int		iAmmo1Max;				// max primary ammo
 	int		iAmmo2;					// ammo index for secondary ammo

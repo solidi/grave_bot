@@ -358,6 +358,7 @@
    LINK_ENTITY_TO_FUNC(flameball);
    LINK_ENTITY_TO_FUNC(flamestream);
    LINK_ENTITY_TO_FUNC(weapon_flamethrower);
+   LINK_ENTITY_TO_FUNC(weapon_dual_flamethrower);
 
    // Science and Industry
    LINK_ENTITY_TO_FUNC(ammo_rocketpistol);
