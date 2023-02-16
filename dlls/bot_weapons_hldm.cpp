@@ -1287,6 +1287,37 @@ bot_weapon_select_t valve_weapon_select[] =
 		0.0,					// time to charge weapon (primary)
 		0.0						// time to charge weapon (secondary)
 	},
+	// dual flame thrower
+	{
+		VALVE_WEAPON_DUAL_FLAMETHROWER,		// id
+		"weapon_dual_flamethrower",			// classname
+		"flamethrower",					// third person model
+		{						// primary ammo pickup classnames
+			"ammo_gaussclip",
+			"",
+		},
+		{						// secondary ammo pickup classnames
+			"",
+			"",
+		},
+		5,						// skill level
+		4,						// priority
+		32.0,					// min primary distance
+		1024.0,					// max primary distance
+		32.0,					// min secondary distance
+		1024.0,					// max secondary distance
+		FALSE,					// can use underwater?
+		3,						// how long does this weapon take to reload?
+		70,						// times out of 100 to use primary fire
+		1,						// minimum ammout of primary ammo needed to fire
+		1,						// minimum ammout of seconday ammo needed to fire
+		TRUE,					// hold down primary fire button to use?
+		TRUE,					// hold down secondary fire button to use?
+		FALSE,					// charge weapon using primary fire?
+		FALSE,					// charge weapon using secondary fire?
+		0.0,					// time to charge weapon (primary)
+		0.0						// time to charge weapon (secondary)
+	},
 	/* terminator */
 	{
 		0,
@@ -2688,6 +2719,40 @@ bot_fire_delay_t valve_fire_delay[] =
 	// flamethrower
 	{
 		VALVE_WEAPON_FLAMETHROWER,
+		0.0,
+		{
+			0.0,
+			0.0,
+			0.0,
+			0.0,
+			0.0
+		},
+		{
+			0.0,
+			0.0,
+			0.0,
+			0.0,
+			0.0
+		},
+		0.0,
+		{
+			0.0,
+			0.0,
+			0.0,
+			0.0,
+			0.0
+		},
+		{
+			0.0,
+			0.0,
+			0.0,
+			0.0,
+			0.0
+		}
+	},
+	// dual flamethrower
+	{
+		VALVE_WEAPON_DUAL_FLAMETHROWER,
 		0.0,
 		{
 			0.0,
