@@ -1318,6 +1318,37 @@ bot_weapon_select_t valve_weapon_select[] =
 		0.0,					// time to charge weapon (primary)
 		0.0						// time to charge weapon (secondary)
 	},
+	// portal gun
+	{
+		VALVE_WEAPON_ASHPOD,	// id
+		"weapon_ashpod",		// classname
+		"gauss",				// third person model
+		{						// primary ammo pickup classnames
+			"",
+			"",
+		},
+		{						// secondary ammo pickup classnames
+			"",
+			"",
+		},
+		5,						// skill level
+		9,						// priority
+		0.0,					// min primary distance
+		500.0,					// max primary distance
+		0.0,					// min secondary distance
+		500.0,					// max secondary distance
+		TRUE,					// can use underwater?
+		0,						// how long does this weapon take to reload?
+		50,						// times out of 100 to use primary fire
+		0,						// minimum ammout of primary ammo needed to fire
+		0,						// minimum ammout of seconday ammo needed to fire
+		FALSE,					// hold down primary fire button to use?
+		FALSE,					// hold down secondary fire button to use?
+		FALSE,					// charge weapon using primary fire?
+		FALSE,					// charge weapon using secondary fire?
+		0.0,					// time to charge weapon (primary)
+		0.0						// time to charge weapon (secondary)
+	},
 	/* terminator */
 	{
 		0,
@@ -2782,6 +2813,40 @@ bot_fire_delay_t valve_fire_delay[] =
 			0.0,
 			0.0,
 			0.0
+		}
+	},
+	// ashpod
+	{
+		VALVE_WEAPON_ASHPOD,
+		0.2,
+		{
+			0.0,
+			0.0,
+			0.3,
+			0.5,
+			1.0
+		},
+		{
+			0.0,
+			0.1,
+			0.5,
+			0.8,
+			1.2
+		},
+		1.0,
+		{
+			0.0,
+			0.0,
+			0.5,
+			0.8,
+			1.2
+		},
+		{
+			0.0,
+			0.7,
+			1.0,
+			1.5,
+			2.0
 		}
 	},
 	// terminator 
