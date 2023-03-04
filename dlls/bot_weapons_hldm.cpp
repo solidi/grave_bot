@@ -1349,6 +1349,37 @@ bot_weapon_select_t valve_weapon_select[] =
 		0.0,					// time to charge weapon (primary)
 		0.0						// time to charge weapon (secondary)
 	},
+	// satchels
+	{
+		VALVE_WEAPON_SATCHEL,// id
+		"weapon_satchel",	// classname
+		"satchel",				// third person model
+		{						// primary ammo pickup classnames
+			"weapon_satchel",
+			"",
+		},
+		{						// secondary ammo pickup classnames
+			"",
+			"",
+		},
+		5,						// skill level
+		4,						// priority
+		250.0,					// min primary distance
+		750.0,					// max primary distance
+		0.0,					// min secondary distance
+		0.0,					// max secondary distance
+		TRUE,					// can use underwater?
+		0,						// how long does this weapon take to reload?
+		50,						// times out of 100 to use primary fire
+		1,						// minimum ammout of primary ammo needed to fire
+		0,						// minimum ammout of seconday ammo needed to fire
+		FALSE,					// hold down primary fire button to use?
+		FALSE,					// hold down secondary fire button to use?
+		FALSE,					// charge weapon using primary fire?
+		FALSE,					// charge weapon using secondary fire?
+		0.0,					// time to charge weapon (primary)
+		0.0						// time to charge weapon (secondary)
+	},
 	/* terminator */
 	{
 		0,
@@ -2847,6 +2878,40 @@ bot_fire_delay_t valve_fire_delay[] =
 			1.0,
 			1.5,
 			2.0
+		}
+	},
+	// satchels
+	{
+		VALVE_WEAPON_SATCHEL,
+		0.5,
+		{
+			0.0,
+			0.0,
+			1.0,
+			2.0,
+			3.0
+		},
+		{
+			0.0,
+			1.0,
+			2.0,
+			3.0,
+			4.0
+		},
+		0.0,
+		{
+			0.0,
+			0.0,
+			0.0,
+			0.0,
+			0.0
+		},
+		{
+			0.0,
+			0.0,
+			0.0,
+			0.0,
+			0.0
 		}
 	},
 	// terminator 
