@@ -575,6 +575,7 @@ void ClientDisconnect( edict_t *pEntity )
 				// someone kicked this bot off of the server...				
 				bots[i].is_used = FALSE;  // this slot is now free to use
 				bots[i].kick_time = gpGlobals->time;  // save the kicked time
+				bots[i].pEdict->v.health = 0.0;
 				break;
 			}
 		}
