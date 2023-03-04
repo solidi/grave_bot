@@ -451,17 +451,6 @@ void BotPickName( char *name_buffer )
 	edict_t *pPlayer;
 	int attempts = 0;
 	
-	// see if a name exists from a kicked bot (if so, reuse it)
-	for (index=0; index < 32; index++)
-	{
-		if ((bots[index].is_used == FALSE) && (bots[index].name[0]))
-		{
-			strcpy(name_buffer, bots[index].name);
-			
-			return;
-		}   
-	}
-	
 	name_index = RANDOM_LONG(1, number_names) - 1;  // zero based
 	
 	// check make sure this name isn't used
