@@ -311,6 +311,7 @@
    LINK_ENTITY_TO_FUNC(flying_wrench);
    LINK_ENTITY_TO_FUNC(weapon_chumtoad);
    LINK_ENTITY_TO_FUNC(monster_chumtoad);
+   LINK_ENTITY_TO_FUNC(monster_ctctoad);
    LINK_ENTITY_TO_FUNC(weapon_sniperrifle);
    LINK_ENTITY_TO_FUNC(weapon_railgun);
    LINK_ENTITY_TO_FUNC(weapon_dual_railgun);

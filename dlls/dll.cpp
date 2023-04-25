@@ -103,6 +103,7 @@ int g_menu_waypoint;
 int g_menu_state = 0;
 
 float is_team_play = 0.0;
+float is_ctc_play = 0.0;
 char team_names[MAX_TEAMS][MAX_TEAMNAME_LENGTH];
 int num_teams = 0;
 bool checked_teamplay = FALSE;
