@@ -30,6 +30,7 @@ extern bool b_observer_mode;
 extern int team_allies[4];
 extern edict_t *pent_info_ctfdetect;
 extern float is_team_play;
+extern float is_ctc_play;
 extern bool checked_teamplay;
 extern edict_t *listenserver_edict;
 extern bool b_chat_debug;
@@ -59,7 +60,10 @@ void BotCheckTeamplay()
 
 	if (strstr(CVAR_GET_STRING("mp_gamemode"), "iceman"))
 		is_team_play = TRUE;
-	
+
+	if (strstr(CVAR_GET_STRING("mp_gamemode"), "ctc"))
+		is_ctc_play = TRUE;
+
 	checked_teamplay = TRUE;
 }
 
@@ -126,6 +130,17 @@ edict_t *BotFindEnemy( bot_t *pBot )
 			pBot->pBotEnemy = NULL;
 			pBot->f_ignore_wpt_time = 0.0;
 		}
+
+		if (pBot->pBotEnemy && is_ctc_play > 0.0)
+		{
+			// Void enemy if they dropped the chumtoad
+			if (!UTIL_HasWeaponId(pBot->pBotEnemy, VALVE_WEAPON_CHUMTOAD))
+				pBot->pBotEnemy = pRemember = NULL;
+			
+			// Void enemy is bot has picked up chumtoad
+			if (pBot->current_weapon.iId == VALVE_WEAPON_CHUMTOAD)
+				pBot->pBotEnemy = pRemember = NULL;
+		}
 	}
 	
 	pent = NULL;
@@ -156,6 +171,13 @@ edict_t *BotFindEnemy( bot_t *pBot )
 			// don't attack hornets
 			if (mod_id != SI_DLL && FStrEq(STRING(pMonster->v.classname), "hornet"))
 				continue;
+
+			if (is_ctc_play > 0.0)
+			{
+				// don't target golden chumtoad
+				if (FStrEq(STRING(pMonster->v.classname), "monster_ctctoad"))
+					continue;
+			}
 
 			if (!FStrEq(STRING(pMonster->v.classname), "func_tech_breakable"))
 			{
@@ -259,7 +281,18 @@ edict_t *BotFindEnemy( bot_t *pBot )
 					if (bot_team == player_team)
 						continue;
 				}
-				
+
+				if (is_ctc_play > 0.0)
+				{
+					// target person only with chumtoad
+					if (!UTIL_HasWeaponId(pPlayer, VALVE_WEAPON_CHUMTOAD))
+						continue;
+
+					// Don't fire if I have the chumtoad
+					if (UTIL_HasWeaponId(pEdict, VALVE_WEAPON_CHUMTOAD))
+						continue;
+				}
+
 				vecEnd = pPlayer->v.origin + pPlayer->v.view_ofs;
 				
 				// see if bot can see the player...
