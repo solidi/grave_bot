@@ -99,7 +99,7 @@ char *valve_bot_skins[VALVE_MAX_SKINS] = {
 	"hgrunt", "recon", "robo", "scientist", "zombie"};
 
 char *ice_bot_skins[ICE_MAX_SKINS] = {
-   "army", "assassin", "alpina", "baer", "commando", "frost", "grunt", "hhev","holo", "hotfire",
+   "army", "assassin", "alpina", "baer", "commando", "frost", "grunt", "hhev", "holo", "hotfire",
    "iceman", "navy", "recon", "santa", "snowman", "stormtrooper", "swat"};
 				
 // store the player names for each of the models...
