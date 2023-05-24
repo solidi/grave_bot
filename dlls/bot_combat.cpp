@@ -255,7 +255,14 @@ edict_t *BotFindEnemy( bot_t *pBot )
 				// skip this player if not alive (i.e. dead or dying)
 				if (!IsAlive(pPlayer))
 					continue;
-				
+
+				if (pPlayer->v.deadflag == DEAD_FAKING)
+				{
+					// Allow feign detection a range
+					if ((pPlayer->v.origin - pEdict->v.origin).Length() > 128)
+						continue;
+				}
+
 				if ((b_observer_mode) && !(pPlayer->v.flags & FL_FAKECLIENT))
 					continue;
 				// can we see them?

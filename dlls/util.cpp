@@ -410,7 +410,7 @@ bot_t *UTIL_GetBotPointer(edict_t *pEdict)
 
 bool IsAlive(edict_t *pEdict)
 {
-	return ((pEdict->v.deadflag == DEAD_NO) &&
+	return ((pEdict->v.deadflag == DEAD_NO || pEdict->v.deadflag == DEAD_FAKING) &&
 		(pEdict->v.health > 0) && !(pEdict->v.flags & FL_NOTARGET));
 }
 
