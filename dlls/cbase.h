@@ -188,7 +188,7 @@ public:
 	virtual void    StopSneaking( void ) {}
 	virtual BOOL	OnControls( entvars_t *onpev ) { return FALSE; }
 	virtual BOOL    IsSneaking( void ) { return FALSE; }
-	virtual BOOL	IsAlive( void ) { return (pev->deadflag == DEAD_NO) && pev->health > 0; }
+	virtual BOOL	IsAlive( void ) { return (pev->deadflag == DEAD_NO || pev->deadflag == DEAD_FAKING) && pev->health > 0; }
 	virtual BOOL	IsBSPModel( void ) { return pev->solid == SOLID_BSP || pev->movetype == MOVETYPE_PUSHSTEP; }
 	virtual BOOL	ReflectGauss( void ) { return ( IsBSPModel() && !pev->takedamage ); }
 	virtual BOOL	HasTarget( string_t targetname ) { return FStrEq(STRING(targetname), STRING(pev->targetname) ); }
