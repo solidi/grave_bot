@@ -364,6 +364,7 @@
    LINK_ENTITY_TO_FUNC(weapon_ashpod);
    LINK_ENTITY_TO_FUNC(ent_portal);
    LINK_ENTITY_TO_FUNC(weapon_sawedoff);
+   LINK_ENTITY_TO_FUNC(weapon_dual_sawedoff);
 
    // Science and Industry
    LINK_ENTITY_TO_FUNC(ammo_rocketpistol);
