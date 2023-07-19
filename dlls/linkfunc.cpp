@@ -351,6 +351,7 @@
    LINK_ENTITY_TO_FUNC(rune_gravity);
    LINK_ENTITY_TO_FUNC(rune_strength);
    LINK_ENTITY_TO_FUNC(rune_cloak);
+   LINK_ENTITY_TO_FUNC(rune_ammo);
    LINK_ENTITY_TO_FUNC(env_snow);
    LINK_ENTITY_TO_FUNC(func_snow);
    LINK_ENTITY_TO_FUNC(env_rain);
