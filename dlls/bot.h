@@ -337,6 +337,7 @@ typedef struct
 	bool	b_lift_moving;
 	
 	bool	b_longjump;
+	bool	b_rune;
 
 	bot_current_weapon_t current_weapon;  // one current weapon for each bot
 	int m_rgAmmo[MAX_AMMO_SLOTS];  // total ammo amounts (1 array for each bot)

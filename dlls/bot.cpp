@@ -304,6 +304,7 @@ void BotSpawnInit( bot_t *pBot )
 	pBot->f_reaction_target_time = 0.0;
 
 	pBot->b_longjump = FALSE;
+	pBot->b_rune = FALSE;
 
 	pBot->respawn_time = 0;
 	pBot->respawn_set = FALSE;
@@ -1341,7 +1342,20 @@ void BotFindItem( bot_t *pBot )
 						can_pickup = TRUE;
 					}
 				}
-				
+
+				else if (strncmp("rune_", item_name, 5) == 0)
+				{
+					// check if the item is not visible (i.e. has not respawned)
+					if (pent->v.effects & EF_NODRAW)
+						continue;
+
+					// check if the bot can use this item...
+					if (!pBot->b_rune)
+					{
+						can_pickup = TRUE;
+					}
+				}
+
 				// check if entity is a packed up weapons box...
 				else if (strcmp("weaponbox", item_name) == 0)
 				{

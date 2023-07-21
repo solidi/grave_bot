@@ -413,6 +413,10 @@ void BotClient_Valve_ItemPickup(void *p, edict_t *pEdict)
 //		SERVER_PRINT( "%s has a longjump module now!\n", STRING(pBot->pEdict->v.netname));
 		pBot->b_longjump = true;
 	}
+	else if (strncmp(itemname, "rune_", 5) == 0)
+	{
+		pBot->b_rune = true;
+	}
 }
 
 void BotClient_Valve_WeapPickup(void *p, edict_t *pEdict)
