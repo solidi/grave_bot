@@ -106,6 +106,16 @@ edict_t *BotFindEnemy( bot_t *pBot )
 			pBot->pBotEnemy = NULL;
 		// Cannot see transparent player (with rune)
 		}
+		else if (is_ctc_play > 0.0)
+		{
+			// Void enemy if they dropped the chumtoad
+			if (pBot->pBotEnemy->v.fuser4 == 0)
+				pBot->pBotEnemy = pRemember = NULL;
+
+			// Void enemy if bot has picked up chumtoad
+			if (pBot->current_weapon.iId == VALVE_WEAPON_CHUMTOAD)
+				pBot->pBotEnemy = pRemember = NULL;
+		}
 		else if (pBot->pBotEnemy->v.rendermode == kRenderTransAlpha &&
 				 pBot->pBotEnemy->v.renderamt < 60 &&
 				 (pBot->pBotEnemy->v.origin - pEdict->v.origin).Length() > 192) {
@@ -129,17 +139,6 @@ edict_t *BotFindEnemy( bot_t *pBot )
 				pRemember = pBot->pBotEnemy;
 			pBot->pBotEnemy = NULL;
 			pBot->f_ignore_wpt_time = 0.0;
-		}
-
-		if (pBot->pBotEnemy && is_ctc_play > 0.0)
-		{
-			// Void enemy if they dropped the chumtoad
-			if (!UTIL_HasWeaponId(pBot->pBotEnemy, VALVE_WEAPON_CHUMTOAD))
-				pBot->pBotEnemy = pRemember = NULL;
-			
-			// Void enemy is bot has picked up chumtoad
-			if (pBot->current_weapon.iId == VALVE_WEAPON_CHUMTOAD)
-				pBot->pBotEnemy = pRemember = NULL;
 		}
 	}
 	
@@ -292,11 +291,7 @@ edict_t *BotFindEnemy( bot_t *pBot )
 				if (is_ctc_play > 0.0)
 				{
 					// target person only with chumtoad
-					if (!UTIL_HasWeaponId(pPlayer, VALVE_WEAPON_CHUMTOAD))
-						continue;
-
-					// Don't fire if I have the chumtoad
-					if (UTIL_HasWeaponId(pEdict, VALVE_WEAPON_CHUMTOAD))
+					if (pPlayer->v.fuser4 == 0)
 						continue;
 				}
 
@@ -416,6 +411,14 @@ bool BotShouldEngageEnemy( bot_t *pBot, edict_t *pEnemy )
 	if (mod_id == SI_DLL && pBot->i_carry_type)
 		return FALSE;
 
+	if (is_ctc_play > 0.0)
+	{
+		if (pBot->pEdict->v.fuser4 > 0)
+		{
+			return FALSE;
+		}
+	}
+
 	int our_weapon = WeaponGetSelectIndex(pBot->current_weapon.iId);
 	int enemy_weapon = WeaponGetSelectIndex(BotGetEnemyWeapon(pEnemy));
 
@@ -508,6 +511,13 @@ bool BotFireWeapon(Vector v_enemy, bot_t *pBot, int weapon_choice, bool nofire)
 	// Don't fire weapon if frozen
 	if (pBot->pEdict->v.flags & FL_FROZEN) {
 		return FALSE;
+	}
+
+	if (is_ctc_play > 0.0)
+	{
+		// Don't fire if I have the chumtoad
+		if (pBot->current_weapon.iId == VALVE_WEAPON_CHUMTOAD)
+			return FALSE;
 	}
 
 	// Kick or punch this grenade!
