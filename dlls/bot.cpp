@@ -2476,8 +2476,8 @@ void BotThink( bot_t *pBot )
 	}
 #endif
 
-	if (strstr(CVAR_GET_STRING("mp_mutators"), "topsyturvy") ||
-		atoi(CVAR_GET_STRING("mp_mutators")) == 12)
+	if (strstr(CVAR_GET_STRING("sv_mutators"), "topsyturvy") ||
+		atoi(CVAR_GET_STRING("sv_mutators")) == 12)
 		pEdict->v.v_angle[2] = 180;
 
 	g_engfuncs.pfnRunPlayerMove( pEdict, pEdict->v.v_angle, pBot->f_move_speed * speed_mod[pBot->bot_skill],

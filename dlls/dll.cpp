@@ -139,6 +139,7 @@ float msecval;
 */
 
 cvar_t sv_bot = {"gravebot",""};
+cvar_t sv_defaultbots = {"sv_defaultbots","0"};
 
 char *show_menu_1 =
    {"Waypoint Tags\n\n1. Team Specific\n2. Wait for Lift\n3. Door\n4. Sniper Spot\n5. More..."};
@@ -262,6 +263,7 @@ C_DLLEXPORT int Meta_Attach (PLUG_LOADTIME now, META_FUNCTIONS *pFunctionTable, 
 
    // ask the engine to register the CVARs this plugin uses
    CVAR_REGISTER (&sv_bot);
+   CVAR_REGISTER (&sv_defaultbots);
 
    return (TRUE); // returning TRUE enables metamod to attach this plugin
 }
@@ -293,6 +295,7 @@ void GameDLLInit()
 
    #ifndef METAMOD_BUILD
 	   CVAR_REGISTER (&sv_bot);
+	   CVAR_REGISTER (&sv_defaultbots);
    #endif
 	
 	for (i=0; i<32; i++)
@@ -370,9 +373,14 @@ int DispatchSpawn( edict_t *pent )
 			respawn_time = 0.0;
 			spawn_time_reset = FALSE;
 			
-			prev_num_bots = num_bots;
+			int botsWanted = CVAR_GET_FLOAT("sv_defaultbots");
+			if (botsWanted > 0)
+				prev_num_bots = 0;
+			else
+				prev_num_bots = num_bots;
 			num_bots = 0;
-			
+
+			max_bots = botsWanted;
 			bot_check_time = gpGlobals->time + 30.0;
 
 			// reset all research data
@@ -518,7 +526,7 @@ BOOL ClientConnect( edict_t *pEntity, const char *pszName, const char *pszAddres
 		if (strcmp(pszAddress, "127.0.0.1") != 0)
 		{
 			// don't try to add bots for 60 seconds, give client time to get added
-			bot_check_time = gpGlobals->time + 60.0;
+			bot_check_time = gpGlobals->time + 5.0;
 			
 			for (i=0; i < 32; i++)
 			{
