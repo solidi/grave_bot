@@ -843,9 +843,12 @@ bool BotFireWeapon(Vector v_enemy, bot_t *pBot, int weapon_choice, bool nofire)
 			return TRUE;
 		}
 
+		BOOL dontshoot = (strstr(CVAR_GET_STRING("sv_mutators"), "dontshoot") || atoi(CVAR_GET_STRING("sv_mutators")) == 41);
+
 		if (use_primary[final_index])
 		{
-			pEdict->v.button |= IN_ATTACK;  // use primary attack
+			if (!dontshoot)
+				pEdict->v.button |= IN_ATTACK;  // use primary attack
 			// for dual uzies, we want to fire both guns at the same time
 			if (mod_id == SI_DLL && iId == SI_WEAPON_SNUZI)
 				pEdict->v.button |= IN_ATTACK2;
@@ -895,7 +898,8 @@ bool BotFireWeapon(Vector v_enemy, bot_t *pBot, int weapon_choice, bool nofire)
 		}
 		else if (use_secondary[final_index]) // MUST be use_secondary...
 		{
-			pEdict->v.button |= IN_ATTACK2;  // use secondary attack
+			if (!dontshoot)
+				pEdict->v.button |= IN_ATTACK2;  // use secondary attack
 			// for dual uzies, we want to fire both guns at the same time
 			if (mod_id == SI_DLL && iId == SI_WEAPON_SNUZI)
 				pEdict->v.button |= IN_ATTACK;
