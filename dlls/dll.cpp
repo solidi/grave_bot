@@ -57,10 +57,10 @@ extern int num_waypoints;  // number of waypoints currently in use
 extern WAYPOINT waypoints[MAX_WAYPOINTS];
 extern float wp_display_time[MAX_WAYPOINTS];
 extern bot_t bots[32];
-extern bool b_observer_mode;
-bool b_chat_debug = FALSE;
-bool b_botdontshoot = FALSE;
-bool b_botpause = FALSE;
+bool b_observer_mode;
+bool b_chat_debug;
+bool b_botdontshoot;
+bool b_botpause;
 char welcome_msg[] = "Grave Bot by Ghoul - Based on HPB Bot template 4 by botman and Pierre-Marie Baty\n";
 
 extern float g_flVomiting[32];
@@ -300,6 +300,11 @@ void GameDLLInit()
 	
 	for (i=0; i<32; i++)
 		clients[i] = NULL;
+
+	b_observer_mode = FALSE;
+	b_chat_debug = FALSE;
+	b_botdontshoot = FALSE;
+	b_botpause = FALSE;
 	
 	// initialize the bots array of structures...
 	memset(bots, 0, sizeof(bots));
@@ -365,6 +370,7 @@ int DispatchSpawn( edict_t *pent )
 			g_GameRules = TRUE;
 			
 			is_team_play = 0.0;
+			is_ctc_play = 0.0;
 			memset(team_names, 0, sizeof(team_names));
 			num_teams = 0;
 			checked_teamplay = FALSE;

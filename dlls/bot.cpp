@@ -68,7 +68,7 @@ double pi = 3.1415926535897932384626433832795;
 
 
 bot_t bots[32];   // max of 32 bots in a game
-bool b_observer_mode = FALSE;
+extern bool b_observer_mode;
 extern bool b_chat_debug;
 extern bool b_botdontshoot;
 extern bool b_botpause;

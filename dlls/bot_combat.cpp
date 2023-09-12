@@ -209,6 +209,12 @@ edict_t *BotFindEnemy( bot_t *pBot )
 					continue;
 			}
 
+			if (is_ctc_play > 0.0)
+			{
+				if (pMonster->v.fuser4 < 1)
+					continue;
+			}
+
 			vecEnd = UTIL_GetOrigin(pMonster) + pMonster->v.view_ofs;
 			
 			// see if bot can't see the monster...
