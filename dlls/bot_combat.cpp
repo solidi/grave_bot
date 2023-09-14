@@ -58,7 +58,7 @@ void BotCheckTeamplay()
 
 	is_team_play = CVAR_GET_FLOAT("mp_teamplay");  // teamplay enabled?
 
-	if (strstr(CVAR_GET_STRING("mp_gamemode"), "iceman"))
+	if (strstr(CVAR_GET_STRING("mp_gamemode"), "jvs"))
 		is_team_play = TRUE;
 
 	if (strstr(CVAR_GET_STRING("mp_gamemode"), "ctc"))
