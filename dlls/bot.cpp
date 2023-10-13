@@ -86,7 +86,7 @@ static int number_names = 0;
 #define MAX_BOT_NAMES 100
 
 #define VALVE_MAX_SKINS    10
-#define ICE_MAX_SKINS      18
+#define ICE_MAX_SKINS      19
 #define GEARBOX_MAX_SKINS  20
 
 // indicate which models are currently used for random model allocation
@@ -100,7 +100,7 @@ char *valve_bot_skins[VALVE_MAX_SKINS] = {
 
 char *ice_bot_skins[ICE_MAX_SKINS] = {
    "army", "assassin", "alpina", "baer", "commando", "frost", "grunt", "hhev", "holo", "hotfire",
-   "iceman", "jesus", "navy", "recon", "santa", "snowman", "stormtrooper", "swat"};
+   "iceman", "jesus", "navy", "recon", "santa", "skeleton", "snowman", "stormtrooper", "swat"};
 				
 // store the player names for each of the models...
 char *valve_bot_names[VALVE_MAX_SKINS] = {
@@ -109,7 +109,7 @@ char *valve_bot_names[VALVE_MAX_SKINS] = {
 
 char *ice_bot_names[ICE_MAX_SKINS] = {
    "Army", "Assassin", "Alpina", "Baer", "Commando", "Frost", "Grunt", "HHev", "Holo", "HotFire",
-   "Iceman", "Jesus", "Navy", "Recon", "Santa", "Snowman", "Stormtrooper", "Swat"};
+   "Iceman", "Jesus", "Navy", "Recon", "Santa", "Skeleton", "Snowman", "Stormtrooper", "Swat"};
 						
 char bot_names[MAX_BOT_NAMES][BOT_NAME_LEN+1];
 						
