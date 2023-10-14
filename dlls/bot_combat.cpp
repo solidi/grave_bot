@@ -31,6 +31,7 @@ extern int team_allies[4];
 extern edict_t *pent_info_ctfdetect;
 extern float is_team_play;
 extern float is_ctc_play;
+extern float is_demic_play;
 extern bool checked_teamplay;
 extern edict_t *listenserver_edict;
 extern bool b_chat_debug;
@@ -63,6 +64,12 @@ void BotCheckTeamplay()
 
 	if (strstr(CVAR_GET_STRING("mp_gamemode"), "ctc"))
 		is_ctc_play = TRUE;
+
+	if (strstr(CVAR_GET_STRING("mp_gamemode"), "chilldemic"))
+	{
+		is_team_play = TRUE;
+		is_demic_play = TRUE;
+	}
 
 	checked_teamplay = TRUE;
 }

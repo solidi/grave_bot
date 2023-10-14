@@ -61,6 +61,7 @@ extern bot_t bots[32];
 extern edict_t *pent_info_ctfdetect;
 extern char team_names[MAX_TEAMS][MAX_TEAMNAME_LENGTH];
 extern int num_teams;
+extern float is_demic_play;
 
 int gmsgTextMsg = 0;
 int gmsgSayText = 0;
@@ -222,6 +223,17 @@ int UTIL_GetTeam(edict_t *pEntity)
 {
 	if (mod_id == CRABBED_DLL || mod_id == VALVE_DLL)
 	{
+		if (is_demic_play)
+		{
+			if (!strcmp("skeleton", 
+				(g_engfuncs.pfnInfoKeyValue((*g_engfuncs.pfnGetInfoKeyBuffer)( pEntity ), "model"))))
+			{
+				return 2;
+			}
+
+			return 1;
+		}
+
 		char *infobuffer;
 		char model_name[32];
 		
