@@ -306,6 +306,9 @@ void GameDLLInit()
 	b_chat_debug = FALSE;
 	b_botdontshoot = FALSE;
 	b_botpause = FALSE;
+
+	min_bots = -1;
+	max_bots = -1;
 	
 	// initialize the bots array of structures...
 	memset(bots, 0, sizeof(bots));
@@ -381,14 +384,22 @@ int DispatchSpawn( edict_t *pent )
 			respawn_time = 0.0;
 			spawn_time_reset = FALSE;
 			
-			int botsWanted = CVAR_GET_FLOAT("sv_defaultbots");
+			int botsWanted = sv_defaultbots.value;
+			if (!IS_DEDICATED_SERVER())
+				botsWanted += 1;
+
 			if (botsWanted > 0)
+			{
 				prev_num_bots = 0;
+				min_bots = max_bots = botsWanted;
+			}
 			else
-				prev_num_bots = num_bots;
+			{
+				prev_num_bots = 0;
+				min_bots = max_bots = -1;
+			}
 			num_bots = 0;
 
-			max_bots = botsWanted;
 			bot_check_time = gpGlobals->time + 30.0;
 
 			// reset all research data
@@ -544,6 +555,15 @@ BOOL ClientConnect( edict_t *pEntity, const char *pszName, const char *pszAddres
 			
 			// if there are currently more than the minimum number of bots running
 			// then kick one of the bots off the server...
+			if (sv_defaultbots.value > 0)
+			{
+				min_bots = sv_defaultbots.value;
+				if (!IS_DEDICATED_SERVER())
+					min_bots += 1;
+			}
+			else
+				min_bots = -1;
+
 			if ((count > min_bots) && (min_bots != -1))
 			{
 				for (i=0; i < 32; i++)
@@ -1029,6 +1049,15 @@ void StartFrame()
 			
 			// if there are currently less than the maximum number of "players"
 			// then add another bot using the default skill level...
+			if (sv_defaultbots.value > 0)
+			{
+				max_bots = sv_defaultbots.value;
+				if (!IS_DEDICATED_SERVER())
+					max_bots += 1;
+			}
+			else
+				max_bots = -1;
+
 			if ((count < max_bots) && (max_bots != -1))
 			{
 				BotCreate(NULL, NULL, NULL, NULL, NULL, NULL);
