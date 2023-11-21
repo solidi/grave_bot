@@ -362,6 +362,8 @@ typedef struct
 	BOOL respawn_set;
 	int weapons2;
 	bool b_hasgrenade;
+	float f_lightsout_check;
+	bool f_flashlight;
 
 } bot_t;
 

@@ -309,6 +309,8 @@ void BotSpawnInit( bot_t *pBot )
 	pBot->respawn_time = 0;
 	pBot->respawn_set = FALSE;
 	pBot->b_hasgrenade = FALSE;
+	pBot->f_lightsout_check = 0;
+	pBot->f_flashlight = FALSE;
 
 	if (mod_id == SI_DLL)
 	{	// get longjump
@@ -1627,6 +1629,26 @@ void BotThink( bot_t *pBot )
 	if (pBot->blinded_time > gpGlobals->time)
 	{
 		is_idle = TRUE;  // don't do anything while blinded
+	}
+
+	// lights out
+	if (pBot->f_lightsout_check <= gpGlobals->time)
+	{
+		BOOL lightsout = (strstr(CVAR_GET_STRING("sv_mutators"), "lightsout") || atoi(CVAR_GET_STRING("sv_mutators")) == 10);
+
+		if (lightsout && !pBot->f_flashlight)
+		{
+			pEdict->v.impulse = 100;
+			pBot->f_flashlight = TRUE;
+		}
+
+		if (!lightsout && pBot->f_flashlight)
+		{
+			pEdict->v.impulse = 100;
+			pBot->f_flashlight = FALSE;
+		}
+
+		pBot->f_lightsout_check = gpGlobals->time + 2.5;
 	}
 	
 	if (is_idle)
