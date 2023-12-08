@@ -869,7 +869,7 @@ bool BotFireWeapon(Vector v_enemy, bot_t *pBot, int weapon_choice, bool nofire)
 				pEdict->v.impulse = 210 + RANDOM_LONG(0, 2);
 			} else if (distance <= 250) {
 				// ALERT(at_aiconsole, "Slide!");
-				pEdict->v.impulse = 208;
+				pEdict->v.impulse = RANDOM_LONG(0,1) ? 208 : 214;
 			} else if (distance <= 450) {
 				// ALERT(at_aiconsole, "Throw grenade!");
 				pEdict->v.impulse = 209;
