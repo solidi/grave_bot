@@ -128,7 +128,7 @@ float bot_cfg_pause_time = 0.0;
 float respawn_time = 0.0;
 bool spawn_time_reset = FALSE;
 // reaction time multiplier
-float bot_reaction_time = 1.0;
+float bot_reaction_time;
 extern float speed_mod[5];
 extern float react_time_min[5];
 extern float react_time_max[5];
@@ -309,6 +309,8 @@ void GameDLLInit()
 
 	min_bots = -1;
 	max_bots = -1;
+
+	bot_reaction_time = 2.0;
 	
 	// initialize the bots array of structures...
 	memset(bots, 0, sizeof(bots));

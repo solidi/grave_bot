@@ -43,8 +43,8 @@ float aim_tracking_y_scale[5] = {1.0, 2.0, 4.0, 5.0, 6.0};
 float g_flVomiting[32];
 // reaction time multiplier
 extern float bot_reaction_time;
-float react_time_min[5] = {0.01, 0.05, 0.08, 0.1, 0.15};
-float react_time_max[5] = {0.01, 0.08, 0.1, 0.15, 0.2};
+float react_time_min[5] = {0.51, 0.55, 0.58, 0.6, 0.65};
+float react_time_max[5] = {0.51, 0.58, 0.6, 0.75, 0.7};
 // how transparent does our target have to be before we
 // can't see them?  Diffs per bot level
 int renderamt_threshold[5] = {16, 32, 48, 64, 80};
@@ -869,7 +869,7 @@ bool BotFireWeapon(Vector v_enemy, bot_t *pBot, int weapon_choice, bool nofire)
 				pEdict->v.impulse = 210 + RANDOM_LONG(0, 2);
 			} else if (distance <= 250) {
 				// ALERT(at_aiconsole, "Slide!");
-				pEdict->v.impulse = 208;
+				pEdict->v.impulse = RANDOM_LONG(0,1) ? 208 : 214;
 			} else if (distance <= 450) {
 				// ALERT(at_aiconsole, "Throw grenade!");
 				pEdict->v.impulse = 209;
