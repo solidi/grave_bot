@@ -1442,6 +1442,37 @@ bot_weapon_select_t valve_weapon_select[] =
 		0.0,					// time to charge weapon (primary)
 		0.0						// time to charge weapon (secondary)
 	},
+	// chaingun
+	{
+		VALVE_WEAPON_DUAL_CHAINGUN,		// id
+		"weapon_dual_chaingun",			// classname
+		"dual_chaingun",				// third person model
+		{						// primary ammo pickup classnames
+			"ammo_9mmclip",
+			"ammo_9mmAR",
+		},
+		{						// secondary ammo pickup classnames
+			"",
+			"",
+		},
+		5,						// skill level
+		3,						// priority
+		0.0,					// min primary distance
+		786.0,					// max primary distance
+		300.0,					// min secondary distance
+		600.0,					// max secondary distance
+		FALSE,					// can use underwater?
+		2.5,					// how long does this weapon take to reload?
+		100,						// times out of 100 to use primary fire
+		1,						// minimum ammout of primary ammo needed to fire
+		1,						// minimum ammout of seconday ammo needed to fire
+		TRUE,					// hold down primary fire button to use?
+		FALSE,					// hold down secondary fire button to use?
+		FALSE,					// charge weapon using primary fire?
+		FALSE,					// charge weapon using secondary fire?
+		0.0,					// time to charge weapon (primary)
+		0.0						// time to charge weapon (secondary)
+	},
 	/* terminator */
 	{
 		0,
@@ -3042,6 +3073,40 @@ bot_fire_delay_t valve_fire_delay[] =
 			0.5,
 			0.8,
 			1.2
+		}
+	},
+	// dual chaingun
+	{
+		VALVE_WEAPON_DUAL_CHAINGUN,
+		0.0,
+		{
+			0.0,
+			0.0,
+			0.0,
+			0.0,
+			0.0
+		},
+		{
+			0.0,
+			0.0,
+			0.0,
+			0.0,
+			0.0
+		},
+		0.0,
+		{
+			0.0,
+			0.0,
+			0.0,
+			0.0,
+			0.0
+		},
+		{
+			0.0,
+			0.0,
+			0.0,
+			0.0,
+			0.0
 		}
 	},
 	// terminator 
