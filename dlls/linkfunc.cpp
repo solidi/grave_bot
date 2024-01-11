@@ -368,6 +368,7 @@
    LINK_ENTITY_TO_FUNC(weapon_dual_sawedoff);
    LINK_ENTITY_TO_FUNC(tracer);
    LINK_ENTITY_TO_FUNC(weapon_dual_chaingun);
+   LINK_ENTITY_TO_FUNC(weapon_dual_hornetgun);
 
    // Science and Industry
    LINK_ENTITY_TO_FUNC(ammo_rocketpistol);
