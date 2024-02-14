@@ -1363,7 +1363,13 @@ void BotFindItem( bot_t *pBot )
 				{
 					can_pickup = TRUE;
 				}
-				
+
+				// check if entity is a skull
+				else if (strcmp("skull", item_name) == 0)
+				{
+					can_pickup = TRUE;
+				}
+
 				// check if entity is the spot from RPG laser
 				else if (strcmp("laser_spot", item_name) == 0)
 				{
