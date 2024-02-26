@@ -592,6 +592,11 @@ bool BotHeadTowardWaypoint( bot_t *pBot )
 		{
 			pBot->f_dont_avoid_wall_time = gpGlobals->time + 5.0;
 		}
+
+		if (waypoints[pBot->curr_waypoint_index].flags & W_FL_LIFT)
+		{
+			pBot->f_dont_avoid_wall_time = gpGlobals->time + 5.0;
+		}
 		
 		// check if the next waypoint is a jump waypoint...
 		if (waypoints[pBot->curr_waypoint_index].flags & W_FL_JUMP)
