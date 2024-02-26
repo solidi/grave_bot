@@ -1182,12 +1182,13 @@ void BotFindItem( bot_t *pBot )
 							if (!pBot->b_use_button)
 							{
 								// check if close enough and facing it directly...
-								if ((distance < PLAYER_SEARCH_RADIUS) &&
-									(angle_to_entity <= 10))
+								if ((distance < (PLAYER_SEARCH_RADIUS + 60)) &&
+									(angle_to_entity <= 70))
 								{
 									pBot->b_use_button = TRUE;
 									pBot->b_lift_moving = FALSE;
 									pBot->f_use_button_time = gpGlobals->time;
+									pBot->pEdict->v.button |= IN_USE;
 								}
 								
 								// if close to button...
@@ -2199,6 +2200,12 @@ void BotThink( bot_t *pBot )
 		if (waypoints[pBot->curr_waypoint_index].flags & W_FL_DOOR)
 		{
 			pBot->f_move_speed = pBot->f_max_speed / 3;	// slow down for doors
+		}
+
+		if (waypoints[pBot->curr_waypoint_index].flags & W_FL_LIFT)
+		{
+			//pBot->f_move_speed = pBot->f_max_speed / 3;
+			pEdict->v.button |= IN_USE;
 		}
 		
 		// check if the next waypoint is a ladder waypoint...

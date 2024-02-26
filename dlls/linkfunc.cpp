@@ -370,6 +370,7 @@
    LINK_ENTITY_TO_FUNC(weapon_dual_chaingun);
    LINK_ENTITY_TO_FUNC(weapon_dual_hornetgun);
    LINK_ENTITY_TO_FUNC(skull);
+   LINK_ENTITY_TO_FUNC(disc);
 
    // Science and Industry
    LINK_ENTITY_TO_FUNC(ammo_rocketpistol);
