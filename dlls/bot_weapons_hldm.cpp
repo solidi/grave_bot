@@ -1504,6 +1504,37 @@ bot_weapon_select_t valve_weapon_select[] =
 		0.0,					// time to charge weapon (primary)
 		0.0						// time to charge weapon (secondary)
 	},
+	// fingergun
+	{
+		VALVE_WEAPON_FINGERGUN,	// id
+		"weapon_fingergun",		// classname
+		"fingergun",				// third person model
+		{						// primary ammo pickup classnames
+			"",
+			"",
+		},
+		{						// secondary ammo pickup classnames
+			"",
+			"",
+		},
+		5,						// skill level
+		9,						// priority
+		0.0,					// min primary distance
+		300.0,					// max primary distance
+		0.0,					// min secondary distance
+		100.0,					// max secondary distance
+		TRUE,					// can use underwater?
+		0,						// how long does this weapon take to reload?
+		100,					// times out of 100 to use primary fire
+		0,						// minimum ammout of primary ammo needed to fire
+		0,						// minimum ammout of seconday ammo needed to fire
+		FALSE,					// hold down primary fire button to use?
+		FALSE,					// hold down secondary fire button to use?
+		FALSE,					// charge weapon using primary fire?
+		FALSE,					// charge weapon using secondary fire?
+		0.0,					// time to charge weapon (primary)
+		0.0						// time to charge weapon (secondary)
+	},
 	/* terminator */
 	{
 		0,
@@ -3157,6 +3188,40 @@ bot_fire_delay_t valve_fire_delay[] =
 			0.7,
 			1.0,
 			1.5
+		},
+		0.0,
+		{
+			0.0,
+			0.0,
+			0.0,
+			0.0,
+			0.0
+		},
+		{
+			0.0,
+			0.0,
+			0.0,
+			0.0,
+			0.0
+		}
+	},
+	// fingergun
+	{
+		VALVE_WEAPON_FINGERGUN,
+		0.0,
+		{
+			0.0,
+			0.2,
+			0.3,
+			0.4,
+			0.6
+		},
+		{
+			0.0,
+			0.3,
+			0.5,
+			0.7,
+			1.0
 		},
 		0.0,
 		{
