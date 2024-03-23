@@ -372,6 +372,7 @@
    LINK_ENTITY_TO_FUNC(skull);
    LINK_ENTITY_TO_FUNC(disc);
    LINK_ENTITY_TO_FUNC(weapon_fingergun);
+   LINK_ENTITY_TO_FUNC(trigger_mp3audio);
 
    // Science and Industry
    LINK_ENTITY_TO_FUNC(ammo_rocketpistol);
