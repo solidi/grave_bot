@@ -15,10 +15,10 @@ jobs:
     runs-on: windows-latest
 
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
 
     - name: Add MSBuild to PATH
-      uses: microsoft/setup-msbuild@v1.1
+      uses: microsoft/setup-msbuild@v2
 
     - name: Build gravebot.dll
       working-directory: ${{env.GITHUB_WORKSPACE}}
@@ -33,7 +33,7 @@ jobs:
         Compress-Archive -LiteralPath $env:TEMP\${{env.BUILD_CONFIGURATION}}\dlls -DestinationPath ./dlls.zip -Force
 
     - name: Upload grave_bot dll
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: grave_bot_dll
         path: ./dlls.zip
