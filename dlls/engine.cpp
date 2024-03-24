@@ -337,7 +337,7 @@ void pfnEmitAmbientSound(edict_t *entity, float *pos, const char *samp, float vo
    void pfnClientCommand(edict_t* pEdict, char* szFmt, ...)
    {
 	   if (debug_engine) { fp=fopen("bot.txt","a"); fprintf(fp,"pfnClientCommand=%s\n",szFmt); fclose(fp); }
-	   return;
+	   (*g_engfuncs.pfnClientCommand)(pEdict, szFmt);
    }
    void pfnParticleEffect(const float *org, const float *dir, float color, float count)
    {
