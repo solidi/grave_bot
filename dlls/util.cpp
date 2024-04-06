@@ -62,6 +62,7 @@ extern edict_t *pent_info_ctfdetect;
 extern char team_names[MAX_TEAMS][MAX_TEAMNAME_LENGTH];
 extern int num_teams;
 extern float is_demic_play;
+extern float is_ctf_play;
 
 int gmsgTextMsg = 0;
 int gmsgSayText = 0;
@@ -226,6 +227,17 @@ int UTIL_GetTeam(edict_t *pEntity)
 		if (is_demic_play)
 		{
 			if (!strcmp("skeleton", 
+				(g_engfuncs.pfnInfoKeyValue((*g_engfuncs.pfnGetInfoKeyBuffer)( pEntity ), "model"))))
+			{
+				return 2;
+			}
+
+			return 1;
+		}
+
+		if (is_ctf_play)
+		{
+			if (!strcmp("santa", 
 				(g_engfuncs.pfnInfoKeyValue((*g_engfuncs.pfnGetInfoKeyBuffer)( pEntity ), "model"))))
 			{
 				return 2;

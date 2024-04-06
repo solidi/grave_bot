@@ -1294,7 +1294,21 @@ void BotFindItem( bot_t *pBot )
 						can_pickup = TRUE;
 					}
 				}
-				
+
+				// check if entity is a flag
+				else if (strcmp("flag", item_name) == 0)
+				{
+					// check if the item is not visible (i.e. has not respawned)
+					if (pent->v.effects & EF_NODRAW)
+						continue;
+
+					// check if the bot can use this item...
+					//if (!UTIL_HasWeaponId(pEdict, VALVE_WEAPON_CHUMTOAD))
+					{
+						can_pickup = TRUE;
+					}
+				}
+
 				// check if entity is a battery...
 				else if (strcmp("item_battery", item_name) == 0)
 				{
