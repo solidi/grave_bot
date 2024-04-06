@@ -32,6 +32,7 @@ extern edict_t *pent_info_ctfdetect;
 extern float is_team_play;
 extern float is_ctc_play;
 extern float is_demic_play;
+extern float is_ctf_play;
 extern bool checked_teamplay;
 extern edict_t *listenserver_edict;
 extern bool b_chat_debug;
@@ -60,16 +61,22 @@ void BotCheckTeamplay()
 	is_team_play = CVAR_GET_FLOAT("mp_teamplay");  // teamplay enabled?
 	const char *gameMode = CVAR_GET_STRING("mp_gamemode");
 
-	if (strstr(gameMode, "jvs") || atoi(gameMode) == 2)
+	if (strstr(gameMode, "jvs") || atoi(gameMode) == 8)
 		is_team_play = TRUE;
 
-	if (strstr(gameMode, "ctc") || atoi(gameMode) == 7)
+	if (strstr(gameMode, "ctc") || atoi(gameMode) == 6)
 		is_ctc_play = TRUE;
 
-	if (strstr(gameMode, "chilldemic") || atoi(gameMode) == 8)
+	if (strstr(gameMode, "chilldemic") || atoi(gameMode) == 4)
 	{
 		is_team_play = TRUE;
 		is_demic_play = TRUE;
+	}
+
+	if (strstr(gameMode, "ctf") || atoi(gameMode) == 3)
+	{
+		is_team_play = TRUE;
+		is_ctf_play = TRUE;
 	}
 
 	checked_teamplay = TRUE;
