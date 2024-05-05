@@ -252,6 +252,7 @@ typedef struct
 	int		iPosition;				// slot position
 	int		iId;					// weapon ID
 	int		iFlags;					// flags???
+	int		iMaxClip;
 } bot_weapon_t;
 
 bot_weapon_select_t *WeaponGetSelectPointer();
