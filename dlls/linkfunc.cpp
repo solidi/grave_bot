@@ -375,6 +375,7 @@
    LINK_ENTITY_TO_FUNC(trigger_mp3audio);
    LINK_ENTITY_TO_FUNC(flag);
    LINK_ENTITY_TO_FUNC(base);
+   LINK_ENTITY_TO_FUNC(env_fog);
 
    // Science and Industry
    LINK_ENTITY_TO_FUNC(ammo_rocketpistol);
