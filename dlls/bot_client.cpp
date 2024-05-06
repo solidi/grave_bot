@@ -123,10 +123,12 @@ void BotClient_Valve_WeaponList(void *p, edict_t *pEdict)
 	}
 	else if (state == 8)
 	{
-		state = 0;
-		
+		state++;
 		bot_weapon.iFlags = *static_cast<int *>(p);  // flags for weapon (WTF???)
-		
+	}
+	else if (state == 9)
+	{
+		bot_weapon.iMaxClip = *static_cast<int *>(p);
 		// store away this weapon with it's ammo information...
 		weapon_defs[bot_weapon.iId] = bot_weapon;
 	}
