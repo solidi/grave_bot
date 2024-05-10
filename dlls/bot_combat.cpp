@@ -33,6 +33,7 @@ extern float is_team_play;
 extern float is_ctc_play;
 extern float is_demic_play;
 extern float is_ctf_play;
+extern float is_shidden_play;
 extern bool checked_teamplay;
 extern edict_t *listenserver_edict;
 extern bool b_chat_debug;
@@ -66,6 +67,12 @@ void BotCheckTeamplay()
 
 	if (strstr(gameMode, "ctc") || atoi(gameMode) == 6)
 		is_ctc_play = TRUE;
+
+	if (strstr(gameMode, "shidden") || atoi(gameMode) == 9)
+	{
+		is_team_play = TRUE;
+		is_shidden_play = TRUE;
+	}
 
 	if (strstr(gameMode, "chilldemic") || atoi(gameMode) == 4)
 	{
