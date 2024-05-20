@@ -64,6 +64,7 @@ extern int num_teams;
 extern float is_demic_play;
 extern float is_ctf_play;
 extern float is_shidden_play;
+extern float is_horde_play;
 
 int gmsgTextMsg = 0;
 int gmsgSayText = 0;
@@ -248,6 +249,16 @@ int UTIL_GetTeam(edict_t *pEntity)
 		}
 
 		if (is_shidden_play)
+		{
+			if (pEntity->v.fuser3 > 0)
+			{
+				return 2;
+			}
+
+			return 1;
+		}
+
+		if (is_horde_play)
 		{
 			if (pEntity->v.fuser3 > 0)
 			{

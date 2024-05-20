@@ -107,6 +107,7 @@ float is_ctc_play = 0.0;
 float is_demic_play = 0.0;
 float is_ctf_play = 0.0;
 float is_shidden_play = 0.0;
+float is_horde_play = 0.0;
 char team_names[MAX_TEAMS][MAX_TEAMNAME_LENGTH];
 int num_teams = 0;
 bool checked_teamplay = FALSE;
@@ -382,6 +383,7 @@ int DispatchSpawn( edict_t *pent )
 			is_demic_play = 0.0;
 			is_ctf_play = 0.0;
 			is_shidden_play = 0.0;
+			is_horde_play = 0.0;
 			memset(team_names, 0, sizeof(team_names));
 			num_teams = 0;
 			checked_teamplay = FALSE;
