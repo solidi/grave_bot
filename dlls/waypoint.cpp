@@ -1300,7 +1300,8 @@ void WaypointSearchItems(edict_t *pEntity, Vector origin, int wpt_index)
 		if ((tr.flFraction >= 1.0) || (strcmp("func_healthcharger", STRING(pent->v.classname)) == 0) ||
 			(strcmp("func_recharge", STRING(pent->v.classname)) == 0))
 		{
-			strcpy(item_name, STRING(pent->v.classname));
+			if (pent)
+				strcpy(item_name, STRING(pent->v.classname));
 			
 			/** Runes? **/
 
@@ -1313,7 +1314,7 @@ void WaypointSearchItems(edict_t *pEntity, Vector origin, int wpt_index)
 				(strcmp("monster_satchel", item_name) == 0) ||
 				(strncmp("ammo_", item_name, 5) == 0) ||
 				((strncmp("weapon_", item_name, 7) == 0) &&
-				(pent->v.owner == NULL)))
+				(pent && pent->v.owner == NULL)))
 			{
 				distance = (pent->v.origin - origin).Length();
 				
