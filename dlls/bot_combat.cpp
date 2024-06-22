@@ -63,31 +63,31 @@ void BotCheckTeamplay()
 	is_team_play = CVAR_GET_FLOAT("mp_teamplay");  // teamplay enabled?
 	const char *gameMode = CVAR_GET_STRING("mp_gamemode");
 
-	if (strstr(gameMode, "jvs") || atoi(gameMode) == 9)
+	if (strstr(gameMode, "jvs") || atoi(gameMode) == GAME_ICEMAN)
 		is_team_play = TRUE;
 
-	if (strstr(gameMode, "ctc") || atoi(gameMode) == 6)
+	if (strstr(gameMode, "ctc") || atoi(gameMode) == GAME_CTC)
 		is_ctc_play = TRUE;
 
-	if (strstr(gameMode, "shidden") || atoi(gameMode) == 10)
+	if (strstr(gameMode, "shidden") || atoi(gameMode) == GAME_SHIDDEN)
 	{
 		is_team_play = TRUE;
 		is_shidden_play = TRUE;
 	}
 
-	if (strstr(gameMode, "chilldemic") || atoi(gameMode) == 4)
+	if (strstr(gameMode, "chilldemic") || atoi(gameMode) == GAME_CHILLDEMIC)
 	{
 		is_team_play = TRUE;
 		is_demic_play = TRUE;
 	}
 
-	if (strstr(gameMode, "ctf") || atoi(gameMode) == 3)
+	if (strstr(gameMode, "ctf") || atoi(gameMode) == GAME_CTF)
 	{
 		is_team_play = TRUE;
 		is_ctf_play = TRUE;
 	}
 
-	if (strstr(gameMode, "horde") || atoi(gameMode) == 8)
+	if (strstr(gameMode, "horde") || atoi(gameMode) == GAME_HORDE)
 	{
 		is_team_play = TRUE;
 		is_horde_play = TRUE;

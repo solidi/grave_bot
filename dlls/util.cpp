@@ -691,7 +691,8 @@ bool UTIL_HasWeaponId(edict_t *pEdict, int weaponId) {
 
 bool UTIL_MutatorEnabled(int mutatorId)
 {
-	char mutator[8];
+	char mutator[8] = "";
 	sprintf(mutator, "%d;", mutatorId);
+	// ALERT(at_aiconsole, "STRING(gpGlobals->startspot) = %s, mutator = %s, yes?=%s\n", STRING(gpGlobals->startspot), mutator, strstr(STRING(gpGlobals->startspot), mutator) ? "YES" : "NO");
 	return strstr(STRING(gpGlobals->startspot), mutator);
 }

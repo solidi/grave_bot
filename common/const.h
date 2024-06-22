@@ -842,5 +842,20 @@ typedef struct
 #define MUTATOR_VESTED 67
 #define MUTATOR_VOLATILE 68
 
+#define GAME_FFA 0
+#define GAME_ARENA 1
+#define GAME_LMS 2
+#define GAME_CHILLDEMIC 3
+#define GAME_COLDSKULL 4
+#define GAME_CTC 5
+#define GAME_CTF 6
+#define GAME_GUNGAME 7
+#define GAME_HORDE 8
+#define GAME_INSTAGIB 9
+#define GAME_ICEMAN 10
+#define GAME_SHIDDEN 11
+#define GAME_SNOWBALL 12
+#define GAME_TEAMPLAY 13
+
 #endif
 
