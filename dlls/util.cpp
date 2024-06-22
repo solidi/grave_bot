@@ -688,3 +688,10 @@ bool UTIL_HasWeaponId(edict_t *pEdict, int weaponId) {
 
 	return (pEdict->v.weapons & (1<<weaponId));
 }
+
+bool UTIL_MutatorEnabled(int mutatorId)
+{
+	char mutator[8];
+	sprintf(mutator, "%d;", mutatorId);
+	return strstr(STRING(gpGlobals->startspot), mutator);
+}

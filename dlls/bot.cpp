@@ -1655,7 +1655,7 @@ void BotThink( bot_t *pBot )
 	// lights out
 	if (pBot->f_lightsout_check <= gpGlobals->time)
 	{
-		BOOL lightsout = (strstr(CVAR_GET_STRING("sv_mutators"), "lightsout") || atoi(CVAR_GET_STRING("sv_mutators")) == 10);
+		BOOL lightsout = UTIL_MutatorEnabled(MUTATOR_LIGHTSOUT);
 
 		if (lightsout && !pBot->f_flashlight)
 		{
@@ -2525,8 +2525,7 @@ void BotThink( bot_t *pBot )
 	}
 #endif
 
-	if (strstr(CVAR_GET_STRING("sv_mutators"), "topsyturvy") ||
-		atoi(CVAR_GET_STRING("sv_mutators")) == 12)
+	if (UTIL_MutatorEnabled(MUTATOR_TOPSYTURVY))
 		pEdict->v.v_angle[2] = 180;
 
 	g_engfuncs.pfnRunPlayerMove( pEdict, pEdict->v.v_angle, pBot->f_move_speed * speed_mod[pBot->bot_skill],
