@@ -880,7 +880,7 @@ bool BotFireWeapon(Vector v_enemy, bot_t *pBot, int weapon_choice, bool nofire)
 			if (mod_id == SI_DLL && iId == SI_WEAPON_SNUZI)
 				pEdict->v.button |= IN_ATTACK2;
 
-/*
+ /*
 			if (distance <= 80) {
 				// ALERT(at_aiconsole, "Kick or punch time!");
 				pEdict->v.impulse = 206 + RANDOM_LONG(0, 1);
