@@ -541,3 +541,4 @@ float UTIL_SharedRandomFloat( unsigned int seed, float low, float high );
 float UTIL_WeaponTimeBase( void );
 
 bool UTIL_HasWeaponId(edict_t *pEdict, int weaponId);
+bool UTIL_MutatorEnabled(int mutatorId);

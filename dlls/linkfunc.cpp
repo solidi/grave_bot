@@ -376,6 +376,8 @@
    LINK_ENTITY_TO_FUNC(flag);
    LINK_ENTITY_TO_FUNC(base);
    LINK_ENTITY_TO_FUNC(env_fog);
+   LINK_ENTITY_TO_FUNC(weapon_zapgun);
+   LINK_ENTITY_TO_FUNC(monster_tombstone);
 
    // Science and Industry
    LINK_ENTITY_TO_FUNC(ammo_rocketpistol);
