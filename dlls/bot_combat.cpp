@@ -893,6 +893,12 @@ bool BotFireWeapon(Vector v_enemy, bot_t *pBot, int weapon_choice, bool nofire)
 			} else if (distance <= 450) {
 				// ALERT(at_aiconsole, "Throw grenade!");
 				pEdict->v.impulse = 209;
+			} else {
+				// 10%
+				if (RANDOM_LONG(1,10) == 10) {
+					// ALERT(at_aiconsole, "Force grab it!\n");
+					pEdict->v.impulse = 215;
+				}
 			}
 
 			if (pSelect[final_index].primary_fire_charge)
