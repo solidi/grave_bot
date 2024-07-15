@@ -714,7 +714,9 @@ void BotCreate( edict_t *pPlayer, const char *arg1, const char *arg2,
 
 	if (FNullEnt( BotEnt ))
 	{
+#ifdef _DEBUG
 		SERVER_PRINT( "Max. Players reached.  Can't create bot!\n");
+#endif
 	}
 	else
 	{

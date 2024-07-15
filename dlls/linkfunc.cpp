@@ -379,6 +379,8 @@
    LINK_ENTITY_TO_FUNC(weapon_zapgun);
    LINK_ENTITY_TO_FUNC(monster_tombstone);
    LINK_ENTITY_TO_FUNC(monster_grabweapon);
+   LINK_ENTITY_TO_FUNC(func_vehicle);
+   LINK_ENTITY_TO_FUNC(func_vehiclecontrols);
 
    // Science and Industry
    LINK_ENTITY_TO_FUNC(ammo_rocketpistol);
