@@ -35,6 +35,7 @@ extern float is_demic_play;
 extern float is_ctf_play;
 extern float is_shidden_play;
 extern float is_horde_play;
+extern float is_prophunt_play;
 extern bool checked_teamplay;
 extern edict_t *listenserver_edict;
 extern bool b_chat_debug;
@@ -91,6 +92,12 @@ void BotCheckTeamplay()
 	{
 		is_team_play = TRUE;
 		is_horde_play = TRUE;
+	}
+
+	if (strstr(gameMode, "prophunt") || atoi(gameMode) == GAME_PROPHUNT)
+	{
+		is_team_play = TRUE;
+		is_prophunt_play = TRUE;
 	}
 
 	checked_teamplay = TRUE;
@@ -1362,7 +1369,8 @@ void BotAssessGrenades( bot_t *pBot )
 			if ((strcmp("monster_tripmine", STRING(pGrenade->v.classname)) != 0) && 
 				(strcmp("monster_snark", STRING(pGrenade->v.classname)) != 0) &&
 				(strcmp("grenade", STRING(pGrenade->v.classname)) != 0) &&
-				(strcmp("monster_chumtoad", STRING(pGrenade->v.classname)) != 0))
+				(strcmp("monster_chumtoad", STRING(pGrenade->v.classname)) != 0) &&
+				(strcmp("monster_propdecoy", STRING(pGrenade->v.classname)) != 0))
 				continue;
 
 		}

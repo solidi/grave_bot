@@ -108,6 +108,7 @@ float is_demic_play = 0.0;
 float is_ctf_play = 0.0;
 float is_shidden_play = 0.0;
 float is_horde_play = 0.0;
+float is_prophunt_play = 0.0;
 char team_names[MAX_TEAMS][MAX_TEAMNAME_LENGTH];
 int num_teams = 0;
 bool checked_teamplay = FALSE;

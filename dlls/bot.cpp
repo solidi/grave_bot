@@ -1797,6 +1797,32 @@ void BotThink( bot_t *pBot )
 	}
 	else  // else handle movement related actions...
 */	{
+
+		extern float is_prophunt_play;
+		if (is_prophunt_play)
+		{
+			// Run around until game starts
+			if (pEdict->v.fuser3 > gpGlobals->time)
+			{
+				b_botpause = FALSE;
+				if (pBot->f_shoot_time < gpGlobals->time)
+					pEdict->v.button |= IN_ATTACK;
+				pBot->f_shoot_time = gpGlobals->time + 1.0;
+			}
+			// Bot stop in place
+			else if (pEdict->v.fuser3 > 1)
+			{
+				b_botpause = TRUE;
+				pEdict->v.fuser3 = 0;
+			}
+			// Unstick signal
+			else if (pEdict->v.fuser3 == 1)
+			{
+				b_botpause = FALSE;
+				pEdict->v.fuser3 = 0;
+			}
+		}
+
 		if (b_botdontshoot == 0)
 		{
 			pBot->pBotEnemy = BotFindEnemy( pBot );
