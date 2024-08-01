@@ -381,6 +381,7 @@
    LINK_ENTITY_TO_FUNC(monster_grabweapon);
    LINK_ENTITY_TO_FUNC(func_vehicle);
    LINK_ENTITY_TO_FUNC(func_vehiclecontrols);
+   LINK_ENTITY_TO_FUNC(monster_propdecoy);
 
    // Science and Industry
    LINK_ENTITY_TO_FUNC(ammo_rocketpistol);
