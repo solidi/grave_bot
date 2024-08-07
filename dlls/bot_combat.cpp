@@ -904,7 +904,10 @@ bool BotFireWeapon(Vector v_enemy, bot_t *pBot, int weapon_choice, bool nofire)
 				// 10%
 				if (RANDOM_LONG(1,10) == 10) {
 					// ALERT(at_aiconsole, "Force grab it!\n");
-					pEdict->v.impulse = 215;
+					if (RANDOM_LONG(0,1))
+						pEdict->v.impulse = 215; // force grab
+					else
+						pEdict->v.impulse = 216; // drop explosive weapon
 				}
 			}
 
