@@ -1565,6 +1565,37 @@ bot_weapon_select_t valve_weapon_select[] =
 		0.0,					// time to charge weapon (primary)
 		0.0						// time to charge weapon (secondary)
 	},
+	// dual glock
+	{
+		VALVE_WEAPON_DUAL_GLOCK,	// id
+		"weapon_dual_glock",	// classname
+		"dual_glock",					// third person model
+		{						// primary ammo pickup classnames
+			"ammo_9mm",
+			"",
+		},
+		{						// secondary ammo pickup classnames
+			"",
+			"",
+		},
+		5,						// skill level
+		6,						// priority
+		30.0,					// min primary distance
+		2048.0,					// max primary distance
+		0.0,					// min secondary distance
+		0.0,					// max secondary distance
+		TRUE,					// can use underwater?
+		2.5,					// how long does this weapon take to reload?
+		100,					// times out of 100 to use primary fire
+		1,						// minimum ammout of primary ammo needed to fire
+		0,						// minimum ammout of seconday ammo needed to fire
+		FALSE,					// hold down primary fire button to use?
+		FALSE,					// hold down secondary fire button to use?
+		FALSE,					// charge weapon using primary fire?
+		FALSE,					// charge weapon using secondary fire?
+		0.0,					// time to charge weapon (primary)
+		0.0						// time to charge weapon (secondary)
+	},
 	/* terminator */
 	{
 		0,
@@ -3301,6 +3332,40 @@ bot_fire_delay_t valve_fire_delay[] =
 			0.2,
 			0.2,
 			0.4
+		}
+	},
+	// dual glock
+	{
+		VALVE_WEAPON_DUAL_GLOCK,
+		0.75,
+		{
+			0.0,
+			0.0,
+			0.2,
+			0.4,
+			0.75
+		},
+		{
+			0.0,
+			0.2,
+			0.4,
+			0.8,
+			1.0
+		},
+		0.0,
+		{
+			0.0,
+			0.0,
+			0.0,
+			0.0,
+			0.0
+		},
+		{
+			0.0,
+			0.0,
+			0.0,
+			0.0,
+			0.0
 		}
 	},
 	// terminator 
