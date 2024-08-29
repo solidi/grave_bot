@@ -385,6 +385,7 @@
    LINK_ENTITY_TO_FUNC(monster_throwweapon);
    LINK_ENTITY_TO_FUNC(monster_panther);
    LINK_ENTITY_TO_FUNC(monster_diablo);
+   LINK_ENTITY_TO_FUNC(weapon_dual_glock);
 
    // Science and Industry
    LINK_ENTITY_TO_FUNC(ammo_rocketpistol);
