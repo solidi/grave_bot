@@ -36,6 +36,7 @@ extern float is_ctf_play;
 extern float is_shidden_play;
 extern float is_horde_play;
 extern float is_prophunt_play;
+extern float is_busters_play;
 extern bool checked_teamplay;
 extern edict_t *listenserver_edict;
 extern bool b_chat_debug;
@@ -98,6 +99,12 @@ void BotCheckTeamplay()
 	{
 		is_team_play = TRUE;
 		is_prophunt_play = TRUE;
+	}
+
+	if (strstr(gameMode, "busters") || atoi(gameMode) == GAME_BUSTERS)
+	{
+		is_team_play = TRUE;
+		is_busters_play = TRUE;
 	}
 
 	checked_teamplay = TRUE;
