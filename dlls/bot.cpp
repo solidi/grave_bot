@@ -1802,25 +1802,34 @@ void BotThink( bot_t *pBot )
 		if (is_prophunt_play)
 		{
 			// Run around until game starts
-			if (pEdict->v.fuser3 > gpGlobals->time)
+			if (pEdict->v.fuser4 > 0) // if I'm a prop
 			{
-				b_botpause = FALSE;
-				if (pBot->f_shoot_time < gpGlobals->time)
-					pEdict->v.button |= IN_ATTACK;
-				pBot->f_shoot_time = gpGlobals->time + 1.0;
+				if (pEdict->v.fuser3 > gpGlobals->time)
+				{
+					b_botpause = FALSE;
+					if (pBot->f_shoot_time < gpGlobals->time)
+						pEdict->v.button |= IN_ATTACK;
+					pBot->f_shoot_time = gpGlobals->time + 1.0;
+				}
+				// Bot stop in place
+				else if (pEdict->v.fuser3 > 1)
+				{
+					b_botpause = TRUE;
+					pEdict->v.fuser3 = 0;
+				}
 			}
-			// Bot stop in place
-			else if (pEdict->v.fuser3 > 1)
-			{
-				b_botpause = TRUE;
-				pEdict->v.fuser3 = 0;
-			}
+
 			// Unstick signal
-			else if (pEdict->v.fuser3 == 1)
+			if (pEdict->v.fuser3 == 1)
 			{
 				b_botpause = FALSE;
 				pEdict->v.fuser3 = 0;
+				pBot->pBotEnemy = NULL;
 			}
+
+			// Remove enemy if was a defeated prop
+			if (pBot->pBotEnemy && pBot->pBotEnemy->v.fuser4 == 0)
+				pBot->pBotEnemy = NULL;
 		}
 
 		if (b_botdontshoot == 0)
