@@ -538,6 +538,8 @@ Vector BotBodyTarget( edict_t *pBotEnemy, bot_t *pBot )
 // specifing a weapon_choice allows you to choose the weapon the bot will
 // use (assuming enough ammo exists for that weapon)
 // BotFireWeapon will return TRUE if weapon was fired, FALSE otherwise
+extern cvar_t sv_botsmelee;
+
 bool BotFireWeapon(Vector v_enemy, bot_t *pBot, int weapon_choice, bool nofire)
 {
 //ALERT(at_console, "BotFireWeapon\n");
@@ -895,26 +897,29 @@ bool BotFireWeapon(Vector v_enemy, bot_t *pBot, int weapon_choice, bool nofire)
 				pEdict->v.button |= IN_ATTACK2;
 
 
-			if (distance <= 80) {
-				// ALERT(at_aiconsole, "Kick or punch time!");
-				pEdict->v.impulse = 206 + RANDOM_LONG(0, 1);
-			} else if (distance <= 120) {
-				// ALERT(at_aiconsole, "Flip!");
-				pEdict->v.impulse = 210 + RANDOM_LONG(0, 2);
-			} else if (distance <= 250) {
-				// ALERT(at_aiconsole, "Slide!");
-				pEdict->v.impulse = RANDOM_LONG(0,1) ? 208 : 214;
-			} else if (distance <= 450) {
-				// ALERT(at_aiconsole, "Throw grenade!");
-				pEdict->v.impulse = 209;
-			} else {
-				// 10%
-				if (RANDOM_LONG(1,10) == 10) {
-					// ALERT(at_aiconsole, "Force grab it!\n");
-					if (RANDOM_LONG(0,1))
-						pEdict->v.impulse = 215; // force grab
-					else
-						pEdict->v.impulse = 216; // drop explosive weapon
+			if (sv_botsmelee.value > 0)
+			{
+				if (distance <= 80) {
+					// ALERT(at_aiconsole, "Kick or punch time!");
+					pEdict->v.impulse = 206 + RANDOM_LONG(0, 1);
+				} else if (distance <= 120) {
+					// ALERT(at_aiconsole, "Flip!");
+					pEdict->v.impulse = 210 + RANDOM_LONG(0, 2);
+				} else if (distance <= 250) {
+					// ALERT(at_aiconsole, "Slide!");
+					pEdict->v.impulse = RANDOM_LONG(0,1) ? 208 : 214;
+				} else if (distance <= 450) {
+					// ALERT(at_aiconsole, "Throw grenade!");
+					pEdict->v.impulse = 209;
+				} else {
+					// 10%
+					if (RANDOM_LONG(1,10) == 10) {
+						// ALERT(at_aiconsole, "Force grab it!\n");
+						if (RANDOM_LONG(0,1))
+							pEdict->v.impulse = 215; // force grab
+						else
+							pEdict->v.impulse = 216; // drop explosive weapon
+					}
 				}
 			}
 
