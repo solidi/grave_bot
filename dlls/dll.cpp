@@ -146,6 +146,7 @@ float msecval;
 
 cvar_t sv_bot = {"gravebot",""};
 cvar_t sv_defaultbots = {"sv_defaultbots","0"};
+cvar_t sv_botsmelee = {"sv_botsmelee","1"};
 
 char *show_menu_1 =
    {"Waypoint Tags\n\n1. Team Specific\n2. Wait for Lift\n3. Door\n4. Sniper Spot\n5. More..."};
@@ -270,6 +271,7 @@ C_DLLEXPORT int Meta_Attach (PLUG_LOADTIME now, META_FUNCTIONS *pFunctionTable, 
    // ask the engine to register the CVARs this plugin uses
    CVAR_REGISTER (&sv_bot);
    CVAR_REGISTER (&sv_defaultbots);
+   CVAR_REGISTER (&sv_botsmelee);
 
    return (TRUE); // returning TRUE enables metamod to attach this plugin
 }
@@ -300,8 +302,9 @@ void GameDLLInit()
 	int i;
 
    #ifndef METAMOD_BUILD
-	   CVAR_REGISTER (&sv_bot);
-	   CVAR_REGISTER (&sv_defaultbots);
+		CVAR_REGISTER (&sv_bot);
+		CVAR_REGISTER (&sv_defaultbots);
+		CVAR_REGISTER (&sv_botsmelee);
    #endif
 	
 	for (i=0; i<32; i++)
@@ -386,6 +389,9 @@ int DispatchSpawn( edict_t *pent )
 			is_ctf_play = 0.0;
 			is_shidden_play = 0.0;
 			is_horde_play = 0.0;
+			is_prophunt_play = 0.0;
+			is_busters_play = 0.0;
+
 			memset(team_names, 0, sizeof(team_names));
 			num_teams = 0;
 			checked_teamplay = FALSE;
@@ -2241,6 +2247,8 @@ bool ProcessCommand( edict_t *pEntity, const char *pcmd, const char *arg1, const
 					waypoints[index].flags &= ~W_FL_CROUCH;
 				else if (FStrEq(arg2, "duckjump"))	// duck jump
 					waypoints[index].flags &= ~W_FL_DUCKJUMP;
+				else if (FStrEq(arg2, "doublejump"))
+					waypoints[index].flags &= ~W_FL_DOUBLEJUMP;
 				else if (FStrEq(arg2, "ladder"))	// ladder
 					waypoints[index].flags &= ~W_FL_LADDER;
 				else if (FStrEq(arg2, "lift"))	// lift

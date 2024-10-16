@@ -2288,6 +2288,9 @@ void WaypointPrintInfo(edict_t *pEntity)
 	if (flags & W_FL_DUCKJUMP)
 		SERVER_PRINT( "Bot will duck jump here\n");
 
+	if (flags & W_FL_DOUBLEJUMP)
+		SERVER_PRINT( "Bot will double jump here\n");
+
 	if (flags & W_FL_SNIPER)
 		SERVER_PRINT( "This is a sniper waypoint\n");
 
