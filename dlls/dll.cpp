@@ -389,6 +389,9 @@ int DispatchSpawn( edict_t *pent )
 			is_ctf_play = 0.0;
 			is_shidden_play = 0.0;
 			is_horde_play = 0.0;
+			is_prophunt_play = 0.0;
+			is_busters_play = 0.0;
+
 			memset(team_names, 0, sizeof(team_names));
 			num_teams = 0;
 			checked_teamplay = FALSE;
