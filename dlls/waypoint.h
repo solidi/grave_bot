@@ -43,6 +43,8 @@
 
 #define W_FL_DEFEND        (1<<21) /* bot will patrol this waypoint */
 
+#define W_FL_DOUBLEJUMP        (1<<22) /* CIR */
+
 #define W_FL_DELETED     (1<<31) /* used by waypoint allocation code */
 
 

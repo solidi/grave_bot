@@ -237,6 +237,8 @@ void BotSpawnInit( bot_t *pBot )
 	pBot->f_jump_time = 0.0;
 	pBot->f_delay_duck_time = 0.0;
 	pBot->f_do_duck_time = 0.0;
+	pBot->f_delay_doublejump_time = 0.0;
+	pBot->f_do_doublejump_time = 0.0;
 	pBot->f_dont_check_stuck = 0.0;
 	
 	pBot->f_sound_sensitivity = sound_sense[pBot->bot_skill];
@@ -2210,6 +2212,10 @@ void BotThink( bot_t *pBot )
 	// duck for duration of duck time
 	if (pBot->f_do_duck_time > gpGlobals->time && pBot->f_delay_duck_time < gpGlobals->time)
 		pEdict->v.button |= IN_DUCK;
+
+	// duck for duration of duck time
+	if (pBot->f_do_doublejump_time > gpGlobals->time && pBot->f_delay_doublejump_time < gpGlobals->time)
+		pEdict->v.button |= IN_JUMP;
 
 	if (pBot->pBotEnemy == NULL && pBot->f_switch_weapon_time < gpGlobals->time)
 	{	// try to select our best weapon

@@ -250,6 +250,8 @@ typedef struct
 	float	f_jump_time;
 	float	f_delay_duck_time;
 	float	f_do_duck_time;
+	float	f_delay_doublejump_time;
+	float	f_do_doublejump_time;
 	float	f_dont_check_stuck;
 	
 	float	f_avoid_drop_time;

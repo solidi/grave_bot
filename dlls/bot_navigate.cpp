@@ -552,7 +552,8 @@ bool BotHeadTowardWaypoint( bot_t *pBot )
 	if (waypoints[pBot->curr_waypoint_index].flags & W_FL_CROUCH)
 		min_distance = 20.0;
 	
-	if (waypoints[pBot->curr_waypoint_index].flags & W_FL_JUMP)
+	if (waypoints[pBot->curr_waypoint_index].flags & W_FL_JUMP ||
+		waypoints[pBot->curr_waypoint_index].flags & W_FL_DOUBLEJUMP)
 		min_distance = 20.0;
 
 	if (waypoints[pBot->curr_waypoint_index].flags & W_FL_DUCKJUMP)
@@ -610,6 +611,13 @@ bool BotHeadTowardWaypoint( bot_t *pBot )
 			pEdict->v.button |= IN_JUMP;  // jump here
 			pBot->f_delay_duck_time = gpGlobals->time + 0.1;
 			pBot->f_do_duck_time = pBot->f_delay_duck_time + 0.4;
+		}
+
+		if (waypoints[pBot->curr_waypoint_index].flags & W_FL_DOUBLEJUMP)
+		{
+			pEdict->v.button |= IN_JUMP;  // jump here
+			pBot->f_delay_doublejump_time = gpGlobals->time + 0.1;
+			pBot->f_do_doublejump_time = pBot->f_delay_doublejump_time + 0.4;
 		}
 
 		// check if the waypoint is a sniper waypoint...

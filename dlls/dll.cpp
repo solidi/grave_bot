@@ -2241,6 +2241,8 @@ bool ProcessCommand( edict_t *pEntity, const char *pcmd, const char *arg1, const
 					waypoints[index].flags &= ~W_FL_CROUCH;
 				else if (FStrEq(arg2, "duckjump"))	// duck jump
 					waypoints[index].flags &= ~W_FL_DUCKJUMP;
+				else if (FStrEq(arg2, "doublejump"))
+					waypoints[index].flags &= ~W_FL_DOUBLEJUMP;
 				else if (FStrEq(arg2, "ladder"))	// ladder
 					waypoints[index].flags &= ~W_FL_LADDER;
 				else if (FStrEq(arg2, "lift"))	// lift
