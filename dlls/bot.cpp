@@ -59,6 +59,7 @@ extern int max_bots;
 extern int max_teams;
 extern bot_research_t g_Researched[2][NUM_RESEARCH_OPTIONS];
 extern float is_team_play;
+extern int is_gameplay;
 extern edict_t *clients[32];
 static FILE *fp;
 
@@ -1800,8 +1801,7 @@ void BotThink( bot_t *pBot )
 	else  // else handle movement related actions...
 */	{
 
-		extern float is_prophunt_play;
-		if (is_prophunt_play)
+		if (is_gameplay == GAME_PROPHUNT)
 		{
 			// Run around until game starts
 			if (pEdict->v.fuser4 > 0) // if I'm a prop

@@ -61,12 +61,7 @@ extern bot_t bots[32];
 extern edict_t *pent_info_ctfdetect;
 extern char team_names[MAX_TEAMS][MAX_TEAMNAME_LENGTH];
 extern int num_teams;
-extern float is_demic_play;
-extern float is_ctf_play;
-extern float is_shidden_play;
-extern float is_horde_play;
-extern float is_prophunt_play;
-extern float is_busters_play;
+extern int is_gameplay;
 
 int gmsgTextMsg = 0;
 int gmsgSayText = 0;
@@ -228,7 +223,7 @@ int UTIL_GetTeam(edict_t *pEntity)
 {
 	if (mod_id == CRABBED_DLL || mod_id == VALVE_DLL)
 	{
-		if (is_demic_play)
+		if (is_gameplay == GAME_CHILLDEMIC)
 		{
 			if (!strcmp("skeleton", 
 				(g_engfuncs.pfnInfoKeyValue((*g_engfuncs.pfnGetInfoKeyBuffer)( pEntity ), "model"))))
@@ -239,7 +234,7 @@ int UTIL_GetTeam(edict_t *pEntity)
 			return 1;
 		}
 
-		if (is_ctf_play)
+		if (is_gameplay == GAME_CTF)
 		{
 			if (!strcmp("santa", 
 				(g_engfuncs.pfnInfoKeyValue((*g_engfuncs.pfnGetInfoKeyBuffer)( pEntity ), "model"))))
@@ -250,7 +245,7 @@ int UTIL_GetTeam(edict_t *pEntity)
 			return 1;
 		}
 
-		if (is_shidden_play)
+		if (is_gameplay == GAME_SHIDDEN)
 		{
 			if (pEntity->v.fuser3 > 0)
 			{
@@ -260,7 +255,7 @@ int UTIL_GetTeam(edict_t *pEntity)
 			return 1;
 		}
 
-		if (is_prophunt_play)
+		if (is_gameplay == GAME_PROPHUNT)
 		{
 			if (pEntity->v.fuser4 > 0)
 			{
@@ -270,7 +265,7 @@ int UTIL_GetTeam(edict_t *pEntity)
 			return 1;
 		}
 
-		if (is_busters_play)
+		if (is_gameplay == GAME_BUSTERS)
 		{
 			if (pEntity->v.fuser4 > 0)
 			{
@@ -280,7 +275,7 @@ int UTIL_GetTeam(edict_t *pEntity)
 			return 1;
 		}
 
-		if (is_horde_play)
+		if (is_gameplay == GAME_HORDE)
 		{
 			if (pEntity->v.fuser3 > 0)
 			{
