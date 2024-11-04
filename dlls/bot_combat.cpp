@@ -30,13 +30,7 @@ extern bool b_observer_mode;
 extern int team_allies[4];
 extern edict_t *pent_info_ctfdetect;
 extern float is_team_play;
-extern float is_ctc_play;
-extern float is_demic_play;
-extern float is_ctf_play;
-extern float is_shidden_play;
-extern float is_horde_play;
-extern float is_prophunt_play;
-extern float is_busters_play;
+extern int is_gameplay;
 extern bool checked_teamplay;
 extern edict_t *listenserver_edict;
 extern bool b_chat_debug;
@@ -69,42 +63,48 @@ void BotCheckTeamplay()
 		is_team_play = TRUE;
 
 	if (strstr(gameMode, "ctc") || atoi(gameMode) == GAME_CTC)
-		is_ctc_play = TRUE;
+		is_gameplay = GAME_CTC;
 
 	if (strstr(gameMode, "shidden") || atoi(gameMode) == GAME_SHIDDEN)
 	{
 		is_team_play = TRUE;
-		is_shidden_play = TRUE;
+		is_gameplay = GAME_SHIDDEN;
 	}
 
 	if (strstr(gameMode, "chilldemic") || atoi(gameMode) == GAME_CHILLDEMIC)
 	{
 		is_team_play = TRUE;
-		is_demic_play = TRUE;
+		is_gameplay = GAME_CHILLDEMIC;
 	}
 
 	if (strstr(gameMode, "ctf") || atoi(gameMode) == GAME_CTF)
 	{
 		is_team_play = TRUE;
-		is_ctf_play = TRUE;
+		is_gameplay = GAME_CTF;
+	}
+
+	if (strstr(gameMode, "coldspot") || atoi(gameMode) == GAME_COLDSPOT)
+	{
+		is_team_play = TRUE;
+		is_gameplay = GAME_COLDSPOT;
 	}
 
 	if (strstr(gameMode, "horde") || atoi(gameMode) == GAME_HORDE)
 	{
 		is_team_play = TRUE;
-		is_horde_play = TRUE;
+		is_gameplay = GAME_HORDE;
 	}
 
 	if (strstr(gameMode, "prophunt") || atoi(gameMode) == GAME_PROPHUNT)
 	{
 		is_team_play = TRUE;
-		is_prophunt_play = TRUE;
+		is_gameplay = GAME_PROPHUNT;
 	}
 
 	if (strstr(gameMode, "busters") || atoi(gameMode) == GAME_BUSTERS)
 	{
 		is_team_play = TRUE;
-		is_busters_play = TRUE;
+		is_gameplay = GAME_BUSTERS;
 	}
 
 	checked_teamplay = TRUE;
@@ -149,7 +149,7 @@ edict_t *BotFindEnemy( bot_t *pBot )
 			pBot->pBotEnemy = NULL;
 		// Cannot see transparent player (with rune)
 		}
-		else if (is_ctc_play > 0.0)
+		else if (is_gameplay == GAME_CTC)
 		{
 			// Void enemy if they dropped the chumtoad
 			if (pBot->pBotEnemy->v.fuser4 == 0)
@@ -214,7 +214,7 @@ edict_t *BotFindEnemy( bot_t *pBot )
 			if (mod_id != SI_DLL && FStrEq(STRING(pMonster->v.classname), "hornet"))
 				continue;
 
-			if (is_ctc_play > 0.0)
+			if (is_gameplay == GAME_CTC)
 			{
 				// don't target golden chumtoad
 				if (FStrEq(STRING(pMonster->v.classname), "monster_ctctoad"))
@@ -252,7 +252,7 @@ edict_t *BotFindEnemy( bot_t *pBot )
 					continue;
 			}
 
-			if (is_ctc_play > 0.0)
+			if (is_gameplay == GAME_CTC)
 			{
 				if (pMonster->v.fuser4 < 1)
 					continue;
@@ -337,7 +337,7 @@ edict_t *BotFindEnemy( bot_t *pBot )
 						continue;
 				}
 
-				if (is_ctc_play > 0.0)
+				if (is_gameplay == GAME_CTC)
 				{
 					// target person only with chumtoad
 					if (pPlayer->v.fuser4 == 0)
@@ -460,7 +460,7 @@ bool BotShouldEngageEnemy( bot_t *pBot, edict_t *pEnemy )
 	if (mod_id == SI_DLL && pBot->i_carry_type)
 		return FALSE;
 
-	if (is_ctc_play > 0.0)
+	if (is_gameplay == GAME_CTC)
 	{
 		if (pBot->pEdict->v.fuser4 > 0)
 		{
@@ -564,7 +564,7 @@ bool BotFireWeapon(Vector v_enemy, bot_t *pBot, int weapon_choice, bool nofire)
 		return FALSE;
 	}
 
-	if (is_ctc_play > 0.0)
+	if (is_gameplay == GAME_CTC)
 	{
 		// Don't fire if I have the chumtoad
 		if (pBot->current_weapon.iId == VALVE_WEAPON_CHUMTOAD)
