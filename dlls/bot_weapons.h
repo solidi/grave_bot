@@ -64,7 +64,8 @@
 #define VALVE_WEAPON_ZAPGUN				51
 #define VALVE_WEAPON_DUAL_GLOCK			52 // end models
 #define VALVE_WEAPON_FINGERGUN			53
-#define VALVE_WEAPON_FISTS				54 // must be last for bot recognition
+#define VALVE_WEAPON_VICE				54
+#define VALVE_WEAPON_FISTS				55 // must be last for bot recognition
 
 #define VALVE_MAX_NORMAL_BATTERY   100
 
