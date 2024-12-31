@@ -1709,6 +1709,7 @@ void WaypointCreatePath(edict_t *pEntity, int cmd)
 		// play "start" sound...
 		EMIT_SOUND_DYN2(pEntity, CHAN_WEAPON, "common/wpn_hudoff.wav", 1.0,
 			ATTN_NORM, 0, 100);
+		SERVER_PRINT( "pathwaypoint create1\n");
 		
 		return;
 	}
@@ -1731,6 +1732,7 @@ void WaypointCreatePath(edict_t *pEntity, int cmd)
 		// play "done" sound...
 		EMIT_SOUND_DYN2(pEntity, CHAN_WEAPON, "common/wpn_hudon.wav", 1.0,
 			ATTN_NORM, 0, 100);
+		SERVER_PRINT( "pathwaypoint create2\n");
 	}
 }
 
@@ -1757,6 +1759,7 @@ void WaypointRemovePath(edict_t *pEntity, int cmd)
 		// play "start" sound...
 		EMIT_SOUND_DYN2(pEntity, CHAN_WEAPON, "common/wpn_hudoff.wav", 1.0,
 			ATTN_NORM, 0, 100);
+		SERVER_PRINT( "pathwaypoint remove1\n");
 		
 		return;
 	}
@@ -1779,6 +1782,7 @@ void WaypointRemovePath(edict_t *pEntity, int cmd)
 		// play "done" sound...
 		EMIT_SOUND_DYN2(pEntity, CHAN_WEAPON, "common/wpn_hudon.wav", 1.0,
 			ATTN_NORM, 0, 100);
+		SERVER_PRINT( "pathwaypoint remove2\n");
 	}
 }
 
