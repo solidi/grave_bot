@@ -389,8 +389,6 @@ int DispatchSpawn( edict_t *pent )
 			spawn_time_reset = FALSE;
 			
 			int botsWanted = sv_defaultbots.value;
-			if (!IS_DEDICATED_SERVER())
-				botsWanted += 1;
 
 			if (botsWanted > 0)
 			{
@@ -562,8 +560,6 @@ BOOL ClientConnect( edict_t *pEntity, const char *pszName, const char *pszAddres
 			if (sv_defaultbots.value > 0)
 			{
 				min_bots = sv_defaultbots.value;
-				if (!IS_DEDICATED_SERVER())
-					min_bots += 1;
 			}
 			else
 				min_bots = -1;
@@ -1047,20 +1043,22 @@ void StartFrame()
 			
 			for (i = 0; i < 32; i++)
 			{
-				if (clients[i] != NULL)
+				if (clients[i] != NULL && clients[i]->v.flags & FL_FAKECLIENT)
 					count++;
 			}
-			
+
 			// if there are currently less than the maximum number of "players"
 			// then add another bot using the default skill level...
 			if (sv_defaultbots.value > 0)
 			{
 				max_bots = sv_defaultbots.value;
-				if (!IS_DEDICATED_SERVER())
-					max_bots += 1;
 			}
 			else
+			{
+				if (max_bots != -1)
+					g_engfuncs.pfnServerCommand("kickall\n");
 				max_bots = -1;
+			}
 
 			if ((count < max_bots) && (max_bots != -1))
 			{
