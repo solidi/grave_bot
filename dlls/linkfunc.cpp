@@ -388,6 +388,7 @@
    LINK_ENTITY_TO_FUNC(weapon_dual_glock);
    LINK_ENTITY_TO_FUNC(coldspot);
    LINK_ENTITY_TO_FUNC(weapon_vice);
+   LINK_ENTITY_TO_FUNC(safespot);
 
    // Science and Industry
    LINK_ENTITY_TO_FUNC(ammo_rocketpistol);
