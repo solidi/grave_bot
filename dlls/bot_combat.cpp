@@ -107,6 +107,9 @@ void BotCheckTeamplay()
 		is_gameplay = GAME_BUSTERS;
 	}
 
+	if ((strstr(gameMode, "lms") || atoi(gameMode) == GAME_LMS) && CVAR_GET_FLOAT("mp_royaleteam"))
+		is_team_play = TRUE;
+
 	checked_teamplay = TRUE;
 }
 

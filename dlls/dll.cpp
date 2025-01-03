@@ -389,8 +389,6 @@ int DispatchSpawn( edict_t *pent )
 			spawn_time_reset = FALSE;
 			
 			int botsWanted = sv_defaultbots.value;
-			if (!IS_DEDICATED_SERVER())
-				botsWanted += 1;
 
 			if (botsWanted > 0)
 			{
@@ -562,8 +560,6 @@ BOOL ClientConnect( edict_t *pEntity, const char *pszName, const char *pszAddres
 			if (sv_defaultbots.value > 0)
 			{
 				min_bots = sv_defaultbots.value;
-				if (!IS_DEDICATED_SERVER())
-					min_bots += 1;
 			}
 			else
 				min_bots = -1;
@@ -1047,20 +1043,22 @@ void StartFrame()
 			
 			for (i = 0; i < 32; i++)
 			{
-				if (clients[i] != NULL)
+				if (clients[i] != NULL && clients[i]->v.flags & FL_FAKECLIENT)
 					count++;
 			}
-			
+
 			// if there are currently less than the maximum number of "players"
 			// then add another bot using the default skill level...
 			if (sv_defaultbots.value > 0)
 			{
 				max_bots = sv_defaultbots.value;
-				if (!IS_DEDICATED_SERVER())
-					max_bots += 1;
 			}
 			else
+			{
+				if (max_bots != -1)
+					g_engfuncs.pfnServerCommand("kickall\n");
 				max_bots = -1;
+			}
 
 			if ((count < max_bots) && (max_bots != -1))
 			{
@@ -2158,6 +2156,7 @@ bool ProcessCommand( edict_t *pEntity, const char *pcmd, const char *arg1, const
 					g_waypoint_on = TRUE;  // turn waypoints on if off
 				
 				WaypointAdd(pEntity);
+				SERVER_PRINT( "waypoint ADDED\n");
 			}
 			else if (FStrEq(arg1, "delete"))
 			{
@@ -2165,6 +2164,7 @@ bool ProcessCommand( edict_t *pEntity, const char *pcmd, const char *arg1, const
 					g_waypoint_on = TRUE;  // turn waypoints on if off
 				
 				WaypointDelete(pEntity);
+				SERVER_PRINT( "waypoint DELETED\n");
 			}
 			else if (FStrEq(arg1, "save"))
 			{
@@ -2300,31 +2300,75 @@ bool ProcessCommand( edict_t *pEntity, const char *pcmd, const char *arg1, const
 				else if (FStrEq(arg2, "itemname"))	// itemname
 					strcpy(waypoints[index].item, arg3);
 				else if (FStrEq(arg2, "jump"))	// jump
+				{
 					waypoints[index].flags |= W_FL_JUMP;
+					SERVER_PRINT( "waypoflag JUMP added\n");
+				}
 				else if (FStrEq(arg2, "crouch"))	// crouch
+				{
 					waypoints[index].flags |= W_FL_CROUCH;
+					SERVER_PRINT( "waypoflag CROUCH added\n");
+				}
 				else if (FStrEq(arg2, "duckjump"))	// duck jump
+				{
 					waypoints[index].flags |= W_FL_DUCKJUMP;
+					SERVER_PRINT( "waypoflag DUCKJUMP added\n");
+				}
+				else if (FStrEq(arg2, "doublejump"))
+				{
+					waypoints[index].flags |= W_FL_DOUBLEJUMP;
+					SERVER_PRINT( "waypoflag DOUBLEJUMP added\n");
+				}
 				else if (FStrEq(arg2, "ladder"))	// ladder
+				{
 					waypoints[index].flags |= W_FL_LADDER;
+					SERVER_PRINT( "waypoflag LADDER added\n");
+				}
 				else if (FStrEq(arg2, "lift"))	// lift
+				{
 					waypoints[index].flags |= W_FL_LIFT;
+					SERVER_PRINT( "waypoflag LIFT added\n");
+				}
 				else if (FStrEq(arg2, "door"))	// door
+				{
 					waypoints[index].flags |= W_FL_DOOR;
+					SERVER_PRINT( "waypoflag DOOR added\n");
+				}
 				else if (FStrEq(arg2, "health"))	// health
+				{
 					waypoints[index].flags |= W_FL_HEALTH;
+					SERVER_PRINT( "waypoflag HEALTH added\n");
+				}
 				else if (FStrEq(arg2, "armor"))	// armor
+				{
 					waypoints[index].flags |= W_FL_ARMOR;
+					SERVER_PRINT( "waypoflag ARMOR added\n");
+				}
 				else if (FStrEq(arg2, "sniper"))	// sniper spot
+				{
 					waypoints[index].flags |= W_FL_SNIPER;
+					SERVER_PRINT( "waypoflag SNIPER added\n");
+				}
 				else if (FStrEq(arg2, "weapon"))	// weapon
+				{
 					waypoints[index].flags |= W_FL_WEAPON;
+					SERVER_PRINT( "waypoflag WEAPON added\n");
+				}
 				else if (FStrEq(arg2, "ammo"))	// ammo
+				{
 					waypoints[index].flags |= W_FL_AMMO;
+					SERVER_PRINT( "waypoflag AMMO added\n");
+				}
 				else if (FStrEq(arg2, "item"))	// item
+				{
 					waypoints[index].flags |= W_FL_ITEM;
+					SERVER_PRINT( "waypoflag ITEM added\n");
+				}
 				else if (FStrEq(arg2, "defend"))
+				{
 					waypoints[index].flags |= W_FL_DEFEND; // on
+					SERVER_PRINT( "waypoflag DEFEND added\n");
+				}
 				else if (FStrEq(arg2, "update"))
 					WaypointSearchItems(pEntity, waypoints[index].origin, index);
 			}
