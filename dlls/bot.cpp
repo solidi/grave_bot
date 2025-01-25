@@ -84,7 +84,7 @@ extern char *SubroleToString(int subrole);
 
 static int number_names = 0;
 
-#define MAX_BOT_NAMES 100
+#define MAX_BOT_NAMES 64
 
 #define VALVE_MAX_SKINS    10
 #define ICE_MAX_SKINS      28
@@ -112,7 +112,7 @@ char *ice_bot_names[ICE_MAX_SKINS] = {
    "Army", "Assassin", "Alpina", "Baer", "Barney", "Commando", "Frost", "Gman", "Hgrunt", "HHev", "Gina", "Gordon", "Helmet", "HotFire",
    "Ivan", "Iceman", "Jesus", "Navy", "Recon", "Robo", "Santa", "Scientist", "Skeleton", "Snowman", "Stormtrooper", "Swat", "CoffeeMan", "Zombie"};
 						
-char bot_names[MAX_BOT_NAMES][BOT_NAME_LEN+1];
+static char bot_names[MAX_BOT_NAMES][BOT_NAME_LEN+1];
 						
 // how often (out of 1000 times) the bot will pause, based on bot skill
 float pause_frequency[5] = {4, 7, 10, 15, 20};
