@@ -8,7 +8,7 @@ ifeq "$(CFG)" "debug"
 	DEBUG_CFLAGS=-D_DEBUG -DDEBUG
 endif
 
-CPP = g++ -m32
+CPP = g++ -m32 -w -Wfatal-errors -std=c++11
 TARGET = gravebot
 ARCHFLAG = i686
 BASEFLAGS = -Dstricmp=strcasecmp -Dstrcmpi=strcasecmp
