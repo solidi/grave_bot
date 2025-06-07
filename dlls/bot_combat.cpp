@@ -435,7 +435,7 @@ int BotGetEnemyWeapon( edict_t *pEnemy )
 		while (pSelect[select_index].iId)
 		{	// does our enemy weapon model match this weapon's model?
 			// compare!
-			if (strstr(STRING(pEnemy->v.weaponmodel) > iStringNull ? STRING(pEnemy->v.weaponmodel) : "", pSelect[select_index].weapon_model) != NULL)
+			if (strstr(strcmp(STRING(pEnemy->v.weaponmodel), "0") != 0 ? STRING(pEnemy->v.weaponmodel) : "", pSelect[select_index].weapon_model) != NULL)
 				break;
 
 			select_index++;
