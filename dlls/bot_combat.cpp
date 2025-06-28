@@ -110,6 +110,11 @@ void BotCheckTeamplay()
 	if ((strstr(gameMode, "lms") || atoi(gameMode) == GAME_LMS) && CVAR_GET_FLOAT("mp_royaleteam"))
 		is_team_play = TRUE;
 
+	if (strstr(gameMode, "gungame") || atoi(gameMode) == GAME_GUNGAME)
+	{
+		is_gameplay = GAME_GUNGAME;
+	}
+
 	checked_teamplay = TRUE;
 }
 
@@ -900,7 +905,7 @@ bool BotFireWeapon(Vector v_enemy, bot_t *pBot, int weapon_choice, bool nofire)
 				pEdict->v.button |= IN_ATTACK2;
 
 
-			if (sv_botsmelee.value > 0)
+			if (sv_botsmelee.value > 0 && is_gameplay != GAME_GUNGAME)
 			{
 				if (distance <= 80) {
 					// ALERT(at_aiconsole, "Kick or punch time!");
