@@ -160,12 +160,21 @@ edict_t *BotFindEnemy( bot_t *pBot )
 		else if (is_gameplay == GAME_CTC)
 		{
 			// Void enemy if they dropped the chumtoad
-			if (pBot->pBotEnemy->v.fuser4 == 0)
+			if (pBot->pEdict->v.health > 25 && pBot->pBotEnemy->v.fuser4 == 0)
+			{
 				pBot->pBotEnemy = pRemember = NULL;
+			}
 
-			// Void enemy if bot has picked up chumtoad
-			if (pBot->current_weapon.iId == VALVE_WEAPON_CHUMTOAD)
+			// Void enemy if bot has good health and picked up chumtoad
+			if (pBot->pEdict->v.health > 25 && pBot->current_weapon.iId == VALVE_WEAPON_CHUMTOAD)
+			{
 				pBot->pBotEnemy = pRemember = NULL;
+			}
+
+			if (pBot->pEdict->v.health <= 25 && pBot->current_weapon.iId != VALVE_WEAPON_CHUMTOAD && pBot->pBotEnemy->v.fuser4 == 0)
+			{
+				pBot->pBotEnemy = pRemember = NULL;
+			}
 		}
 		else if (pBot->pBotEnemy->v.rendermode == kRenderTransAlpha &&
 				 pBot->pBotEnemy->v.renderamt < 60 &&
@@ -262,8 +271,14 @@ edict_t *BotFindEnemy( bot_t *pBot )
 
 			if (is_gameplay == GAME_CTC)
 			{
-				if (pMonster->v.fuser4 < 1)
+				// Bot has good health and chumtoad, skip
+				if (pBot->pEdict->v.health > 25 && pBot->pEdict->v.fuser4 > 0)
 					continue;
+
+				// Bot doesnt have chumtoad and monster doesnt have chumtoad, skip
+				if (pBot->pEdict->v.fuser4 < 1)
+					if (pMonster->v.fuser4 < 1)
+						continue;
 			}
 
 			vecEnd = UTIL_GetOrigin(pMonster) + pMonster->v.view_ofs;
@@ -347,9 +362,14 @@ edict_t *BotFindEnemy( bot_t *pBot )
 
 				if (is_gameplay == GAME_CTC)
 				{
-					// target person only with chumtoad
-					if (pPlayer->v.fuser4 == 0)
+					// Bot has good health and chumtoad, skip
+					if (pBot->pEdict->v.health > 25 && pBot->pEdict->v.fuser4 > 0)
 						continue;
+
+					// Bot doesnt have chumtoad and monster doesnt have chumtoad, skip
+					if (pBot->pEdict->v.fuser4 < 1)
+						if (pPlayer->v.fuser4 < 1)
+							continue;
 				}
 
 				vecEnd = pPlayer->v.origin + pPlayer->v.view_ofs;
@@ -470,7 +490,8 @@ bool BotShouldEngageEnemy( bot_t *pBot, edict_t *pEnemy )
 
 	if (is_gameplay == GAME_CTC)
 	{
-		if (pBot->pEdict->v.fuser4 > 0)
+		// Don't engage if I have good health and the chumtoad
+		if (pBot->pEdict->v.health > 25 && pBot->pEdict->v.fuser4 > 0)
 		{
 			return FALSE;
 		}
@@ -574,8 +595,8 @@ bool BotFireWeapon(Vector v_enemy, bot_t *pBot, int weapon_choice, bool nofire)
 
 	if (is_gameplay == GAME_CTC)
 	{
-		// Don't fire if I have the chumtoad
-		if (pBot->current_weapon.iId == VALVE_WEAPON_CHUMTOAD)
+		// Don't fire if I have good health and the chumtoad
+		if (pBot->pEdict->v.health > 25 && pBot->current_weapon.iId == VALVE_WEAPON_CHUMTOAD)
 			return FALSE;
 	}
 
@@ -855,7 +876,7 @@ bool BotFireWeapon(Vector v_enemy, bot_t *pBot, int weapon_choice, bool nofire)
 		iId = pSelect[final_index].iId;
 
 		// select this weapon if it isn't already selected
-		if (pBot->current_weapon.iId != iId/* && g_flWeaponSwitch <= gpGlobals->time*/)
+		if (is_gameplay != GAME_CTC && pBot->current_weapon.iId != iId/* && g_flWeaponSwitch <= gpGlobals->time*/)
 		{
 			//ALERT(at_console, "Switch weapon\n");
 			//g_flWeaponSwitch = gpGlobals->time + 1.0;
@@ -886,7 +907,13 @@ bool BotFireWeapon(Vector v_enemy, bot_t *pBot, int weapon_choice, bool nofire)
 			pEdict->v.button |= IN_RELOAD;
 			return FALSE;
 		}
-		
+
+		if (is_gameplay == GAME_CTC)
+		{
+			if (pBot->pEdict->v.health <= 25 && pBot->pEdict->v.fuser4 > 0)
+				pBot->pBotEnemy = NULL;
+		}
+
 		// zoom in if crossbow
 		if ((((mod_id == CRABBED_DLL || mod_id == VALVE_DLL) && iId == VALVE_WEAPON_CROSSBOW) ||
 			(mod_id == SI_DLL && iId == SI_WEAPON_CROSSBOW)) &&
