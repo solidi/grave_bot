@@ -927,6 +927,9 @@ bool BotFireWeapon(Vector v_enemy, bot_t *pBot, int weapon_choice, bool nofire)
 		{
 			if (!UTIL_MutatorEnabled(MUTATOR_DONTSHOOT))
 				pEdict->v.button |= IN_ATTACK;  // use primary attack
+			else
+				if (RANDOM_LONG(0,4) == 0)
+					pEdict->v.button |= IN_ATTACK;
 			// for dual uzies, we want to fire both guns at the same time
 			if (mod_id == SI_DLL && iId == SI_WEAPON_SNUZI)
 				pEdict->v.button |= IN_ATTACK2;
@@ -991,6 +994,9 @@ bool BotFireWeapon(Vector v_enemy, bot_t *pBot, int weapon_choice, bool nofire)
 		{
 			if (!UTIL_MutatorEnabled(MUTATOR_DONTSHOOT))
 				pEdict->v.button |= IN_ATTACK2;  // use secondary attack
+			else
+				if (RANDOM_LONG(0,4) == 0)
+					pEdict->v.button |= IN_ATTACK2;
 			// for dual uzies, we want to fire both guns at the same time
 			if (mod_id == SI_DLL && iId == SI_WEAPON_SNUZI)
 				pEdict->v.button |= IN_ATTACK;
