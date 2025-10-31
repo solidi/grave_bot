@@ -1808,7 +1808,7 @@ void BotThink( bot_t *pBot )
 			{
 				if (pEdict->v.fuser3 > gpGlobals->time)
 				{
-					b_botpause = FALSE;
+					pBot->f_pause_time = 0;
 					if (pBot->f_shoot_time < gpGlobals->time)
 						pEdict->v.button |= IN_ATTACK;
 					pBot->f_shoot_time = gpGlobals->time + 1.0;
@@ -1816,7 +1816,7 @@ void BotThink( bot_t *pBot )
 				// Bot stop in place
 				else if (pEdict->v.fuser3 > 1)
 				{
-					b_botpause = TRUE;
+					pBot->f_pause_time = pEdict->v.fuser3;
 					pEdict->v.fuser3 = 0;
 				}
 			}
@@ -1824,7 +1824,7 @@ void BotThink( bot_t *pBot )
 			// Unstick signal
 			if (pEdict->v.fuser3 == 1)
 			{
-				b_botpause = FALSE;
+				pBot->f_pause_time = 0;
 				pEdict->v.fuser3 = 0;
 				pBot->pBotEnemy = NULL;
 			}
