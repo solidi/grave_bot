@@ -132,17 +132,17 @@ BOOL WINAPI DllMain(HINSTANCE hinstDLL, DWORD fdwReason, LPVOID lpvReserved)
 	
 	strcpy(mod_name, &game_dir[pos]);
 	
-	if (strcmpi(mod_name, "ice_beta5") == 0)
+	if (strcmpi(mod_name, "ice_v1") == 0)
 	{
 		mod_id = VALVE_DLL;
 
       #ifndef METAMOD_BUILD
          #ifndef __linux__		
 		         // test if the game DLL file is NOT available outside of the Steam/PAK cache
-		         if (access("ice_beta5/dlls/ice.dll", 0) == -1)
+		         if (access("ice_v1/dlls/ice.dll", 0) == -1)
 		         {
 			         filebuf = LOAD_FILE_FOR_ME ("dlls/ice.dll", &filesize);
-			         filep = fopen ("ice_beta5/dlls/ice.dll", "wb");
+			         filep = fopen ("ice_v1/dlls/ice.dll", "wb");
 			         if (filep != NULL)
 			         {
 				         fwrite (filebuf, 1, filesize, filep); // if in cache, then extract it
@@ -150,13 +150,13 @@ BOOL WINAPI DllMain(HINSTANCE hinstDLL, DWORD fdwReason, LPVOID lpvReserved)
 			         }
 		         }
 
-		         h_Library = LoadLibrary("ice_beta5/dlls/ice.dll"); // and load the library
+		         h_Library = LoadLibrary("ice_v1/dlls/ice.dll"); // and load the library
          #else
 		         // test if the game DLL file is NOT available outside of the Steam/PAK cache
-		         if (access("ice_beta5/dlls/ice.so", 0) == -1)
+		         if (access("ice_v1/dlls/ice.so", 0) == -1)
 		         {
 			         filebuf = LOAD_FILE_FOR_ME ("dlls/ice.so", &filesize);
-			         filep = fopen ("ice_beta5/dlls/ice.so", "wb");
+			         filep = fopen ("ice_v1/dlls/ice.so", "wb");
 			         if (filep != NULL)
 			         {
 				         fwrite (filebuf, 1, filesize, filep); // if in cache, then extract it
@@ -164,7 +164,7 @@ BOOL WINAPI DllMain(HINSTANCE hinstDLL, DWORD fdwReason, LPVOID lpvReserved)
 			         }
 		         }
 
-		         h_Library = dlopen("ice_beta5/dlls/ice.so", RTLD_NOW);
+		         h_Library = dlopen("ice_v1/dlls/ice.so", RTLD_NOW);
          #endif
       #endif
 	}
