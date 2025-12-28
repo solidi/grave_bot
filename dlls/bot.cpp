@@ -1093,7 +1093,7 @@ void BotFindItem( bot_t *pBot )
 					pEdict->v.pContainingEntity, &tr);
 				
 				// check if traced all the way up to the entity (didn't hit wall)
-				if (strcmp(item_name, STRING(tr.pHit->v.classname)) == 0)
+				if (tr.pHit != NULL && strcmp(item_name, STRING(tr.pHit->v.classname)) == 0)
 				{
 					// find distance to item for later use...
 					float distance = (vecEnd - vecStart).Length( );
