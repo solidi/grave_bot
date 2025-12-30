@@ -1256,7 +1256,11 @@ void BotFindItem( bot_t *pBot )
 							if (strcmp(pSelect[select_index].weapon_name, item_name) == 0)
 							{	// check ammo for weapon if weapon stay is off
 								if (CVAR_GET_FLOAT("mp_weaponstay") == 0)
+								{
+									if (b_chat_debug)
+										ALERT(at_console, "1. pBot=%p, select_index=%d, item_name=%s\n", pBot, select_index, item_name);
 									ammo = BotAssessPrimaryAmmo(pBot, pSelect[select_index].iId);
+								}
 								weapon_index = select_index;
 							}
 
@@ -1265,7 +1269,11 @@ void BotFindItem( bot_t *pBot )
 							while (pSelect[select_index].primary_ammo_names[i][0])
 							{	// if so, get percent
 								if (strcmp(pSelect[select_index].primary_ammo_names[i], item_name) == 0)
+								{
+									if (b_chat_debug)
+										ALERT(at_console, "2. pBot=%p, select_index=%d, item_name=%s\n", pBot, select_index, item_name);
 									ammo = BotAssessPrimaryAmmo(pBot, pSelect[select_index].iId);
+								}
 
 								i++;
 							}
@@ -1276,7 +1284,11 @@ void BotFindItem( bot_t *pBot )
 							while (pSelect[select_index].secondary_ammo_names[i][0])
 							{	// if so, get percent
 								if (strcmp(pSelect[select_index].secondary_ammo_names[i], item_name) == 0)
+								{
+									if (b_chat_debug)
+										ALERT(at_console, "3. pBot=%p, select_index=%d, item_name=%s\n", pBot, select_index, item_name);
 									ammo = BotAssessSecondaryAmmo(pBot, pSelect[select_index].iId);
+								}
 
 								i++;
 							}
