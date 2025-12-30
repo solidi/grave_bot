@@ -1435,9 +1435,9 @@ void BotFindItem( bot_t *pBot )
 			
 			BotFixIdealYaw(pEdict);
 		}
-		int item_wpt = WaypointFindNearest(pPickupEntity, 48, team);
+		int item_wpt = WaypointFindNearest(pickup_origin, pEdict, 48, team);
 		if (item_wpt != pBot->curr_waypoint_index)
-			pBot->item_waypoint = WaypointFindNearest(pPickupEntity, 48, team);
+			pBot->item_waypoint = WaypointFindNearest(pickup_origin, pEdict, 48, team);
 		if (b_chat_debug && pPickupEntity && pBot)
 		{
 			sprintf(pBot->debugchat, "I found a(n) %s at %i\n", STRING(pPickupEntity->v.classname),
