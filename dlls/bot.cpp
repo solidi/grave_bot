@@ -971,6 +971,9 @@ void BotFindItem( bot_t *pBot )
 	Vector vecEnd;
 	int angle_to_entity;
 	edict_t *pEdict = pBot->pEdict;
+
+	if (pBot == NULL || pEdict == NULL)
+		return;
 	
 	// forget about our item if it's been three seconds
 	// forget about item if it we picked it up

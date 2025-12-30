@@ -162,6 +162,7 @@
    LINK_ENTITY_TO_FUNC(info_null);
    LINK_ENTITY_TO_FUNC(info_player_deathmatch);
    LINK_ENTITY_TO_FUNC(info_player_start);
+   LINK_ENTITY_TO_FUNC(info_player_coop);
    LINK_ENTITY_TO_FUNC(info_target);
    LINK_ENTITY_TO_FUNC(info_teleport_destination);
    LINK_ENTITY_TO_FUNC(infodecal);
