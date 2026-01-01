@@ -7,7 +7,7 @@ env:
 
 jobs:
   linux_libs:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04 # For GLIBC_3.4.30+ support
 
     steps:
     - uses: actions/checkout@v4
