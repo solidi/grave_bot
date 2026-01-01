@@ -61,6 +61,7 @@ bool b_observer_mode;
 bool b_chat_debug;
 bool b_botdontshoot;
 bool b_botpause;
+bool b_botfinditem;
 char welcome_msg[] = "Grave Bot by Ghoul - Based on HPB Bot template 4 by botman and Pierre-Marie Baty\n";
 
 extern float g_flVomiting[32];
@@ -308,6 +309,7 @@ void GameDLLInit()
 	b_chat_debug = FALSE;
 	b_botdontshoot = FALSE;
 	b_botpause = FALSE;
+	b_botfinditem = TRUE;
 
 	min_bots = -1;
 	max_bots = -1;
@@ -2036,6 +2038,24 @@ bool ProcessCommand( edict_t *pEntity, const char *pcmd, const char *arg1, const
 				SERVER_PRINT( "b_botpause ENABLED\n");
 			else
 				SERVER_PRINT( "b_botpause DISABLED\n");
+			
+			return TRUE;
+		}
+		else if (FStrEq(pcmd, "botfinditem"))
+		{
+			if ((arg1 != NULL) && (*arg1 != 0))
+			{
+				int temp = atoi(arg1);
+				if (temp)
+					b_botfinditem = TRUE;
+				else
+					b_botfinditem = FALSE;
+			}
+			
+			if (b_botfinditem)
+				SERVER_PRINT( "b_botfinditem ENABLED\n");
+			else
+				SERVER_PRINT( "b_botfinditem DISABLED\n");
 			
 			return TRUE;
 		}

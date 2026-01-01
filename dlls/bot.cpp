@@ -74,6 +74,7 @@ extern bool b_chat_debug;
 extern bool b_botdontshoot;
 extern bool b_botpause;
 extern bool b_random_color;
+extern bool b_botfinditem;
 extern bot_weapon_t weapon_defs[MAX_WEAPONS];
 extern bot_weapon_select_t valve_weapon_select[];
 extern edict_t *listenserver_edict;
@@ -1256,42 +1257,15 @@ void BotFindItem( bot_t *pBot )
 							if (strcmp(pSelect[select_index].weapon_name, item_name) == 0)
 							{	// check ammo for weapon if weapon stay is off
 								if (CVAR_GET_FLOAT("mp_weaponstay") == 0)
-								{
-									if (b_chat_debug)
-										ALERT(at_console, "1. pBot=%p, select_index=%d, item_name=%s\n", pBot, select_index, item_name);
 									ammo = BotAssessPrimaryAmmo(pBot, pSelect[select_index].iId);
-								}
 								weapon_index = select_index;
 							}
 
-							i = 0;
-							// is this ammo for one of our weapon's primary ammo count
-							while (pSelect[select_index].primary_ammo_names[i][0])
-							{	// if so, get percent
-								if (strcmp(pSelect[select_index].primary_ammo_names[i], item_name) == 0)
-								{
-									if (b_chat_debug)
-										ALERT(at_console, "2. pBot=%p, select_index=%d, item_name=%s\n", pBot, select_index, item_name);
-									ammo = BotAssessPrimaryAmmo(pBot, pSelect[select_index].iId);
-								}
+							if (strcmp(pSelect[select_index].primary_ammo_names[i], item_name) == 0)
+								ammo = BotAssessPrimaryAmmo(pBot, pSelect[select_index].iId);
 
-								i++;
-							}
-
-							// for second loop
-							i = 0;
-							// is this ammo for one of our weapon's secondary ammo count
-							while (pSelect[select_index].secondary_ammo_names[i][0])
-							{	// if so, get percent
-								if (strcmp(pSelect[select_index].secondary_ammo_names[i], item_name) == 0)
-								{
-									if (b_chat_debug)
-										ALERT(at_console, "3. pBot=%p, select_index=%d, item_name=%s\n", pBot, select_index, item_name);
-									ammo = BotAssessSecondaryAmmo(pBot, pSelect[select_index].iId);
-								}
-
-								i++;
-							}
+							if (strcmp(pSelect[select_index].secondary_ammo_names[i], item_name) == 0)
+								ammo = BotAssessSecondaryAmmo(pBot, pSelect[select_index].iId);
 
 							select_index++;
 						}
@@ -2241,9 +2215,11 @@ void BotThink( bot_t *pBot )
 	}
 
 	// check if bot should look for items now or not...
-	if (pBot->f_find_item < gpGlobals->time)
+	if (b_botfinditem && pBot->f_find_item < gpGlobals->time)
 	{
 		BotFindItem( pBot );  // see if there are any visible items
+		if (pBot->f_find_item < gpGlobals->time)
+			pBot->f_find_item = gpGlobals->time + 1.0;  // wait at least 1 second before looking again
 	}
 
 	if ((pBot->f_role_check < gpGlobals->time) && (!pBot->b_role_locked))
