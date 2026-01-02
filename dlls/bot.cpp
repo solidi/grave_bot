@@ -74,6 +74,7 @@ extern bool b_chat_debug;
 extern bool b_botdontshoot;
 extern bool b_botpause;
 extern bool b_random_color;
+extern bool b_botfinditem;
 extern bot_weapon_t weapon_defs[MAX_WEAPONS];
 extern bot_weapon_select_t valve_weapon_select[];
 extern edict_t *listenserver_edict;
@@ -971,6 +972,9 @@ void BotFindItem( bot_t *pBot )
 	Vector vecEnd;
 	int angle_to_entity;
 	edict_t *pEdict = pBot->pEdict;
+
+	if (pBot == NULL || pEdict == NULL)
+		return;
 	
 	// forget about our item if it's been three seconds
 	// forget about item if it we picked it up
@@ -1093,7 +1097,7 @@ void BotFindItem( bot_t *pBot )
 					pEdict->v.pContainingEntity, &tr);
 				
 				// check if traced all the way up to the entity (didn't hit wall)
-				if (strcmp(item_name, STRING(tr.pHit->v.classname)) == 0)
+				if (tr.pHit != NULL && strcmp(item_name, STRING(tr.pHit->v.classname)) == 0)
 				{
 					// find distance to item for later use...
 					float distance = (vecEnd - vecStart).Length( );
@@ -1257,26 +1261,11 @@ void BotFindItem( bot_t *pBot )
 								weapon_index = select_index;
 							}
 
-							i = 0;
-							// is this ammo for one of our weapon's primary ammo count
-							while (pSelect[select_index].primary_ammo_names[i][0])
-							{	// if so, get percent
-								if (strcmp(pSelect[select_index].primary_ammo_names[i], item_name) == 0)
-									ammo = BotAssessPrimaryAmmo(pBot, pSelect[select_index].iId);
+							if (strcmp(pSelect[select_index].primary_ammo_names[i], item_name) == 0)
+								ammo = BotAssessPrimaryAmmo(pBot, pSelect[select_index].iId);
 
-								i++;
-							}
-
-							// for second loop
-							i = 0;
-							// is this ammo for one of our weapon's secondary ammo count
-							while (pSelect[select_index].secondary_ammo_names[i][0])
-							{	// if so, get percent
-								if (strcmp(pSelect[select_index].secondary_ammo_names[i], item_name) == 0)
-									ammo = BotAssessSecondaryAmmo(pBot, pSelect[select_index].iId);
-
-								i++;
-							}
+							if (strcmp(pSelect[select_index].secondary_ammo_names[i], item_name) == 0)
+								ammo = BotAssessSecondaryAmmo(pBot, pSelect[select_index].iId);
 
 							select_index++;
 						}
@@ -1435,9 +1424,9 @@ void BotFindItem( bot_t *pBot )
 			
 			BotFixIdealYaw(pEdict);
 		}
-		int item_wpt = WaypointFindNearest(pPickupEntity, 48, team);
+		int item_wpt = WaypointFindNearest(pickup_origin, pEdict, 48, team);
 		if (item_wpt != pBot->curr_waypoint_index)
-			pBot->item_waypoint = WaypointFindNearest(pPickupEntity, 48, team);
+			pBot->item_waypoint = WaypointFindNearest(pickup_origin, pEdict, 48, team);
 		if (b_chat_debug && pPickupEntity && pBot)
 		{
 			sprintf(pBot->debugchat, "I found a(n) %s at %i\n", STRING(pPickupEntity->v.classname),
@@ -2226,9 +2215,11 @@ void BotThink( bot_t *pBot )
 	}
 
 	// check if bot should look for items now or not...
-	if (pBot->f_find_item < gpGlobals->time)
+	if (b_botfinditem && pBot->f_find_item < gpGlobals->time)
 	{
 		BotFindItem( pBot );  // see if there are any visible items
+		if (pBot->f_find_item < gpGlobals->time)
+			pBot->f_find_item = gpGlobals->time + 1.0;  // wait at least 1 second before looking again
 	}
 
 	if ((pBot->f_role_check < gpGlobals->time) && (!pBot->b_role_locked))
