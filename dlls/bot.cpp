@@ -982,12 +982,23 @@ void BotFindItem( bot_t *pBot )
 	{
 		if (b_chat_debug && pBot && pBot->pBotPickupItem)
 		{
-			sprintf(pBot->debugchat, "I tried to get to %s for too long!\n",
-				STRING(pBot->pBotPickupItem->v.classname));
-			UTIL_HostSay(pBot->pEdict, 0, pBot->debugchat);
+			// ensure pickup ent still valid before deref
+			if (!FNullEnt(pBot->pBotPickupItem) && !pBot->pBotPickupItem->free)
+			{
+				sprintf(pBot->debugchat, "I tried to get to %s for too long!\n",
+					STRING(pBot->pBotPickupItem->v.classname));
+				UTIL_HostSay(pBot->pEdict, 0, pBot->debugchat);
+			}
 		}
 		pBot->f_find_item = gpGlobals->time + 2.0;
 		pBot->f_last_item_found = -1;
+		pBot->pBotPickupItem = NULL;
+		pBot->item_waypoint = -1;
+	}
+
+	// validate existing pickup pointer (may have been freed by engine)
+	if (pBot->pBotPickupItem && (FNullEnt(pBot->pBotPickupItem) || pBot->pBotPickupItem->free))
+	{
 		pBot->pBotPickupItem = NULL;
 		pBot->item_waypoint = -1;
 	}
@@ -997,9 +1008,13 @@ void BotFindItem( bot_t *pBot )
 	{
 		if (b_chat_debug && pBot && pBot->pBotPickupItem)
 		{
-			sprintf(pBot->debugchat, "I can't see %s anymore.\n",
-				STRING(pBot->pBotPickupItem->v.classname));
-			UTIL_HostSay(pBot->pEdict, 0, pBot->debugchat);
+			// only reference classname if entity valid
+			if (!FNullEnt(pBot->pBotPickupItem) && !pBot->pBotPickupItem->free)
+			{
+				sprintf(pBot->debugchat, "I can't see %s anymore.\n",
+					STRING(pBot->pBotPickupItem->v.classname));
+				UTIL_HostSay(pBot->pEdict, 0, pBot->debugchat);
+			}
 		}
 		pBot->f_last_item_found = -1;
 		pBot->pBotPickupItem = NULL;
@@ -1033,9 +1048,19 @@ void BotFindItem( bot_t *pBot )
 	
 	while ((pent = UTIL_FindEntityInSphere( pent, pEdict->v.origin, radius )) != NULL)
 	{
+		// skip invalid / freed entities
+		if (FNullEnt(pent) || pent->free)
+			continue;
+
 		can_pickup = FALSE;  // assume can't use it until known otherwise
 		entteam = UTIL_GetTeam(pent);
-		strcpy(item_name, STRING(pent->v.classname));
+
+		// safe copy of classname into bounded buffer
+		const char *pn = "";
+		if (pent->v.classname)
+			pn = STRING(pent->v.classname);
+		strncpy(item_name, pn, sizeof(item_name)-1);
+		item_name[sizeof(item_name)-1] = '\0';
 		
 		// see if this is a "func_" type of entity (func_button, etc.)...
 		if (strncmp("func_", item_name, 5) == 0)
@@ -1096,8 +1121,9 @@ void BotFindItem( bot_t *pBot )
 				UTIL_TraceLine( vecStart, vecEnd, dont_ignore_monsters,
 					pEdict->v.pContainingEntity, &tr);
 				
-				// check if traced all the way up to the entity (didn't hit wall)
-				if (tr.pHit != NULL && strcmp(item_name, STRING(tr.pHit->v.classname)) == 0)
+				// check tr.pHit before deref
+				if (tr.pHit != NULL && !tr.pHit->free && tr.pHit->v.classname &&
+					strcmp(item_name, STRING(tr.pHit->v.classname)) == 0)
 				{
 					// find distance to item for later use...
 					float distance = (vecEnd - vecStart).Length( );
