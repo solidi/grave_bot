@@ -90,7 +90,7 @@ int default_bot_skill = 2;
 bool b_random_color = TRUE;
 int isFakeClientCommand = 0;
 int fake_arg_count;
-float bot_check_time = 30.0;
+float bot_check_time = 9999999.0;  // Initialize to large value to prevent premature firing
 int min_bots = -1;
 int max_bots = -1;
 int num_bots = 0;
@@ -858,6 +858,9 @@ void StartFrame()
 		if (count > num_bots)
 			num_bots = count;
 		
+		// Update prev_num_bots to current count for proper map change handling
+		prev_num_bots = count;
+		
 		for (player_index = 1; player_index <= gpGlobals->maxClients; player_index++)
 		{
 			pPlayer = INDEXENT(player_index);
@@ -1041,30 +1044,68 @@ void StartFrame()
 		{
 			int count = 0;
 			
-			bot_check_time = gpGlobals->time + 5.0;
-			
+			// Count ALL active bots regardless of respawn state
+			// This prevents spawning more bots than sv_defaultbots allows
 			for (i = 0; i < 32; i++)
 			{
-				if (clients[i] != NULL && clients[i]->v.flags & FL_FAKECLIENT)
+				if (bots[i].is_used)
 					count++;
 			}
 
 			// if there are currently less than the maximum number of "players"
 			// then add another bot using the default skill level...
+			// sv_defaultbots takes priority and overrides any cfg file settings
+			// Special cases:
+			//   sv_defaultbots > 0: automatic bot management up to this limit
+			//   sv_defaultbots = 0: kick all bots, disable automatic management
+			//   sv_defaultbots < 0: manual mode, no automatic control, no limits
 			if (sv_defaultbots.value > 0)
 			{
 				max_bots = sv_defaultbots.value;
 			}
-			else
+			else if (sv_defaultbots.value == 0)
 			{
 				if (max_bots != -1)
 					g_engfuncs.pfnServerCommand("kickall\n");
 				max_bots = -1;
 			}
-
-			if ((count < max_bots) && (max_bots != -1))
+			else // sv_defaultbots < 0: manual mode, no automatic control
 			{
-				BotCreate(NULL, NULL, NULL, NULL, NULL, NULL);
+				max_bots = -1;
+				// Don't do anything - let operator manually add/remove bots
+				bot_check_time = gpGlobals->time + 5.0;
+			}
+
+			// Skip automatic bot management if in manual mode (sv_defaultbots < 0)
+			if (sv_defaultbots.value >= 0)
+			{
+				// If we have MORE bots than sv_defaultbots allows, kick the excess
+				if ((count > max_bots) && (max_bots != -1))
+				{
+					// Kick one bot at a time to gradually reach the target
+					for (i = 0; i < 32; i++)
+					{
+						if (bots[i].is_used)
+						{
+							char cmd[80];
+							sprintf(cmd, "kick \"%s\"\n", bots[i].name);
+							SERVER_COMMAND(cmd);
+							break;  // Only kick one bot per check cycle
+						}
+					}
+					bot_check_time = gpGlobals->time + 5.0;
+				}
+				else if ((count < max_bots) && (max_bots != -1))
+				{
+					BotCreate(NULL, NULL, NULL, NULL, NULL, NULL);
+					// Reset timer AFTER bot creation to ensure 5-second spacing between bots
+					bot_check_time = gpGlobals->time + 5.0;
+				}
+				else
+				{
+					// Even if not creating a bot, reset the timer
+					bot_check_time = gpGlobals->time + 5.0;
+				}
 			}
 		}
 
@@ -1386,7 +1427,12 @@ void ProcessBotCfgFile()
 		return;  // return if comment or blank line
 
 	if (ProcessCommand(NULL, cmd, arg1, arg2, arg3, arg4, arg5))
+	{
+		// Add a small delay between processing cfg file commands to prevent
+		// rapid-fire command execution that could bypass sv_defaultbots checks
+		//bot_cfg_pause_time = gpGlobals->time + 0.1;
 		return;
+	}
 
 	sprintf(msg, "executing server command: %s\n", server_cmd);
 	SERVER_PRINT( msg );
@@ -1425,6 +1471,28 @@ bool ProcessCommand( edict_t *pEntity, const char *pcmd, const char *arg1, const
 		
 		if (FStrEq(pcmd, "addbot"))
 		{	
+			float sv_defaultbots_value = CVAR_GET_FLOAT("sv_defaultbots");
+			
+			// Don't allow addbot if sv_defaultbots is 0 (disabled mode)
+			if (sv_defaultbots_value == 0)
+				return TRUE;
+			
+			// If sv_defaultbots < 0, allow unlimited bots (manual mode)
+			if (sv_defaultbots_value > 0)
+			{
+				// Count current bots to enforce sv_defaultbots limit
+				int current_bot_count = 0;
+				for (int i = 0; i < 32; i++)
+				{
+					if (bots[i].is_used)
+						current_bot_count++;
+				}
+				
+				// Don't allow addbot if we're already at or above the sv_defaultbots limit
+				if (current_bot_count >= (int)sv_defaultbots_value)
+					return TRUE;
+			}
+			
 			// The arguments are out of line because I don't feel
 			// like editing the BotCreate function. :P
 			// HLDM skill name skin topcolor bottomcolor
