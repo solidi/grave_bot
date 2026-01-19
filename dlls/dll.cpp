@@ -90,7 +90,7 @@ int default_bot_skill = 2;
 bool b_random_color = TRUE;
 int isFakeClientCommand = 0;
 int fake_arg_count;
-float bot_check_time = 30.0;
+float bot_check_time = 0.0;
 int min_bots = -1;
 int max_bots = -1;
 int num_bots = 0;
@@ -1062,9 +1062,10 @@ void StartFrame()
 			}
 			else if ((int)sv_defaultbots.value == 0)
 			{
-				if (max_bots != -1)
+				max_bots = 0;
+				// Always kick bots when sv_defaultbots is 0, regardless of previous state
+				if (count > 0)
 					g_engfuncs.pfnServerCommand("kickall\n");
-				max_bots = -1;
 			}
 			else // sv_defaultbots < 0: manual mode, no automatic control
 			{
