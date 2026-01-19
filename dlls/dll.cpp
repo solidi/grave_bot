@@ -90,7 +90,7 @@ int default_bot_skill = 2;
 bool b_random_color = TRUE;
 int isFakeClientCommand = 0;
 int fake_arg_count;
-float bot_check_time = 9999999.0;  // Initialize to large value to prevent premature firing
+float bot_check_time = 30.0;
 int min_bots = -1;
 int max_bots = -1;
 int num_bots = 0;
@@ -1464,12 +1464,14 @@ bool ProcessCommand( edict_t *pEntity, const char *pcmd, const char *arg1, const
 		if (FStrEq(pcmd, "addbot"))
 		{	
 			float sv_defaultbots_value = CVAR_GET_FLOAT("sv_defaultbots");
-			
+
 			// Don't allow addbot if sv_defaultbots is 0 (disabled mode)
 			if ((int)sv_defaultbots_value == 0)
+			{
+				SERVER_PRINT("Cannot add bot: sv_defaultbots is set to 0 (disabled)\n");
 				return TRUE;
-			
-			// If sv_defaultbots < 0, allow unlimited bots (manual mode)
+			}
+
 			if (sv_defaultbots_value > 0)
 			{
 				// Count current bots to enforce sv_defaultbots limit
@@ -1479,16 +1481,16 @@ bool ProcessCommand( edict_t *pEntity, const char *pcmd, const char *arg1, const
 					if (bots[i].is_used)
 						current_bot_count++;
 				}
-				
+			
 				// Don't allow addbot if we're already at or above the sv_defaultbots limit
 				if (current_bot_count >= (int)sv_defaultbots_value)
+				{
+					char msg[128];
+					sprintf(msg, "Cannot add bot: sv_defaultbots limit of %d reached - or switch to -1\n", (int)sv_defaultbots_value);
+					SERVER_PRINT(msg);
 					return TRUE;
+				}
 			}
-			
-			// The arguments are out of line because I don't feel
-			// like editing the BotCreate function. :P
-			// HLDM skill name skin topcolor bottomcolor
-			// SI skill team model name
 			if (mod_id != SI_DLL) BotCreate( pEntity, arg3, arg2, arg1, arg4, arg5 );
 			else BotCreate( pEntity, arg2, arg3, arg4, arg1, arg5 );
 
