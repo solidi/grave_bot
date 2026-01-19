@@ -858,9 +858,6 @@ void StartFrame()
 		if (count > num_bots)
 			num_bots = count;
 		
-		// Update prev_num_bots to current count for proper map change handling
-		prev_num_bots = count;
-		
 		for (player_index = 1; player_index <= gpGlobals->maxClients; player_index++)
 		{
 			pPlayer = INDEXENT(player_index);
@@ -1063,7 +1060,7 @@ void StartFrame()
 			{
 				max_bots = sv_defaultbots.value;
 			}
-			else if (sv_defaultbots.value == 0)
+			else if ((int)sv_defaultbots.value == 0)
 			{
 				if (max_bots != -1)
 					g_engfuncs.pfnServerCommand("kickall\n");
@@ -1427,12 +1424,7 @@ void ProcessBotCfgFile()
 		return;  // return if comment or blank line
 
 	if (ProcessCommand(NULL, cmd, arg1, arg2, arg3, arg4, arg5))
-	{
-		// Add a small delay between processing cfg file commands to prevent
-		// rapid-fire command execution that could bypass sv_defaultbots checks
-		//bot_cfg_pause_time = gpGlobals->time + 0.1;
 		return;
-	}
 
 	sprintf(msg, "executing server command: %s\n", server_cmd);
 	SERVER_PRINT( msg );
@@ -1474,7 +1466,7 @@ bool ProcessCommand( edict_t *pEntity, const char *pcmd, const char *arg1, const
 			float sv_defaultbots_value = CVAR_GET_FLOAT("sv_defaultbots");
 			
 			// Don't allow addbot if sv_defaultbots is 0 (disabled mode)
-			if (sv_defaultbots_value == 0)
+			if ((int)sv_defaultbots_value == 0)
 				return TRUE;
 			
 			// If sv_defaultbots < 0, allow unlimited bots (manual mode)
