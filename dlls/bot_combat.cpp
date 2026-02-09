@@ -132,6 +132,16 @@ edict_t *BotFindEnemy( bot_t *pBot )
 	
 	edict_t *pEdict = pBot->pEdict;
 
+	if (is_gameplay == GAME_PROPHUNT)
+	{
+		if (pBot->f_pause_time >= gpGlobals->time)
+		{
+			// we're a prop, can't have an enemy
+			pBot->pBotEnemy = NULL;
+			return NULL;
+		}
+	}
+
 	// Priorize live grenade over everything else
 	if (mod_id == VALVE_DLL && pBot->pBotEnemy && FStrEq(STRING(pBot->pBotEnemy->v.classname), "grenade")
 		&& ((pBot->pBotEnemy->v.origin - pEdict->v.origin).Length() < 192)
