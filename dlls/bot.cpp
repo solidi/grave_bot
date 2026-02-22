@@ -1831,7 +1831,7 @@ void BotThink( bot_t *pBot )
 				// Bot stop in place
 				else if (pEdict->v.fuser3 > 1)
 				{
-					pBot->f_pause_time = pEdict->v.fuser3;
+					pBot->f_pause_time = gpGlobals->time + 1000;
 					pEdict->v.fuser3 = 0;
 				}
 			}
