@@ -391,6 +391,9 @@
    LINK_ENTITY_TO_FUNC(weapon_vice);
    LINK_ENTITY_TO_FUNC(safespot);
    LINK_ENTITY_TO_FUNC(snowbomb);
+   LINK_ENTITY_TO_FUNC(loot_entity);
+   LINK_ENTITY_TO_FUNC(loot_crate);
+   LINK_ENTITY_TO_FUNC(loot_goal);
 
    // Science and Industry
    LINK_ENTITY_TO_FUNC(ammo_rocketpistol);

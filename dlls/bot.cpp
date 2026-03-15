@@ -1315,6 +1315,24 @@ void BotFindItem( bot_t *pBot )
 					}
 				}
 
+				else if (strcmp("loot_entity", item_name) == 0)
+				{
+					// check if the item is not visible (i.e. has not respawned)
+					if (pent->v.effects & EF_NODRAW)
+						continue;
+
+					can_pickup = TRUE;
+				}
+
+				else if (strcmp("loot_goal", item_name) == 0)
+				{
+					// check if the item is not visible (i.e. has not respawned)
+					if (pent->v.effects & EF_NODRAW)
+						continue;
+
+					can_pickup = TRUE;
+				}
+
 				// check if entity is a flag
 				else if (strcmp("flag", item_name) == 0)
 				{

@@ -115,6 +115,12 @@ void BotCheckTeamplay()
 		is_gameplay = GAME_GUNGAME;
 	}
 
+	if (strstr(gameMode, "loot") || atoi(gameMode) == GAME_LOOT)
+	{
+		is_team_play = TRUE;
+		is_gameplay = GAME_LOOT;
+	}
+
 	checked_teamplay = TRUE;
 }
 
@@ -1436,7 +1442,8 @@ void BotAssessGrenades( bot_t *pBot )
 				(strcmp("monster_snark", STRING(pGrenade->v.classname)) != 0) &&
 				(strcmp("grenade", STRING(pGrenade->v.classname)) != 0) &&
 				(strcmp("monster_chumtoad", STRING(pGrenade->v.classname)) != 0) &&
-				(strcmp("monster_propdecoy", STRING(pGrenade->v.classname)) != 0))
+				(strcmp("monster_propdecoy", STRING(pGrenade->v.classname)) != 0) &&
+				(strcmp("loot_crate", STRING(pGrenade->v.classname)) != 0))
 				continue;
 
 		}
