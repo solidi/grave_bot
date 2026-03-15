@@ -1315,6 +1315,24 @@ void BotFindItem( bot_t *pBot )
 					}
 				}
 
+				else if (strcmp("loot_entity", item_name) == 0)
+				{
+					// check if the item is not visible (i.e. has not respawned)
+					if (pent->v.effects & EF_NODRAW)
+						continue;
+
+					can_pickup = TRUE;
+				}
+
+				else if (strcmp("loot_goal", item_name) == 0)
+				{
+					// check if the item is not visible (i.e. has not respawned)
+					if (pent->v.effects & EF_NODRAW)
+						continue;
+
+					can_pickup = TRUE;
+				}
+
 				// check if entity is a flag
 				else if (strcmp("flag", item_name) == 0)
 				{
@@ -1324,6 +1342,19 @@ void BotFindItem( bot_t *pBot )
 
 					// check if the bot can use this item...
 					//if (!UTIL_HasWeaponId(pEdict, VALVE_WEAPON_CHUMTOAD))
+					{
+						can_pickup = TRUE;
+					}
+				}
+
+				// check if entity is a base
+				else if (strcmp("base", item_name) == 0)
+				{
+					// check if the item is not visible (i.e. has not respawned)
+					if (pent->v.effects & EF_NODRAW)
+						continue;
+
+					// check if the bot can use this item...
 					{
 						can_pickup = TRUE;
 					}
