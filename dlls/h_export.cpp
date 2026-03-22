@@ -142,11 +142,15 @@ BOOL WINAPI DllMain(HINSTANCE hinstDLL, DWORD fdwReason, LPVOID lpvReserved)
 		         if (access("ice_v1.1/dlls/ice.dll", 0) == -1)
 		         {
 			         filebuf = LOAD_FILE_FOR_ME ("dlls/ice.dll", &filesize);
-			         filep = fopen ("ice_v1.1/dlls/ice.dll", "wb");
-			         if (filep != NULL)
+			         if (filebuf != NULL)
 			         {
-				         fwrite (filebuf, 1, filesize, filep); // if in cache, then extract it
-				         fclose (filep);
+				         filep = fopen ("ice_v1.1/dlls/ice.dll", "wb");
+				         if (filep != NULL)
+				         {
+					         fwrite (filebuf, 1, filesize, filep); // if in cache, then extract it
+					         fclose (filep);
+				         }
+				         FREE_FILE (filebuf);
 			         }
 		         }
 
@@ -156,11 +160,15 @@ BOOL WINAPI DllMain(HINSTANCE hinstDLL, DWORD fdwReason, LPVOID lpvReserved)
 		         if (access("ice_v1.1/dlls/ice.so", 0) == -1)
 		         {
 			         filebuf = LOAD_FILE_FOR_ME ("dlls/ice.so", &filesize);
-			         filep = fopen ("ice_v1.1/dlls/ice.so", "wb");
-			         if (filep != NULL)
+			         if (filebuf != NULL)
 			         {
-				         fwrite (filebuf, 1, filesize, filep); // if in cache, then extract it
-				         fclose (filep);
+				         filep = fopen ("ice_v1.1/dlls/ice.so", "wb");
+				         if (filep != NULL)
+				         {
+					         fwrite (filebuf, 1, filesize, filep); // if in cache, then extract it
+					         fclose (filep);
+				         }
+				         FREE_FILE (filebuf);
 			         }
 		         }
 
