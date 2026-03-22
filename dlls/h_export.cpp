@@ -24,6 +24,8 @@
 
 #ifdef _WIN32
 #define strcmpi _strcmpi
+#else
+#define strcmpi strcasecmp
 #endif
 
 #ifndef METAMOD_BUILD
