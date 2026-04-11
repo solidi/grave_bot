@@ -234,7 +234,7 @@ int UTIL_GetTeam(edict_t *pEntity)
 			return 1;
 		}
 
-		if (is_gameplay == GAME_CTF)
+		if (is_gameplay == GAME_CTF || is_gameplay == GAME_KTS)
 		{
 			if (!strcmp("santa", 
 				(g_engfuncs.pfnInfoKeyValue((*g_engfuncs.pfnGetInfoKeyBuffer)( pEntity ), "model"))))

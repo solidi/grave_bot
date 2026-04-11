@@ -873,11 +873,12 @@ typedef struct
 #define GAME_HORDE 10
 #define GAME_INSTAGIB 11
 #define GAME_ICEMAN 12
-#define GAME_LOOT 13
-#define GAME_PROPHUNT 14
-#define GAME_SHIDDEN 15
-#define GAME_SNOWBALL 16
-#define GAME_TEAMPLAY 17
+#define GAME_KTS 13
+#define GAME_LOOT 14
+#define GAME_PROPHUNT 15
+#define GAME_SHIDDEN 16
+#define GAME_SNOWBALL 17
+#define GAME_TEAMPLAY 18
 
 #endif
 

@@ -975,6 +975,17 @@ void BotFindItem( bot_t *pBot )
 
 	if (pBot == NULL || pEdict == NULL)
 		return;
+
+	// KTS: all navigation is handled by BotFindWaypointGoal and BotKtsThink.
+	// BotFindItem's entity scanning interferes — it sets pBotPickupItem to
+	// chargers/weapons which block BotKtsThink, and its LOS-based kts_snowball
+	// pickup uses a 48u item_waypoint radius that is too small for a bouncing ball.
+	if (is_gameplay == GAME_KTS)
+	{
+		pBot->pBotPickupItem = NULL;
+		pBot->item_waypoint  = -1;
+		return;
+	}
 	
 	// forget about our item if it's been three seconds
 	// forget about item if it we picked it up
@@ -1003,7 +1014,15 @@ void BotFindItem( bot_t *pBot )
 		pBot->item_waypoint = -1;
 	}
 
-	if (pBot->pBotPickupItem && ((pBot->pBotPickupItem->v.effects & EF_NODRAW) ||
+	// In KTS, kts_snowball is always the target regardless of whether the bot
+	// has line-of-sight to it.  The bot routes to the ball via waypoints, so
+	// clearing it on a failed LOS trace would cause the bot to lose the ball
+	// as its active pickup and fall back to tour waypoints.
+	bool ktsPickupIsBall = is_gameplay == GAME_KTS
+		&& pBot->pBotPickupItem && !FNullEnt(pBot->pBotPickupItem)
+		&& FStrEq(STRING(pBot->pBotPickupItem->v.classname), "kts_snowball");
+
+	if (!ktsPickupIsBall && pBot->pBotPickupItem && ((pBot->pBotPickupItem->v.effects & EF_NODRAW) ||
 		!BotEntityIsVisible(pBot, pBot->pBotPickupItem)))
 	{
 		if (b_chat_debug && pBot && pBot->pBotPickupItem)
@@ -1331,6 +1350,33 @@ void BotFindItem( bot_t *pBot )
 						continue;
 
 					can_pickup = TRUE;
+				}
+
+				else if (strcmp("kts_goal", item_name) == 0)
+				{
+					// check if the item is not visible (i.e. has not respawned)
+					if (pent->v.effects & EF_NODRAW)
+						continue;
+
+					can_pickup = TRUE;
+				}
+
+				else if (strcmp("kts_snowball", item_name) == 0)
+				{
+					// check if the item is not visible (i.e. has not respawned)
+					if (pent->v.effects & EF_NODRAW)
+						continue;
+
+					// Skip if the ball is currently being dribbled by someone
+					// (SOLID_NOT / MOVETYPE_NOCLIP) — approaching it has no effect.
+					if (pent->v.movetype == MOVETYPE_NOCLIP)
+						continue;
+
+					// Ball is loose: it is the highest-priority item in KTS.
+					// Directly assign and break so no later item can override it.
+					pPickupEntity = pent;
+					pickup_origin = entity_origin;
+					break;
 				}
 
 				// check if entity is a flag
@@ -1880,6 +1926,59 @@ void BotThink( bot_t *pBot )
 				pBot->pBotEnemy = NULL;
 		}
 
+		// KTS: update b_kts_has_ball BEFORE BotFindEnemy so the early-return
+		// inside BotFindEnemy can read the correct value.  Without this the
+		// flag is only updated inside BotKtsThink (which lives in the no-enemy
+		// else-branch), creating a deadlock: enemy found → BotKtsThink skipped
+		// → flag stays false → enemy found again on the next tick forever.
+		if (is_gameplay == GAME_KTS)
+		{
+			edict_t *pBallKts = UTIL_FindEntityByClassname((edict_t *)NULL, "kts_snowball");
+			pBot->b_kts_has_ball = !FNullEnt(pBallKts)
+				&& pBallKts->v.movetype == MOVETYPE_NOCLIP
+				&& pBallKts->v.euser1 == pEdict;
+
+			// Also pre-set v_goal toward the enemy goal so the movement block
+			// has a target even on ticks where BotKtsThink is bypassed.
+			if (pBot->b_kts_has_ball)
+			{
+				int botTeam       = UTIL_GetTeam(pEdict);
+				int enemyGoalBody = (botTeam == 1) ? 1 : 0;
+				edict_t *pGoalEnt = NULL;
+				bool goalFound = false;
+				while ((pGoalEnt = UTIL_FindEntityByClassname(pGoalEnt, "kts_goal")) != NULL)
+				{
+					if (pGoalEnt->v.body == enemyGoalBody)
+					{
+						pBot->v_goal           = pGoalEnt->v.origin;
+						pBot->f_goal_proximity = 0.0f; // run all the way through the trigger
+						goalFound = true;
+						if (b_chat_debug && pBot->f_find_item < gpGlobals->time - 1.0f)
+						{
+							sprintf(pBot->debugchat, "KTS goal body=%d at (%.0f,%.0f,%.0f) team=%d",
+								pGoalEnt->v.body,
+								pGoalEnt->v.origin.x, pGoalEnt->v.origin.y, pGoalEnt->v.origin.z,
+								botTeam);
+							UTIL_HostSay(pBot->pEdict, 0, pBot->debugchat);
+						}
+						break;
+					}
+				}
+				if (b_chat_debug && !goalFound && pBot->f_find_item < gpGlobals->time - 1.0f)
+				{
+					sprintf(pBot->debugchat, "KTS: NO goal found! want body=%d team=%d", enemyGoalBody, botTeam);
+					UTIL_HostSay(pBot->pEdict, 0, pBot->debugchat);
+				}
+				// Also clear any stale pBotPickupItem so it can't block BotKtsThink
+				pBot->pBotPickupItem = NULL;
+				pBot->item_waypoint  = -1;
+			}
+			else if (!pBot->b_kts_has_ball)
+			{
+				pBot->v_goal = g_vecZero;
+			}
+		}
+
 		if (b_botdontshoot == 0)
 		{
 			pBot->pBotEnemy = BotFindEnemy( pBot );
@@ -1916,8 +2015,18 @@ void BotThink( bot_t *pBot )
 			{
 //				SERVER_PRINT( "%s gave up engaging...\n", STRING(pEdict->v.netname));
 				pBot->b_engaging_enemy = FALSE;
-				// remember our old goal if we had one
-				if (pBot->old_waypoint_goal != -1)
+				// In KTS there is no valid 'old goal' to return to — the ball is
+				// always the objective.  Restoring old_waypoint_goal here would
+				// redirect the bot to wherever it was heading before the tackle,
+				// away from the dislodged ball.  Reset to -1 so BotFindWaypointGoal
+				// picks up the ball position on the very next 0.5s cycle.
+				if (is_gameplay == GAME_KTS)
+				{
+					pBot->waypoint_goal     = -1;
+					pBot->old_waypoint_goal = -1;
+					pBot->f_waypoint_goal_time = 0.0f; // force immediate BotFindWaypointGoal update
+				}
+				else if (pBot->old_waypoint_goal != -1)
 				{
 					pBot->waypoint_goal = pBot->old_waypoint_goal;
 					pBot->old_waypoint_goal = -1;
@@ -1938,7 +2047,22 @@ void BotThink( bot_t *pBot )
 			pEdict->v.angles.y = pEdict->v.v_angle.y;
 			pEdict->v.angles.z = 0;	
 
-			if (pBot->pBotPickupItem)
+			// KTS: always clear pBotPickupItem in KTS mode.
+			// Navigation is handled by BotFindWaypointGoal (waypoint_goal) and
+			// BotKtsThink (v_goal).  A non-NULL pBotPickupItem would block
+			// BotKtsThink in the if/else-if chain below and prevent v_goal
+			// from being refreshed.
+			if (is_gameplay == GAME_KTS && pBot->pBotPickupItem)
+			{
+				pBot->pBotPickupItem = NULL;
+				pBot->item_waypoint  = -1;
+			}
+
+			if (is_gameplay == GAME_KTS && BotKtsThink(pBot))
+			{
+				// BotKtsThink sets v_goal + f_move_speed for all KTS cases.
+			}
+			else if (pBot->pBotPickupItem)
 			{
 				if (FStrEq(STRING(pBot->pBotPickupItem->v.classname), "func_healthcharger"))
 				{	// check if we can use the charger
@@ -2522,9 +2646,29 @@ void BotThink( bot_t *pBot )
 		&& (pBot->f_ignore_wpt_time < gpGlobals->time) && (pEdict->v.movetype != MOVETYPE_FLY))
 	{
 		bool bGoGoal = false;
-		if ((pBot->v_goal != g_vecZero) && ((pBot->v_goal - pEdict->v.origin).Length() < 256) &&
-			FVisible(pBot->v_goal, pEdict))
-			bGoGoal = true;
+		if (pBot->v_goal != g_vecZero)
+		{
+			float goalDist = (pBot->v_goal - pEdict->v.origin).Length();
+			// KTS dribbling: only direct-steer when close to the enemy goal.
+			// When far away, follow waypoints (the routing in BotHeadTowardWaypoint
+			// navigates via waypoint_goal set by BotFindWaypointGoal).
+			// Bypassing waypoints at long range makes the bot walk into walls
+			// and oscillate.  512u gives enough room for the final approach
+			// once the bot is near the goal waypoint.
+			bool ktsDirectSteer = (is_gameplay == GAME_KTS && pBot->b_kts_has_ball
+				&& goalDist < 512);
+			// KTS ball-chasing: when the ball is loose and visible, always
+			// direct-steer toward it regardless of distance.  The 256u limit
+			// is for non-KTS pickups; in KTS the ball is always the objective
+			// and the bot should never prefer a stale waypoint over a visible ball.
+			bool ktsBallChase = (is_gameplay == GAME_KTS && !pBot->b_kts_has_ball
+				&& pBot->v_goal != g_vecZero
+				&& FVisible(pBot->v_goal, pEdict));
+			if (ktsDirectSteer || ktsBallChase)
+				bGoGoal = true;
+			else if (goalDist < 256 && FVisible(pBot->v_goal, pEdict))
+				bGoGoal = true;
+		}
 
 		Vector direction;
 
