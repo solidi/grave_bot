@@ -830,22 +830,7 @@ bool BotHeadTowardWaypoint( bot_t *pBot )
 				pBot->f_waypoint_time = gpGlobals->time;
 			}
 		}
-		// KTS: waypoint_goal was just cleared (bot reached ball waypoint or engage reset)
-		// but item_waypoint still holds the last-known ball waypoint.  Route toward it
-		// directly so we never fall through to BotFindWaypoint (tour navigation).
-		else if (is_gameplay == GAME_KTS
-			&& pBot->pBotPickupItem != NULL && pBot->item_waypoint > -1)
-		{
-			int kts_next = WaypointRouteFromTo(pBot->curr_waypoint_index, pBot->item_waypoint, team);
-			if (kts_next != WAYPOINT_UNREACHABLE && kts_next < num_waypoints && kts_next > 0)
-			{
-				waypoint_found = TRUE;
-				pBot->curr_waypoint_index = kts_next;
-				pBot->waypoint_origin = waypoints[kts_next].origin;
-				pBot->f_waypoint_time = gpGlobals->time;
-			}
-		}
-		
+
 		if (waypoint_found == FALSE)
 		{
 			index = 4;

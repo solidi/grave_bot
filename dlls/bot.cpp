@@ -309,6 +309,9 @@ void BotSpawnInit( bot_t *pBot )
 
 	pBot->b_longjump = FALSE;
 	pBot->b_rune = FALSE;
+	// Clear per-life KTS possession state before recomputing it so stale
+	// values cannot leak across spawn/life boundaries into this think step.
+	pBot->b_kts_has_ball = false;
 
 	pBot->respawn_time = 0;
 	pBot->respawn_set = FALSE;
@@ -1014,32 +1017,6 @@ void BotFindItem( bot_t *pBot )
 		pBot->item_waypoint = -1;
 	}
 
-	// In KTS, kts_snowball is always the target regardless of whether the bot
-	// has line-of-sight to it.  The bot routes to the ball via waypoints, so
-	// clearing it on a failed LOS trace would cause the bot to lose the ball
-	// as its active pickup and fall back to tour waypoints.
-	bool ktsPickupIsBall = is_gameplay == GAME_KTS
-		&& pBot->pBotPickupItem && !FNullEnt(pBot->pBotPickupItem)
-		&& FStrEq(STRING(pBot->pBotPickupItem->v.classname), "kts_snowball");
-
-	if (!ktsPickupIsBall && pBot->pBotPickupItem && ((pBot->pBotPickupItem->v.effects & EF_NODRAW) ||
-		!BotEntityIsVisible(pBot, pBot->pBotPickupItem)))
-	{
-		if (b_chat_debug && pBot && pBot->pBotPickupItem)
-		{
-			// only reference classname if entity valid
-			if (!FNullEnt(pBot->pBotPickupItem) && !pBot->pBotPickupItem->free)
-			{
-				sprintf(pBot->debugchat, "I can't see %s anymore.\n",
-					STRING(pBot->pBotPickupItem->v.classname));
-				UTIL_HostSay(pBot->pEdict, 0, pBot->debugchat);
-			}
-		}
-		pBot->f_last_item_found = -1;
-		pBot->pBotPickupItem = NULL;
-		pBot->item_waypoint = -1;
-	}
-
 	// halt the rest of the function
 	if (pBot->f_find_item > gpGlobals->time || pBot->pBotPickupItem)
 		return;
@@ -1350,33 +1327,6 @@ void BotFindItem( bot_t *pBot )
 						continue;
 
 					can_pickup = TRUE;
-				}
-
-				else if (strcmp("kts_goal", item_name) == 0)
-				{
-					// check if the item is not visible (i.e. has not respawned)
-					if (pent->v.effects & EF_NODRAW)
-						continue;
-
-					can_pickup = TRUE;
-				}
-
-				else if (strcmp("kts_snowball", item_name) == 0)
-				{
-					// check if the item is not visible (i.e. has not respawned)
-					if (pent->v.effects & EF_NODRAW)
-						continue;
-
-					// Skip if the ball is currently being dribbled by someone
-					// (SOLID_NOT / MOVETYPE_NOCLIP) — approaching it has no effect.
-					if (pent->v.movetype == MOVETYPE_NOCLIP)
-						continue;
-
-					// Ball is loose: it is the highest-priority item in KTS.
-					// Directly assign and break so no later item can override it.
-					pPickupEntity = pent;
-					pickup_origin = entity_origin;
-					break;
 				}
 
 				// check if entity is a flag

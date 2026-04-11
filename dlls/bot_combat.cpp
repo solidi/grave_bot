@@ -36,6 +36,18 @@ extern edict_t *listenserver_edict;
 extern bool b_chat_debug;
 FILE *fp;
 
+static edict_t *BotGetKtsSnowballCached()
+ {
+ 	static float flCachedTime = -1.0f;
+ 	static edict_t *pCachedBall = NULL;
+ 	if (flCachedTime != gpGlobals->time)
+ 	{
+ 		flCachedTime = gpGlobals->time;
+ 		pCachedBall = UTIL_FindEntityByClassname((edict_t *)NULL, "kts_snowball");
+ 	}
+ 	return pCachedBall;
+ }
+
 float aim_tracking_x_scale[5] = {1.0, 2.0, 4.0, 5.0, 6.0};
 float aim_tracking_y_scale[5] = {1.0, 2.0, 4.0, 5.0, 6.0};
 // who is vomiting?
@@ -605,7 +617,7 @@ edict_t *BotFindEnemy( bot_t *pBot )
 				// If the ball is loose or this player is not the owner, skip.
 				if (is_gameplay == GAME_KTS)
 				{
-					edict_t *pBallKts = UTIL_FindEntityByClassname((edict_t *)NULL, "kts_snowball");
+					edict_t *pBallKts = BotGetKtsSnowballCached();
 					if (!FNullEnt(pBallKts)
 						&& pBallKts->v.movetype == MOVETYPE_NOCLIP
 						&& pBallKts->v.euser1 == pPlayer)
