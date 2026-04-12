@@ -1555,9 +1555,21 @@ int BotFindWaypointGoal( bot_t *pBot )
 			}
 			if (pEnemyGoal)
 			{
-				// Use a large radius — goals are fixed map entities and some
-				// maps place waypoints well away from the goal bbox.
-				index = WaypointFindNearest(pEnemyGoal, 2048, team);
+				// Find nearest waypoint to the enemy goal by pure distance.
+				// Do NOT use WaypointFindNearest (edict overload) — it traces
+				// LOS from the goal entity's origin, which fails when the goal
+				// sits inside a recessed trigger volume or behind brush geometry.
+				Vector goalPos = pEnemyGoal->v.origin;
+				float nearDist = 9e9f;
+				for (int w = 0; w < num_waypoints; w++)
+				{
+					if (waypoints[w].flags & W_FL_DELETED) continue;
+					if (waypoints[w].flags & W_FL_AIMING)  continue;
+					if ((team != -1) && (waypoints[w].flags & W_FL_TEAM_SPECIFIC) &&
+						((waypoints[w].flags & W_FL_TEAM) != team)) continue;
+					float d = (waypoints[w].origin - goalPos).Length();
+					if (d < nearDist) { nearDist = d; index = w; }
+				}
 				if (index != -1)
 				{
 					pBot->wpt_goal_type = WPT_GOAL_LOCATION;

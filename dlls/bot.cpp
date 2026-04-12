@@ -2599,14 +2599,14 @@ void BotThink( bot_t *pBot )
 		if (pBot->v_goal != g_vecZero)
 		{
 			float goalDist = (pBot->v_goal - pEdict->v.origin).Length();
-			// KTS dribbling: only direct-steer when close to the enemy goal.
-			// When far away, follow waypoints (the routing in BotHeadTowardWaypoint
-			// navigates via waypoint_goal set by BotFindWaypointGoal).
-			// Bypassing waypoints at long range makes the bot walk into walls
-			// and oscillate.  512u gives enough room for the final approach
-			// once the bot is near the goal waypoint.
+			// KTS dribbling: direct-steer toward the enemy goal when the bot
+			// can see it.  When the goal is not visible, follow waypoints
+			// (routing via waypoint_goal set by BotFindWaypointGoal).
+			// Using FVisible instead of a fixed distance cap lets the bot
+			// charge the goal the moment it rounds a corner, while still
+			// relying on waypoint routing through corridors and around walls.
 			bool ktsDirectSteer = (is_gameplay == GAME_KTS && pBot->b_kts_has_ball
-				&& goalDist < 512);
+				&& FVisible(pBot->v_goal, pEdict));
 			// KTS ball-chasing: when the ball is loose and visible, always
 			// direct-steer toward it regardless of distance.  The 256u limit
 			// is for non-KTS pickups; in KTS the ball is always the objective

@@ -215,13 +215,14 @@ bool BotKtsThink( bot_t *pBot )
 			Vector dir    = goalTarget - pEdict->v.origin;
 			float  dist   = dir.Length();
 
-			// Only override ideal_yaw when close to the goal (< 512u).
-			// When far away, BotHeadTowardWaypoint sets yaw toward the
-			// current routing waypoint so the bot faces its path.
-			// Overriding yaw at long range makes the bot look sideways
-			// while walking toward waypoints, which can cause movement
-			// conflicts and oscillation.
-			if (dist < 512.0f)
+			// Override ideal_yaw toward the goal when the bot can see it.
+			// When the goal is not visible (behind walls / around a corner),
+			// let BotHeadTowardWaypoint's yaw toward the current routing
+			// waypoint stand so the bot faces its path through the map.
+			// This matches the FVisible gate on ktsDirectSteer in the
+			// movement direction block — both switch to direct navigation
+			// at the same moment.
+			if (FVisible(goalTarget, pEdict))
 			{
 				Vector angles = UTIL_VecToAngles(dir);
 				pEdict->v.ideal_yaw = angles.y;
