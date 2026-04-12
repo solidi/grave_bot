@@ -36,6 +36,18 @@ extern edict_t *listenserver_edict;
 extern bool b_chat_debug;
 FILE *fp;
 
+static edict_t *BotGetKtsSnowballCached()
+ {
+ 	static float flCachedTime = -1.0f;
+ 	static edict_t *pCachedBall = NULL;
+ 	if (flCachedTime != gpGlobals->time)
+ 	{
+ 		flCachedTime = gpGlobals->time;
+ 		pCachedBall = UTIL_FindEntityByClassname((edict_t *)NULL, "kts_snowball");
+ 	}
+ 	return pCachedBall;
+ }
+
 float aim_tracking_x_scale[5] = {1.0, 2.0, 4.0, 5.0, 6.0};
 float aim_tracking_y_scale[5] = {1.0, 2.0, 4.0, 5.0, 6.0};
 // who is vomiting?
@@ -121,7 +133,202 @@ void BotCheckTeamplay()
 		is_gameplay = GAME_LOOT;
 	}
 
+	if (strstr(gameMode, "kts") || atoi(gameMode) == GAME_KTS)
+	{
+		is_team_play = TRUE;
+		is_gameplay = GAME_KTS;
+	}
+
 	checked_teamplay = TRUE;
+}
+
+//=========================================================
+// BotKtsThink — called from BotThink when in KTS mode and
+// no combat is active.
+//
+// Priority hierarchy:
+//  1. Bot IS the dribbler → navigate to enemy goal and score.
+//  2. An opponent IS dribbling → that player becomes the enemy
+//     so BotShootAtEnemy will run toward them and tackle.
+//  3. Ball is loose → run toward it (waypoint nav already handles
+//     this; return false to fall through to normal navigation).
+//
+// Returns true when this function has fully set the bot's
+// movement intent; returns false to fall back to normal nav.
+//=========================================================
+bool BotKtsThink( bot_t *pBot )
+{
+	if (is_gameplay != GAME_KTS)
+		return false;
+
+	edict_t *pEdict = pBot->pEdict;
+
+	// Locate the snowball
+	edict_t *pBall = UTIL_FindEntityByClassname((edict_t *)NULL, "kts_snowball");
+	if (FNullEnt(pBall))
+		return false;
+
+	Vector ballOrigin = pBall->v.origin;
+
+	// Team mapping: UTIL_GetTeam returns 1=blue(iceman), 2=red(santa)
+	// kts_goal pev->body: 0=TEAM_BLUE goal, 1=TEAM_RED goal
+	// Blue bot (1) scores in red goal (body==1); red bot (2) in blue goal (body==0)
+	int botTeam      = UTIL_GetTeam(pEdict);
+	int enemyGoalBody = (botTeam == 1) ? 1 : 0;
+
+	// --- Dribble detection -------------------------------------------
+	// b_kts_has_ball is authoritative from the pre-update block in bot.cpp
+	// (runs before BotFindEnemy every tick).  Do NOT re-assign it here —
+	// a second distance check with a freshly moved ball can flicker the
+	// flag and immediately reset v_goal before the movement block reads it.
+	bool ballBeingDribbled = (pBall->v.movetype == MOVETYPE_NOCLIP);
+	float distToBall = (ballOrigin - pEdict->v.origin).Length();
+
+	// -----------------------------------------------------------------
+	// Case 1: THIS bot is dribbling — head straight for the enemy goal.
+	// -----------------------------------------------------------------
+	if (pBot->b_kts_has_ball)
+	{
+		// Clear any stale enemy so combat routines don't interfere
+		pBot->pBotEnemy = NULL;
+
+		// Find enemy goal
+		edict_t *pGoal = NULL;
+		edict_t *pEnemyGoal = NULL;
+		while ((pGoal = UTIL_FindEntityByClassname(pGoal, "kts_goal")) != NULL)
+		{
+			if (pGoal->v.body == enemyGoalBody)
+			{
+				pEnemyGoal = pGoal;
+				break;
+			}
+		}
+
+		if (pEnemyGoal)
+		{
+			Vector goalTarget = pEnemyGoal->v.origin;
+			// Store in v_goal so the movement direction block in bot.cpp can
+			// steer directly at the goal when close enough (< 512u).
+			pBot->v_goal = goalTarget;
+			pBot->f_goal_proximity = 0.0f; // run all the way through the trigger
+
+			Vector dir    = goalTarget - pEdict->v.origin;
+			float  dist   = dir.Length();
+
+			// Override ideal_yaw toward the goal when the bot can see it.
+			// When the goal is not visible (behind walls / around a corner),
+			// let BotHeadTowardWaypoint's yaw toward the current routing
+			// waypoint stand so the bot faces its path through the map.
+			// This matches the FVisible gate on ktsDirectSteer in the
+			// movement direction block — both switch to direct navigation
+			// at the same moment.
+			if (FVisible(goalTarget, pEdict))
+			{
+				Vector angles = UTIL_VecToAngles(dir);
+				pEdict->v.ideal_yaw = angles.y;
+				BotFixIdealYaw(pEdict);
+			}
+
+			if (b_chat_debug)
+			{
+				sprintf(pBot->debugchat, "KTS->goal body=%d (%.0f,%.0f,%.0f) dist=%.0f",
+					pEnemyGoal->v.body, goalTarget.x, goalTarget.y, goalTarget.z,
+					dist);
+				UTIL_HostSay(pBot->pEdict, 0, pBot->debugchat);
+			}
+		}
+		else if (b_chat_debug)
+		{
+			sprintf(pBot->debugchat, "KTS Case1: NO enemy goal (want body=%d)", enemyGoalBody);
+			UTIL_HostSay(pBot->pEdict, 0, pBot->debugchat);
+		}
+
+		pBot->f_move_speed = pBot->f_max_speed;
+		return true;
+	}
+
+	// Bot no longer has the ball — clear v_goal so the movement block
+	// doesn't keep steering toward the old goal position.
+	pBot->v_goal = g_vecZero;
+
+	// -----------------------------------------------------------------
+	// Case 2: An OPPONENT is dribbling — target them as enemy so the
+	// bot runs at them and melee-tackles the ball loose.
+	// BotFindEnemy already handles this (it prioritises the ball-carrier)
+	// but we also steer yaw toward that player here for responsiveness.
+	// -----------------------------------------------------------------
+	if (ballBeingDribbled)
+	{
+		// Use pev->euser1 (set by CaptureCharm) to identify the carrier directly.
+		edict_t *pCarrier = !FNullEnt(pBall->v.euser1) ? pBall->v.euser1 : NULL;
+		if (pCarrier && pCarrier != pEdict
+			&& (pCarrier->v.flags & FL_CLIENT) && IsAlive(pCarrier)
+			&& UTIL_GetTeam(pCarrier) != botTeam)
+		{
+			pBot->v_goal           = pCarrier->v.origin;
+			pBot->f_goal_proximity = 48.0f;
+			Vector dir    = pCarrier->v.origin - pEdict->v.origin;
+			Vector angles = UTIL_VecToAngles(dir);
+			pEdict->v.ideal_yaw = angles.y;
+			BotFixIdealYaw(pEdict);
+			pBot->f_move_speed = pBot->f_max_speed;
+			return true;
+		}
+	}
+
+	// -----------------------------------------------------------------
+	// Case 3: Ball is loose and within direct push range — face goal
+	// and run into the ball.
+	// -----------------------------------------------------------------
+	if (!ballBeingDribbled && distToBall <= 120.0f)
+	{
+		edict_t *pGoal = NULL;
+		edict_t *pEnemyGoal = NULL;
+		while ((pGoal = UTIL_FindEntityByClassname(pGoal, "kts_goal")) != NULL)
+		{
+			if (pGoal->v.body == enemyGoalBody)
+			{
+				pEnemyGoal = pGoal;
+				break;
+			}
+		}
+
+		Vector aimTarget = pEnemyGoal
+			? (pEnemyGoal->v.origin + Vector(0, 0, 0))
+			: ballOrigin;
+
+		Vector dir    = aimTarget - pEdict->v.origin;
+		Vector angles = UTIL_VecToAngles(dir);
+		pEdict->v.ideal_yaw = angles.y;
+		BotFixIdealYaw(pEdict);
+
+		pBot->f_move_speed = pBot->f_max_speed;
+		return true;
+	}
+
+	// -----------------------------------------------------------------
+	// Case 4: Ball is loose but not yet in kick range.
+	// Set v_goal so the movement block can steer directly when the ball
+	// is visible, and run at full speed.  Waypoint routing is handled by
+	// BotFindWaypointGoal (updates waypoint_goal to the nearest waypoint
+	// to the ball every 0.5s).  Do NOT set pBotPickupItem here — a non-NULL
+	// pBotPickupItem blocks BotKtsThink in the if/else-if chain on
+	// subsequent ticks (the pBotPickupItem block fires, BotKtsThink in
+	// the else-if is skipped, and v_goal is never refreshed).
+	// -----------------------------------------------------------------
+	pBot->v_goal           = ballOrigin;
+	pBot->f_goal_proximity = 0.0f;
+	pBot->f_move_speed     = pBot->f_max_speed;
+
+	// Face the ball — BotHeadTowardWaypoint runs BEFORE this function and
+	// sets ideal_yaw toward the (possibly stale) curr_waypoint_index.
+	// Override it here so the bot turns toward the ball immediately.
+	Vector ballDir    = ballOrigin - pEdict->v.origin;
+	Vector ballAngles = UTIL_VecToAngles(ballDir);
+	pEdict->v.ideal_yaw = ballAngles.y;
+	BotFixIdealYaw(pEdict);
+
+	return true;
 }
 
 
@@ -146,6 +353,14 @@ edict_t *BotFindEnemy( bot_t *pBot )
 			pBot->pBotEnemy = NULL;
 			return NULL;
 		}
+	}
+
+	// KTS: while this bot has the ball its only job is to run to the goal —
+	// no enemies, no combat.
+	if (is_gameplay == GAME_KTS && pBot->b_kts_has_ball)
+	{
+		pBot->pBotEnemy = NULL;
+		return NULL;
 	}
 
 	// Priorize live grenade over everything else
@@ -191,6 +406,17 @@ edict_t *BotFindEnemy( bot_t *pBot )
 			{
 				pBot->pBotEnemy = pRemember = NULL;
 			}
+		}
+		else if (is_gameplay == GAME_KTS)
+		{
+			// In KTS, only keep an enemy while they are actively dribbling.
+			// Use pev->euser1 (set in CaptureCharm) — zero-flicker authoritative check.
+			edict_t *pBallKts = UTIL_FindEntityByClassname((edict_t *)NULL, "kts_snowball");
+			bool stillDribbler = !FNullEnt(pBallKts)
+				&& pBallKts->v.movetype == MOVETYPE_NOCLIP
+				&& pBallKts->v.euser1 == pBot->pBotEnemy;
+			if (!stillDribbler)
+				pBot->pBotEnemy = pRemember = NULL;
 		}
 		else if (pBot->pBotEnemy->v.rendermode == kRenderTransAlpha &&
 				 pBot->pBotEnemy->v.renderamt < 60 &&
@@ -386,6 +612,22 @@ edict_t *BotFindEnemy( bot_t *pBot )
 					if (pBot->pEdict->v.fuser4 < 1)
 						if (pPlayer->v.fuser4 < 1)
 							continue;
+				}
+
+				// KTS: only target the authoritative dribbler (pev->euser1).
+				// If the ball is loose or this player is not the owner, skip.
+				if (is_gameplay == GAME_KTS)
+				{
+					edict_t *pBallKts = BotGetKtsSnowballCached();
+					if (!FNullEnt(pBallKts)
+						&& pBallKts->v.movetype == MOVETYPE_NOCLIP
+						&& pBallKts->v.euser1 == pPlayer)
+					{
+						pNewEnemy = pPlayer;
+						pBot->pBotUser = NULL;
+						break;
+					}
+					continue;  // skip non-dribblers entirely
 				}
 
 				vecEnd = pPlayer->v.origin + pPlayer->v.view_ofs;
@@ -1265,7 +1507,15 @@ void BotShootAtEnemy( bot_t *pBot )
 		}
 		pBot->f_ignore_wpt_time = 0.0;
 		pBot->b_engaging_enemy = FALSE;
-		if (pBot->old_waypoint_goal != -1)
+		// In KTS there is no valid 'old goal' — the ball is always the objective.
+		// Restoring old_waypoint_goal would send the bot away from the dislodged ball.
+		if (is_gameplay == GAME_KTS)
+		{
+			pBot->waypoint_goal     = -1;
+			pBot->old_waypoint_goal = -1;
+			pBot->f_waypoint_goal_time = 0.0f; // force immediate BotFindWaypointGoal update
+		}
+		else if (pBot->old_waypoint_goal != -1)
 		{
 			pBot->waypoint_goal = pBot->old_waypoint_goal;
 			pBot->old_waypoint_goal = -1;
@@ -1443,7 +1693,8 @@ void BotAssessGrenades( bot_t *pBot )
 				(strcmp("grenade", STRING(pGrenade->v.classname)) != 0) &&
 				(strcmp("monster_chumtoad", STRING(pGrenade->v.classname)) != 0) &&
 				(strcmp("monster_propdecoy", STRING(pGrenade->v.classname)) != 0) &&
-				(strcmp("loot_crate", STRING(pGrenade->v.classname)) != 0))
+				(strcmp("loot_crate", STRING(pGrenade->v.classname)) != 0) &&
+				(strcmp("kts_snowball", STRING(pGrenade->v.classname)) != 0))
 				continue;
 
 		}

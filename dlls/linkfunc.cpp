@@ -395,6 +395,8 @@
    LINK_ENTITY_TO_FUNC(loot_crate);
    LINK_ENTITY_TO_FUNC(loot_goal);
    LINK_ENTITY_TO_FUNC(monster_goldenplayer);
+   LINK_ENTITY_TO_FUNC(kts_snowball);
+   LINK_ENTITY_TO_FUNC(kts_goal);
 
    // Science and Industry
    LINK_ENTITY_TO_FUNC(ammo_rocketpistol);

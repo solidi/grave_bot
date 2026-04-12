@@ -45,6 +45,7 @@ extern char *RoleToString(int role);
 extern char *SubroleToString(int subrole);
 extern bool b_chat_debug;
 static FILE *fp;
+extern int is_gameplay;
 
 void BotFixIdealPitch(edict_t *pEdict)
 {
@@ -520,10 +521,12 @@ bool BotHeadTowardWaypoint( bot_t *pBot )
 	
 	// doesn't have a goal waypoint OR
 	// bot is engaging an enemy OR
+	// KTS: always recalculate so the bot re-routes toward ball / enemy goal every 0.5s
 	// is "attacking" and defending an ally OR
 	// is defending a sci/rsrc currently being stolen AND
 	// our waypoint time allows all of this
-	if ((pBot->waypoint_goal == -1 || pBot->b_engaging_enemy || (pBot->role == ROLE_ATTACK &&
+	if ((pBot->waypoint_goal == -1 || pBot->b_engaging_enemy || is_gameplay == GAME_KTS ||
+		(pBot->role == ROLE_ATTACK &&
 		pBot->subrole == ROLE_SUB_DEF_ALLY) || (pBot->role == ROLE_DEFEND &&
 		(pBot->subrole == ROLE_SUB_DEF_SCIS || pBot->subrole == ROLE_SUB_DEF_RSRC) && pBot->pGoalEnt &&
 		pBot->pGoalEnt->v.aiment && IsCarryEnt(pBot->pGoalEnt))) &&
@@ -531,7 +534,7 @@ bool BotHeadTowardWaypoint( bot_t *pBot )
 	{
 		// tracking something, pick goal much more often
 		if (pBot->b_engaging_enemy || pBot->pGoalEnt != NULL || pBot->v_defend != g_vecZero ||
-			pBot->defend_wpt != -1)
+			pBot->defend_wpt != -1 || is_gameplay == GAME_KTS)
 			pBot->f_waypoint_goal_time = gpGlobals->time + 0.5;
 		else // don't pick a goal more often than every 120 seconds...
 			pBot->f_waypoint_goal_time = gpGlobals->time + 120.0;
@@ -539,7 +542,32 @@ bool BotHeadTowardWaypoint( bot_t *pBot )
 		index = BotFindWaypointGoal(pBot);
 
 		if (index != -1)
+		{
+			// KTS (ball-chasing only): Reset curr_waypoint_index to the nearest
+			// reachable waypoint when the goal actually CHANGES.  Without this,
+			// the bot must walk all the way to its old curr_waypoint_index
+			// (a stale hop from the engage chase) before routing recalculates
+			// — causing it to walk AWAY from the ball toward the old waypoint.
+			// Only reset when the goal changes: if the goal is the same, the
+			// bot is already routing toward it.  Resetting every 0.5s snaps
+			// curr_waypoint_index back to the waypoint the bot just left,
+			// creating a back-and-forth ping-pong.
+			// Skip when dribbling: the bot has a stable goal (enemy goal) and
+			// should follow the waypoint graph normally.
+			if (is_gameplay == GAME_KTS && !pBot->b_kts_has_ball
+				&& index != pBot->waypoint_goal)
+			{
+				int fresh = WaypointFindReachable(pEdict, REACHABLE_RANGE, team);
+				if (fresh != -1)
+				{
+					pBot->curr_waypoint_index = fresh;
+					pBot->waypoint_origin = waypoints[fresh].origin;
+					pBot->f_waypoint_time = gpGlobals->time;
+				}
+			}
+
 			pBot->waypoint_goal = index;
+		}
 	}
 
 	// find the distance to the target waypoint
@@ -675,7 +703,7 @@ bool BotHeadTowardWaypoint( bot_t *pBot )
 			*/
 
 			if ((pBot->b_engaging_enemy) || (pBot->pGoalEnt != NULL) || (pBot->v_defend != g_vecZero) ||
-				(pBot->defend_wpt != -1))
+				(pBot->defend_wpt != -1) || is_gameplay == GAME_KTS)
 				pBot->f_waypoint_goal_time = gpGlobals->time;
 			else	// a little delay time, since we'll touch the waypoint before we actually get what it has
 				pBot->f_waypoint_goal_time = gpGlobals->time + 0.25;
@@ -802,7 +830,7 @@ bool BotHeadTowardWaypoint( bot_t *pBot )
 				pBot->f_waypoint_time = gpGlobals->time;
 			}
 		}
-		
+
 		if (waypoint_found == FALSE)
 		{
 			index = 4;
@@ -850,7 +878,16 @@ bool BotHeadTowardWaypoint( bot_t *pBot )
 		(pBot->subrole == ROLE_SUB_DEF_SCIS || pBot->subrole == ROLE_SUB_DEF_RSRC) &&
 		IsCarryEnt(pBot->pGoalEnt)))) && /*!pBot->pBotPickupItem && */pBot->f_dmg_time < gpGlobals->time)
 	{
-		if (!pBot->pBotPickupItem || (pBot->pBotPickupItem &&
+		// KTS (not dribbling): skip the waypoint-facing override.
+		// BotKtsThink sets v_goal toward the ball; the movement direction
+		// block will steer and face the bot via bGoGoal.  If we set
+		// ideal_yaw toward curr_waypoint_index here (which runs BEFORE
+		// BotKtsThink), the bot faces away from the ball every tick.
+		if (is_gameplay == GAME_KTS && !pBot->b_kts_has_ball)
+		{
+			// do nothing — let BotKtsThink / movement block control yaw
+		}
+		else if (!pBot->pBotPickupItem || (pBot->pBotPickupItem &&
 			!(FStrEq(STRING(pBot->pBotPickupItem->v.classname), "func_healthcharger") ||
 			FStrEq(STRING(pBot->pBotPickupItem->v.classname), "func_recharge"))))
 		{
@@ -1495,6 +1532,87 @@ int BotFindWaypointGoal( bot_t *pBot )
 	int health_chance = floor((pBot->max_health - pEdict->v.health));
 	// this forces to get more health if it's less than 25
 	if (health_chance != 0) health_chance += 25;
+
+	// KTS: navigate toward the enemy goal when dribbling, otherwise the ball.
+	// Health is still checked first only if critically low (< 25).
+	if (is_gameplay == GAME_KTS && pEdict->v.health > 25)
+	{
+		// When dribbling, route to goal regardless of b_engaging_enemy —
+		// the bot's only objective is to score.
+		if (pBot->b_kts_has_ball)
+		{
+			int botTeam       = UTIL_GetTeam(pEdict);
+			int enemyGoalBody = (botTeam == 1) ? 1 : 0;
+			edict_t *pGoalEnt = NULL;
+			edict_t *pEnemyGoal = NULL;
+			while ((pGoalEnt = UTIL_FindEntityByClassname(pGoalEnt, "kts_goal")) != NULL)
+			{
+				if (pGoalEnt->v.body == enemyGoalBody)
+				{
+					pEnemyGoal = pGoalEnt;
+					break;
+				}
+			}
+			if (pEnemyGoal)
+			{
+				// Find nearest waypoint to the enemy goal by pure distance.
+				// Do NOT use WaypointFindNearest (edict overload) — it traces
+				// LOS from the goal entity's origin, which fails when the goal
+				// sits inside a recessed trigger volume or behind brush geometry.
+				Vector goalPos = pEnemyGoal->v.origin;
+				float nearDist = 9e9f;
+				for (int w = 0; w < num_waypoints; w++)
+				{
+					if (waypoints[w].flags & W_FL_DELETED) continue;
+					if (waypoints[w].flags & W_FL_AIMING)  continue;
+					if ((team != -1) && (waypoints[w].flags & W_FL_TEAM_SPECIFIC) &&
+						((waypoints[w].flags & W_FL_TEAM) != team)) continue;
+					float d = (waypoints[w].origin - goalPos).Length();
+					if (d < nearDist) { nearDist = d; index = w; }
+				}
+				if (index != -1)
+				{
+					pBot->wpt_goal_type = WPT_GOAL_LOCATION;
+					pBot->waypoint_goal = index;
+					return index;
+				}
+			}
+			// No waypoints near the enemy goal — return -1 so the movement
+			// block drives the bot directly via v_goal (set by pre-update in bot.cpp).
+			// Do NOT fall through to ball routing: the ball is following the
+			// bot so it would just return a waypoint near the bot itself.
+			return -1;
+		}
+
+		// Ball is loose: always route toward it.
+		// Never fall through to tour/health picks — in KTS the ball is always
+		// the objective.  Use pure distance (no LOS, no range cap) so a ball
+		// that has bounced into a corner or against a wall still gets a valid
+		// waypoint target.  Explicit return on every path prevents fallthrough.
+		{
+			edict_t *pBall = UTIL_FindEntityByClassname((edict_t *)NULL, "kts_snowball");
+			if (FNullEnt(pBall))
+				return -1;  // no ball — do not pick a tour waypoint
+
+			Vector ballPos = pBall->v.origin;
+			pBot->v_goal = ballPos;   // direct-steer fallback when ball is visible
+
+			// Find nearest waypoint to ball by pure distance — no LOS, no range cap.
+			float nearDist = 9e9f;
+			for (int w = 0; w < num_waypoints; w++)
+			{
+				if (waypoints[w].flags & W_FL_DELETED) continue;
+				if (waypoints[w].flags & W_FL_AIMING)  continue;
+				if ((team != -1) && (waypoints[w].flags & W_FL_TEAM_SPECIFIC) &&
+					((waypoints[w].flags & W_FL_TEAM) != team)) continue;
+				float d = (waypoints[w].origin - ballPos).Length();
+				if (d < nearDist) { nearDist = d; index = w; }
+			}
+			pBot->wpt_goal_type = WPT_GOAL_LOCATION;
+			return index;  // -1 only if map has zero valid waypoints; v_goal provides fallback
+		}
+	}
+
 	if (random < health_chance)
 	{	// look for health if we're pretty dead
 		index = WaypointFindNearestGoal(pEdict, pBot->curr_waypoint_index,

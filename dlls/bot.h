@@ -367,6 +367,9 @@ typedef struct
 	float f_lightsout_check;
 	bool f_flashlight;
 
+	// KTS — set true while this bot is detected as the active dribbler
+	bool b_kts_has_ball;
+
 } bot_t;
 
 
