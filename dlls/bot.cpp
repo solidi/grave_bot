@@ -1944,25 +1944,7 @@ void BotThink( bot_t *pBot )
 		// on ticks where the enemy branch runs instead of BotColdskullThink.
 		if (is_gameplay == GAME_COLDSKULL && pEdict->v.health > 25)
 		{
-			edict_t *pSkull = NULL;
-			edict_t *pBestSkull = NULL;
-			float flBestScore = 0.0f;
-			float flBestDist  = 9e9f;
-			while ((pSkull = UTIL_FindEntityByClassname(pSkull, "skull")) != NULL)
-			{
-				if (FNullEnt(pSkull) || pSkull->free) continue;
-				float flDist = (pSkull->v.origin - pEdict->v.origin).Length();
-				if (flDist < 1.0f) flDist = 1.0f;
-				float flValue = pSkull->v.fuser1;
-				if (flValue < 1.0f) flValue = 1.0f;
-				float flScore = flValue / sqrt(flDist);
-				if (flScore > flBestScore)
-				{
-					flBestScore = flScore;
-					flBestDist  = flDist;
-					pBestSkull  = pSkull;
-				}
-			}
+			edict_t *pBestSkull = BotFindBestSkull(pEdict, NULL);
 			if (pBestSkull)
 			{
 				pBot->v_goal           = pBestSkull->v.origin;

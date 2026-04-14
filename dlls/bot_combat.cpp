@@ -48,6 +48,68 @@ static edict_t *BotGetKtsSnowballCached()
  	return pCachedBall;
  }
 
+//=========================================================
+// BotFindBestSkull — per-bot skull selection with per-frame
+// entity-scan caching.  The entity list is walked once per
+// server frame; scoring (value/sqrt(dist)) is per-bot since
+// it depends on the bot's position.
+//
+// Returns the best skull edict (or NULL).  Writes the
+// distance to that skull into *pflDist if non-NULL.
+//=========================================================
+edict_t *BotFindBestSkull( edict_t *pBotEdict, float *pflDist )
+{
+	// --- per-frame entity cache ---
+	static float  s_flCacheTime = -1.0f;
+	static int    s_nSkulls = 0;
+	static edict_t *s_pSkulls[128];
+
+	if (s_flCacheTime != gpGlobals->time)
+	{
+		s_flCacheTime = gpGlobals->time;
+		s_nSkulls = 0;
+		edict_t *pScan = NULL;
+		while ((pScan = UTIL_FindEntityByClassname(pScan, "skull")) != NULL)
+		{
+			if (FNullEnt(pScan) || pScan->free)
+				continue;
+			if (s_nSkulls < 128)
+				s_pSkulls[s_nSkulls++] = pScan;
+		}
+	}
+
+	// --- per-bot scoring ---
+	edict_t *pBest = NULL;
+	float flBestScore = 0.0f;
+	float flBestDist  = 9e9f;
+
+	for (int i = 0; i < s_nSkulls; i++)
+	{
+		edict_t *pSkull = s_pSkulls[i];
+		if (FNullEnt(pSkull) || pSkull->free)
+			continue;
+
+		float flDist = (pSkull->v.origin - pBotEdict->v.origin).Length();
+		if (flDist < 1.0f) flDist = 1.0f;
+
+		float flValue = pSkull->v.fuser1;
+		if (flValue < 1.0f) flValue = 1.0f;
+
+		float flScore = flValue / sqrt(flDist);
+		if (flScore > flBestScore)
+		{
+			flBestScore = flScore;
+			flBestDist  = flDist;
+			pBest       = pSkull;
+		}
+	}
+
+	if (pflDist)
+		*pflDist = pBest ? flBestDist : 0.0f;
+
+	return pBest;
+}
+
 float aim_tracking_x_scale[5] = {1.0, 2.0, 4.0, 5.0, 6.0};
 float aim_tracking_y_scale[5] = {1.0, 2.0, 4.0, 5.0, 6.0};
 // who is vomiting?
@@ -169,35 +231,8 @@ bool BotColdskullThink( bot_t *pBot )
 	if (pEdict->v.health <= 25)
 		return false;
 
-	// Scan all skull entities and pick the best one.
-	// Score = fuser1 (point value) / sqrt(distance) — balances value vs proximity.
-	edict_t *pSkull = NULL;
-	edict_t *pBestSkull = NULL;
-	float flBestScore = 0.0f;
-	float flBestDist  = 9e9f;
-
-	while ((pSkull = UTIL_FindEntityByClassname(pSkull, "skull")) != NULL)
-	{
-		if (FNullEnt(pSkull) || pSkull->free)
-			continue;
-
-		float flDist = (pSkull->v.origin - pEdict->v.origin).Length();
-		if (flDist < 1.0f)
-			flDist = 1.0f;
-
-		float flValue = pSkull->v.fuser1;
-		if (flValue < 1.0f)
-			flValue = 1.0f;
-
-		float flScore = flValue / sqrt(flDist);
-
-		if (flScore > flBestScore)
-		{
-			flBestScore = flScore;
-			flBestDist  = flDist;
-			pBestSkull  = pSkull;
-		}
-	}
+	float flBestDist = 0.0f;
+	edict_t *pBestSkull = BotFindBestSkull(pEdict, &flBestDist);
 
 	if (pBestSkull == NULL)
 		return false;  // No skulls in the world — fall back to normal combat/nav
@@ -451,12 +486,16 @@ edict_t *BotFindEnemy( bot_t *pBot )
 		return NULL;
 	}
 
-	// Cold Skulls: when a skull is very close, suppress enemy targeting
-	// so the bot prioritises collection over fighting.
-	if (is_gameplay == GAME_COLDSKULL && pBot->v_goal != g_vecZero)
+	// Cold Skulls: when a skull is very close AND the bot is healthy
+	// enough to be collecting (not seeking health), suppress enemy
+	// targeting so the bot prioritises collection over fighting.
+	// Uses BotFindBestSkull to verify a real skull entity exists nearby
+	// rather than trusting v_goal which can be stale or set through walls.
+	if (is_gameplay == GAME_COLDSKULL && pEdict->v.health > 25)
 	{
-		float flSkullDist = (pBot->v_goal - pEdict->v.origin).Length();
-		if (flSkullDist < 300.0f)
+		float flSkullDist = 0.0f;
+		edict_t *pSkull = BotFindBestSkull(pEdict, &flSkullDist);
+		if (pSkull && flSkullDist < 300.0f)
 		{
 			pBot->pBotEnemy = NULL;
 			return NULL;

@@ -1634,28 +1634,7 @@ int BotFindWaypointGoal( bot_t *pBot )
 	// Health is still checked first if critically low (< 25).
 	if (is_gameplay == GAME_COLDSKULL && pEdict->v.health > 25)
 	{
-		edict_t *pSkull = NULL;
-		edict_t *pBestSkull = NULL;
-		float flBestScore = 0.0f;
-
-		while ((pSkull = UTIL_FindEntityByClassname(pSkull, "skull")) != NULL)
-		{
-			if (FNullEnt(pSkull) || pSkull->free)
-				continue;
-
-			float flDist = (pSkull->v.origin - pEdict->v.origin).Length();
-			if (flDist < 1.0f) flDist = 1.0f;
-
-			float flValue = pSkull->v.fuser1;
-			if (flValue < 1.0f) flValue = 1.0f;
-
-			float flScore = flValue / sqrt(flDist);
-			if (flScore > flBestScore)
-			{
-				flBestScore = flScore;
-				pBestSkull  = pSkull;
-			}
-		}
+		edict_t *pBestSkull = BotFindBestSkull(pEdict, NULL);
 
 		if (pBestSkull)
 		{
@@ -1674,9 +1653,14 @@ int BotFindWaypointGoal( bot_t *pBot )
 				if (d < nearDist) { nearDist = d; index = w; }
 			}
 
-			pBot->wpt_goal_type = WPT_GOAL_ITEM;
-			pBot->waypoint_goal = index;
-			return index;
+			if (index != -1)
+			{
+				pBot->wpt_goal_type = WPT_GOAL_ITEM;
+				pBot->waypoint_goal = index;
+				return index;
+			}
+
+			return -1;
 		}
 
 		// No skulls exist — clear stale waypoint goal so bot doesn't
