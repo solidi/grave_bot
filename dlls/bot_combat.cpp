@@ -139,7 +139,95 @@ void BotCheckTeamplay()
 		is_gameplay = GAME_KTS;
 	}
 
+	if (strstr(gameMode, "coldskull") || atoi(gameMode) == GAME_COLDSKULL)
+	{
+		is_gameplay = GAME_COLDSKULL;
+	}
+
 	checked_teamplay = TRUE;
+}
+
+//=========================================================
+// BotColdskullThink — called from BotThink when in Cold
+// Skulls mode and no combat is active.
+//
+// Scans all skull entities and picks the best one using a
+// value/distance weighting.  Sets v_goal + f_move_speed so
+// the movement block steers the bot toward the skull.
+//
+// Returns true when a skull target was found and movement
+// intent has been set; false to fall back to normal nav.
+//=========================================================
+bool BotColdskullThink( bot_t *pBot )
+{
+	if (is_gameplay != GAME_COLDSKULL)
+		return false;
+
+	edict_t *pEdict = pBot->pEdict;
+
+	// Don't chase skulls when critically low on health — seek health first
+	if (pEdict->v.health <= 25)
+		return false;
+
+	// Scan all skull entities and pick the best one.
+	// Score = fuser1 (point value) / sqrt(distance) — balances value vs proximity.
+	edict_t *pSkull = NULL;
+	edict_t *pBestSkull = NULL;
+	float flBestScore = 0.0f;
+	float flBestDist  = 9e9f;
+
+	while ((pSkull = UTIL_FindEntityByClassname(pSkull, "skull")) != NULL)
+	{
+		if (FNullEnt(pSkull) || pSkull->free)
+			continue;
+
+		float flDist = (pSkull->v.origin - pEdict->v.origin).Length();
+		if (flDist < 1.0f)
+			flDist = 1.0f;
+
+		float flValue = pSkull->v.fuser1;
+		if (flValue < 1.0f)
+			flValue = 1.0f;
+
+		float flScore = flValue / sqrt(flDist);
+
+		if (flScore > flBestScore)
+		{
+			flBestScore = flScore;
+			flBestDist  = flDist;
+			pBestSkull  = pSkull;
+		}
+	}
+
+	if (pBestSkull == NULL)
+		return false;  // No skulls in the world — fall back to normal combat/nav
+
+	// Set movement target toward the best skull
+	Vector vecTarget = pBestSkull->v.origin;
+	pBot->v_goal           = vecTarget;
+
+	// When very close to the skull, suppress combat so the bot doesn't
+	// get distracted fighting mid-collection.
+	if (flBestDist < 200.0f && pBot->pBotEnemy)
+	{
+		pBot->pBotEnemy = NULL;
+	}
+
+	// Always run toward the skull.  Skulls have a zero-size bounding box
+	// (SOLID_TRIGGER with g_vecZero size) so the bot must physically
+	// overlap the skull origin to trigger SkullTouch.  A small proximity
+	// value keeps the bot moving all the way in; magnetic skulls that fly
+	// toward the bot will simply touch it mid-run.
+	pBot->f_goal_proximity = 20.0f;
+	pBot->f_move_speed     = pBot->f_max_speed;
+
+	// Face the skull directly so the bot turns toward it immediately.
+	Vector vecDir    = vecTarget - pEdict->v.origin;
+	Vector vecAngles = UTIL_VecToAngles(vecDir);
+	pEdict->v.ideal_yaw = vecAngles.y;
+	BotFixIdealYaw(pEdict);
+
+	return true;
 }
 
 //=========================================================
@@ -361,6 +449,18 @@ edict_t *BotFindEnemy( bot_t *pBot )
 	{
 		pBot->pBotEnemy = NULL;
 		return NULL;
+	}
+
+	// Cold Skulls: when a skull is very close, suppress enemy targeting
+	// so the bot prioritises collection over fighting.
+	if (is_gameplay == GAME_COLDSKULL && pBot->v_goal != g_vecZero)
+	{
+		float flSkullDist = (pBot->v_goal - pEdict->v.origin).Length();
+		if (flSkullDist < 300.0f)
+		{
+			pBot->pBotEnemy = NULL;
+			return NULL;
+		}
 	}
 
 	// Priorize live grenade over everything else

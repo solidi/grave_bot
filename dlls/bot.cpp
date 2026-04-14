@@ -989,6 +989,16 @@ void BotFindItem( bot_t *pBot )
 		pBot->item_waypoint  = -1;
 		return;
 	}
+
+	// Cold Skulls: navigation handled by BotColdskullThink + BotFindWaypointGoal.
+	// BotFindItem's small search radius (256u) and low priority for skulls
+	// makes it ineffective — skulls need global scanning and value weighting.
+	if (is_gameplay == GAME_COLDSKULL)
+	{
+		pBot->pBotPickupItem = NULL;
+		pBot->item_waypoint  = -1;
+		return;
+	}
 	
 	// forget about our item if it's been three seconds
 	// forget about item if it we picked it up
@@ -1929,6 +1939,41 @@ void BotThink( bot_t *pBot )
 			}
 		}
 
+		// Cold Skulls: pre-set v_goal toward the best skull BEFORE
+		// BotFindEnemy so the movement block always has a target, even
+		// on ticks where the enemy branch runs instead of BotColdskullThink.
+		if (is_gameplay == GAME_COLDSKULL && pEdict->v.health > 25)
+		{
+			edict_t *pSkull = NULL;
+			edict_t *pBestSkull = NULL;
+			float flBestScore = 0.0f;
+			float flBestDist  = 9e9f;
+			while ((pSkull = UTIL_FindEntityByClassname(pSkull, "skull")) != NULL)
+			{
+				if (FNullEnt(pSkull) || pSkull->free) continue;
+				float flDist = (pSkull->v.origin - pEdict->v.origin).Length();
+				if (flDist < 1.0f) flDist = 1.0f;
+				float flValue = pSkull->v.fuser1;
+				if (flValue < 1.0f) flValue = 1.0f;
+				float flScore = flValue / sqrt(flDist);
+				if (flScore > flBestScore)
+				{
+					flBestScore = flScore;
+					flBestDist  = flDist;
+					pBestSkull  = pSkull;
+				}
+			}
+			if (pBestSkull)
+			{
+				pBot->v_goal           = pBestSkull->v.origin;
+				pBot->f_goal_proximity = 0.0f;
+			}
+			else
+			{
+				pBot->v_goal = g_vecZero;
+			}
+		}
+
 		if (b_botdontshoot == 0)
 		{
 			pBot->pBotEnemy = BotFindEnemy( pBot );
@@ -1976,6 +2021,14 @@ void BotThink( bot_t *pBot )
 					pBot->old_waypoint_goal = -1;
 					pBot->f_waypoint_goal_time = 0.0f; // force immediate BotFindWaypointGoal update
 				}
+				// Cold Skulls: same reset — after a kill the bot should target
+				// skulls, not return to a stale weapon/ammo waypoint.
+				else if (is_gameplay == GAME_COLDSKULL)
+				{
+					pBot->waypoint_goal     = -1;
+					pBot->old_waypoint_goal = -1;
+					pBot->f_waypoint_goal_time = 0.0f;
+				}
 				else if (pBot->old_waypoint_goal != -1)
 				{
 					pBot->waypoint_goal = pBot->old_waypoint_goal;
@@ -2008,9 +2061,20 @@ void BotThink( bot_t *pBot )
 				pBot->item_waypoint  = -1;
 			}
 
+			// Cold Skulls: same clearing pattern as KTS.
+			if (is_gameplay == GAME_COLDSKULL && pBot->pBotPickupItem)
+			{
+				pBot->pBotPickupItem = NULL;
+				pBot->item_waypoint  = -1;
+			}
+
 			if (is_gameplay == GAME_KTS && BotKtsThink(pBot))
 			{
 				// BotKtsThink sets v_goal + f_move_speed for all KTS cases.
+			}
+			else if (is_gameplay == GAME_COLDSKULL && BotColdskullThink(pBot))
+			{
+				// BotColdskullThink sets v_goal + f_move_speed when skulls found.
 			}
 			else if (pBot->pBotPickupItem)
 			{
@@ -2463,7 +2527,11 @@ void BotThink( bot_t *pBot )
 	}
 
 	// always forget goal
-	pBot->v_goal = g_vecZero;
+	// Cold Skulls: v_goal is refreshed every tick by the pre-scan and
+	// BotColdskullThink — don't wipe it here or the movement block will
+	// never see the skull target and the bot follows waypoints instead.
+	if (is_gameplay != GAME_COLDSKULL)
+		pBot->v_goal = g_vecZero;
 	// is our goal ent still around?
 	if (pBot->pGoalEnt != NULL)
 	{
@@ -2614,7 +2682,16 @@ void BotThink( bot_t *pBot )
 			bool ktsBallChase = (is_gameplay == GAME_KTS && !pBot->b_kts_has_ball
 				&& pBot->v_goal != g_vecZero
 				&& FVisible(pBot->v_goal, pEdict));
-			if (ktsDirectSteer || ktsBallChase)
+			// Cold Skulls: direct-steer toward the target skull.
+			// For close skulls (< 300u) skip FVisible — the skull is
+			// magnetising toward the bot and its origin can sit at floor
+			// level causing the eye-to-ground trace to clip geometry.
+			// For far skulls, still require FVisible to avoid wall-walking.
+			bool skullChase = (is_gameplay == GAME_COLDSKULL
+				&& pBot->v_goal != g_vecZero
+				&& ((pBot->v_goal - pEdict->v.origin).Length() < 300.0f
+					|| FVisible(pBot->v_goal, pEdict)));
+			if (ktsDirectSteer || ktsBallChase || skullChase)
 				bGoGoal = true;
 			else if (goalDist < 256 && FVisible(pBot->v_goal, pEdict))
 				bGoGoal = true;

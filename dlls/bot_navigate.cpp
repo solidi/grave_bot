@@ -526,6 +526,7 @@ bool BotHeadTowardWaypoint( bot_t *pBot )
 	// is defending a sci/rsrc currently being stolen AND
 	// our waypoint time allows all of this
 	if ((pBot->waypoint_goal == -1 || pBot->b_engaging_enemy || is_gameplay == GAME_KTS ||
+		is_gameplay == GAME_COLDSKULL ||
 		(pBot->role == ROLE_ATTACK &&
 		pBot->subrole == ROLE_SUB_DEF_ALLY) || (pBot->role == ROLE_DEFEND &&
 		(pBot->subrole == ROLE_SUB_DEF_SCIS || pBot->subrole == ROLE_SUB_DEF_RSRC) && pBot->pGoalEnt &&
@@ -534,7 +535,7 @@ bool BotHeadTowardWaypoint( bot_t *pBot )
 	{
 		// tracking something, pick goal much more often
 		if (pBot->b_engaging_enemy || pBot->pGoalEnt != NULL || pBot->v_defend != g_vecZero ||
-			pBot->defend_wpt != -1 || is_gameplay == GAME_KTS)
+			pBot->defend_wpt != -1 || is_gameplay == GAME_KTS || is_gameplay == GAME_COLDSKULL)
 			pBot->f_waypoint_goal_time = gpGlobals->time + 0.5;
 		else // don't pick a goal more often than every 120 seconds...
 			pBot->f_waypoint_goal_time = gpGlobals->time + 120.0;
@@ -556,6 +557,21 @@ bool BotHeadTowardWaypoint( bot_t *pBot )
 			// should follow the waypoint graph normally.
 			if (is_gameplay == GAME_KTS && !pBot->b_kts_has_ball
 				&& index != pBot->waypoint_goal)
+			{
+				int fresh = WaypointFindReachable(pEdict, REACHABLE_RANGE, team);
+				if (fresh != -1)
+				{
+					pBot->curr_waypoint_index = fresh;
+					pBot->waypoint_origin = waypoints[fresh].origin;
+					pBot->f_waypoint_time = gpGlobals->time;
+				}
+			}
+
+			// Cold Skulls: same waypoint reset as KTS — when the goal
+			// changes (new skull target), snap curr_waypoint_index to
+			// nearest reachable so the bot doesn't walk to a stale
+			// weapon/ammo waypoint before re-routing.
+			if (is_gameplay == GAME_COLDSKULL && index != pBot->waypoint_goal)
 			{
 				int fresh = WaypointFindReachable(pEdict, REACHABLE_RANGE, team);
 				if (fresh != -1)
@@ -1611,6 +1627,62 @@ int BotFindWaypointGoal( bot_t *pBot )
 			pBot->wpt_goal_type = WPT_GOAL_LOCATION;
 			return index;  // -1 only if map has zero valid waypoints; v_goal provides fallback
 		}
+	}
+
+	// Cold Skulls: route toward the best skull entity.
+	// Uses value/distance weighting to prefer high-value skulls that aren't too far.
+	// Health is still checked first if critically low (< 25).
+	if (is_gameplay == GAME_COLDSKULL && pEdict->v.health > 25)
+	{
+		edict_t *pSkull = NULL;
+		edict_t *pBestSkull = NULL;
+		float flBestScore = 0.0f;
+
+		while ((pSkull = UTIL_FindEntityByClassname(pSkull, "skull")) != NULL)
+		{
+			if (FNullEnt(pSkull) || pSkull->free)
+				continue;
+
+			float flDist = (pSkull->v.origin - pEdict->v.origin).Length();
+			if (flDist < 1.0f) flDist = 1.0f;
+
+			float flValue = pSkull->v.fuser1;
+			if (flValue < 1.0f) flValue = 1.0f;
+
+			float flScore = flValue / sqrt(flDist);
+			if (flScore > flBestScore)
+			{
+				flBestScore = flScore;
+				pBestSkull  = pSkull;
+			}
+		}
+
+		if (pBestSkull)
+		{
+			Vector skullPos = pBestSkull->v.origin;
+			pBot->v_goal = skullPos;
+
+			// Find nearest waypoint to skull by pure distance (no LOS).
+			float nearDist = 9e9f;
+			for (int w = 0; w < num_waypoints; w++)
+			{
+				if (waypoints[w].flags & W_FL_DELETED) continue;
+				if (waypoints[w].flags & W_FL_AIMING)  continue;
+				if ((team != -1) && (waypoints[w].flags & W_FL_TEAM_SPECIFIC) &&
+					((waypoints[w].flags & W_FL_TEAM) != team)) continue;
+				float d = (waypoints[w].origin - skullPos).Length();
+				if (d < nearDist) { nearDist = d; index = w; }
+			}
+
+			pBot->wpt_goal_type = WPT_GOAL_ITEM;
+			pBot->waypoint_goal = index;
+			return index;
+		}
+
+		// No skulls exist — clear stale waypoint goal so bot doesn't
+		// keep routing toward a weapon/ammo waypoint from before the kill.
+		pBot->waypoint_goal = -1;
+		return -1;
 	}
 
 	if (random < health_chance)
