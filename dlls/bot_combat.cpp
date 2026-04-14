@@ -266,6 +266,215 @@ bool BotColdskullThink( bot_t *pBot )
 }
 
 //=========================================================
+// BotCtcThink — called from BotThink when in Capture The
+// Chumtoad mode and no combat is active.
+//
+// Priority hierarchy:
+//  1. Bot IS holding the chumtoad → evade enemies, keep running
+//     to score points.  Strategic drop when health is critical.
+//  2. An opponent IS holding the chumtoad → pursue them.
+//  3. Chumtoad is loose on the map → run toward it to pick it up.
+//  4. No chumtoad in play → fall back to normal nav.
+//
+// Returns true when movement intent has been set; false to
+// fall back to normal nav/combat.
+//=========================================================
+bool BotCtcThink( bot_t *pBot )
+{
+	if (is_gameplay != GAME_CTC)
+		return false;
+
+	edict_t *pEdict = pBot->pEdict;
+
+	// -----------------------------------------------------------------
+	// Case 1: Bot IS holding the chumtoad — evade and score.
+	// -----------------------------------------------------------------
+	if (pBot->b_ctc_has_chumtoad)
+	{
+		// Never pause while carrying — velocity must stay > 50 u/s to score.
+		pBot->f_pause_time = 0;
+		pBot->f_move_speed = pBot->f_max_speed;
+
+		// Strategic drop: if health is critical, drop the toad and flee.
+		if (pEdict->v.health <= 30 &&
+			pBot->f_ctc_drop_consider_time < gpGlobals->time)
+		{
+			// Fire the chumtoad weapon to trigger DropCharm server-side
+			pEdict->v.button |= IN_ATTACK;
+			pBot->f_ctc_drop_consider_time = gpGlobals->time + 5.0f;
+			// After this tick the server will call DropCharm, b_ctc_has_chumtoad
+			// will clear next frame, and the bot will become a chaser seeking health.
+			return true;
+		}
+
+		// Evasion: find the nearest enemy and run AWAY from them.
+		// Re-evaluate escape direction every 2 seconds to avoid jitter.
+		if (pBot->f_ctc_escape_time < gpGlobals->time)
+		{
+			pBot->f_ctc_escape_time = gpGlobals->time + 2.0f;
+
+			edict_t *pNearest = NULL;
+			float flNearestDist = 9e9f;
+
+			for (int i = 1; i <= gpGlobals->maxClients; i++)
+			{
+				edict_t *pPlayer = INDEXENT(i);
+				if (FNullEnt(pPlayer) || pPlayer == pEdict)
+					continue;
+				if (!IsAlive(pPlayer))
+					continue;
+				if (pPlayer->v.flags & FL_FAKECLIENT || pPlayer->v.flags & FL_CLIENT)
+				{
+					float dist = (pPlayer->v.origin - pEdict->v.origin).Length();
+					if (dist < flNearestDist)
+					{
+						flNearestDist = dist;
+						pNearest = pPlayer;
+					}
+				}
+			}
+
+			if (pNearest && flNearestDist < 1500.0f)
+			{
+				// Run in the opposite direction from the nearest threat
+				Vector vecAway = pEdict->v.origin - pNearest->v.origin;
+				vecAway.z = 0; // keep horizontal
+				vecAway = vecAway.Normalize();
+				pBot->v_goal = pEdict->v.origin + vecAway * 800.0f;
+			}
+			else
+			{
+				// No nearby threat — just keep running forward
+				MAKE_VECTORS(pEdict->v.v_angle);
+				pBot->v_goal = pEdict->v.origin + gpGlobals->v_forward * 500.0f;
+			}
+		}
+
+		pBot->f_goal_proximity = 40.0f;
+
+		// --- Evasive jump / duck ---
+		// More frequent when taking damage (health < 80), otherwise occasional.
+		if (pBot->f_ctc_next_juke_time < gpGlobals->time)
+		{
+			bool bUnderPressure = (pEdict->v.health < 80);
+			float flChance = bUnderPressure ? 0.45f : 0.15f;
+
+			if (RANDOM_FLOAT(0.0f, 1.0f) < flChance)
+			{
+				if (RANDOM_LONG(0, 1))
+					pEdict->v.button |= IN_JUMP;
+				else
+					pEdict->v.button |= IN_DUCK;
+			}
+
+			pBot->f_ctc_next_juke_time = gpGlobals->time +
+				(bUnderPressure ? RANDOM_FLOAT(0.8f, 1.5f) : RANDOM_FLOAT(2.0f, 4.0f));
+		}
+
+		// --- Special evasive moves (slide, hurricane kick, flip) ---
+		if (pBot->f_ctc_next_move_time < gpGlobals->time)
+		{
+			bool bUnderPressure = (pEdict->v.health < 80);
+			float flChance = bUnderPressure ? 0.35f : 0.10f;
+
+			if (RANDOM_FLOAT(0.0f, 1.0f) < flChance)
+			{
+				switch (RANDOM_LONG(0, 2))
+				{
+				case 0: // slide or hurricane kick
+					pEdict->v.impulse = RANDOM_LONG(0, 1) ? 208 : 214;
+					break;
+				case 1: // flip (front, back, side)
+					pEdict->v.impulse = 210 + RANDOM_LONG(0, 2);
+					break;
+				case 2: // slide
+					pEdict->v.impulse = 208;
+					break;
+				}
+			}
+
+			pBot->f_ctc_next_move_time = gpGlobals->time +
+				(bUnderPressure ? RANDOM_FLOAT(1.5f, 3.0f) : RANDOM_FLOAT(3.0f, 6.0f));
+		}
+
+		// Face escape direction
+		Vector vecDir    = pBot->v_goal - pEdict->v.origin;
+		Vector vecAngles = UTIL_VecToAngles(vecDir);
+		pEdict->v.ideal_yaw = vecAngles.y;
+		BotFixIdealYaw(pEdict);
+
+		return true;
+	}
+
+	// -----------------------------------------------------------------
+	// Case 2: An opponent IS holding the chumtoad — pursue them.
+	// -----------------------------------------------------------------
+	{
+		edict_t *pHolder = NULL;
+		float flHolderDist = 9e9f;
+
+		for (int i = 1; i <= gpGlobals->maxClients; i++)
+		{
+			edict_t *pPlayer = INDEXENT(i);
+			if (FNullEnt(pPlayer) || pPlayer == pEdict)
+				continue;
+			if (!IsAlive(pPlayer))
+				continue;
+			if (pPlayer->v.fuser4 > 0)
+			{
+				pHolder = pPlayer;
+				flHolderDist = (pPlayer->v.origin - pEdict->v.origin).Length();
+				break; // only one holder at a time
+			}
+		}
+
+		if (pHolder)
+		{
+			pBot->v_goal           = pHolder->v.origin;
+			pBot->f_goal_proximity = 0.0f;
+			pBot->f_move_speed     = pBot->f_max_speed;
+
+			// Face toward the holder
+			Vector vecDir    = pHolder->v.origin - pEdict->v.origin;
+			Vector vecAngles = UTIL_VecToAngles(vecDir);
+			pEdict->v.ideal_yaw = vecAngles.y;
+			BotFixIdealYaw(pEdict);
+
+			return true;
+		}
+	}
+
+	// -----------------------------------------------------------------
+	// Case 3: Chumtoad is loose on the map — run toward it.
+	// -----------------------------------------------------------------
+	{
+		edict_t *pToad = UTIL_FindEntityByClassname(
+			(edict_t *)NULL, "monster_ctctoad");
+
+		if (!FNullEnt(pToad) && !(pToad->v.effects & EF_NODRAW))
+		{
+			Vector vecTarget = pToad->v.origin;
+			pBot->v_goal           = vecTarget;
+			pBot->f_goal_proximity = 20.0f;
+			pBot->f_move_speed     = pBot->f_max_speed;
+
+			// Face toward the chumtoad
+			Vector vecDir    = vecTarget - pEdict->v.origin;
+			Vector vecAngles = UTIL_VecToAngles(vecDir);
+			pEdict->v.ideal_yaw = vecAngles.y;
+			BotFixIdealYaw(pEdict);
+
+			return true;
+		}
+	}
+
+	// -----------------------------------------------------------------
+	// Case 4: No chumtoad in play — fall back to normal nav.
+	// -----------------------------------------------------------------
+	return false;
+}
+
+//=========================================================
 // BotKtsThink — called from BotThink when in KTS mode and
 // no combat is active.
 //
