@@ -55,7 +55,6 @@ void BotDodgeCrabs( bot_t *pBot );
 bool BotLookForDrop( bot_t *pBot );
 
 void BotCheckTeamplay();
-bool BotKtsThink( bot_t *pBot );
 edict_t *BotFindEnemy( bot_t *pBot );
 int BotGetEnemyWeapon( edict_t *pEnemy );
 bool BotShouldEngageEnemy( bot_t *pBot, edict_t *pEnemy );
@@ -68,6 +67,10 @@ bool BotWeaponPrimaryDistance( bot_t *pBot, float distance, int weapon_id );
 bool BotWeaponSecondaryDistance( bot_t *pBot, float distance, int weapon_id );
 float BotAssessPrimaryAmmo( bot_t *pBot, int weapon_id );
 float BotAssessSecondaryAmmo( bot_t *pBot, int weapon_id );
+
+bool BotKtsThink( bot_t *pBot );
+bool BotColdskullThink( bot_t *pBot );
+edict_t *BotFindBestSkull( edict_t *pBotEdict, float *pflDist = NULL );
 
 #endif // BOT_FUNC_H
 
