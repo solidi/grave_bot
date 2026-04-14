@@ -370,6 +370,13 @@ typedef struct
 	// KTS — set true while this bot is detected as the active dribbler
 	bool b_kts_has_ball;
 
+	// KTS — elevated-goal scoring: jump attempts then kick fallback
+	float f_kts_jump_time;     // next time bot may attempt a jump toward the goal
+	int   i_kts_jump_count;    // consecutive jump attempts at current goal approach
+	float f_kts_kick_time;     // when set, bot is backing up to kick the ball at the goal
+	bool  b_kts_kick_pending;  // true while the bot is in the back-up-and-kick sequence
+	float f_kts_stall_time;    // time when the bot first detected it was stalled on the goal
+
 } bot_t;
 
 

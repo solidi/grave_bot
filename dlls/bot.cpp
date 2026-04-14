@@ -312,6 +312,11 @@ void BotSpawnInit( bot_t *pBot )
 	// Clear per-life KTS possession state before recomputing it so stale
 	// values cannot leak across spawn/life boundaries into this think step.
 	pBot->b_kts_has_ball = false;
+	pBot->f_kts_jump_time    = 0.0f;
+	pBot->i_kts_jump_count   = 0;
+	pBot->f_kts_kick_time    = 0.0f;
+	pBot->b_kts_kick_pending = false;
+	pBot->f_kts_stall_time   = 0.0f;
 
 	pBot->respawn_time = 0;
 	pBot->respawn_set = FALSE;
@@ -2509,10 +2514,10 @@ void BotThink( bot_t *pBot )
 	}
 
 	// always forget goal
-	// Cold Skulls: v_goal is refreshed every tick by the pre-scan and
-	// BotColdskullThink — don't wipe it here or the movement block will
-	// never see the skull target and the bot follows waypoints instead.
-	if (is_gameplay != GAME_COLDSKULL)
+	// Cold Skulls / KTS: v_goal is refreshed every tick by the pre-scan
+	// and the mode's Think function — don't wipe it here or the movement
+	// block will never see the target and the bot follows waypoints instead.
+	if (is_gameplay != GAME_COLDSKULL && is_gameplay != GAME_KTS)
 		pBot->v_goal = g_vecZero;
 	// is our goal ent still around?
 	if (pBot->pGoalEnt != NULL)
@@ -2649,21 +2654,26 @@ void BotThink( bot_t *pBot )
 		if (pBot->v_goal != g_vecZero)
 		{
 			float goalDist = (pBot->v_goal - pEdict->v.origin).Length();
-			// KTS dribbling: direct-steer toward the enemy goal when the bot
-			// can see it.  When the goal is not visible, follow waypoints
-			// (routing via waypoint_goal set by BotFindWaypointGoal).
-			// Using FVisible instead of a fixed distance cap lets the bot
-			// charge the goal the moment it rounds a corner, while still
-			// relying on waypoint routing through corridors and around walls.
+			// KTS dribbling: direct-steer toward the enemy goal.
+			// For close range (< 300u) skip FVisible — the kts_goal trigger
+			// volume origin can sit at floor level causing the eye-to-ground
+			// trace to clip geometry, which would leave bGoGoal false and
+			// make the bot follow waypoints instead of running into the goal.
+			// For far goals, still require FVisible to avoid wall-walking.
 			bool ktsDirectSteer = (is_gameplay == GAME_KTS && pBot->b_kts_has_ball
-				&& FVisible(pBot->v_goal, pEdict));
-			// KTS ball-chasing: when the ball is loose and visible, always
-			// direct-steer toward it regardless of distance.  The 256u limit
-			// is for non-KTS pickups; in KTS the ball is always the objective
-			// and the bot should never prefer a stale waypoint over a visible ball.
+				&& ((pBot->v_goal - pEdict->v.origin).Length() < 300.0f
+					|| FVisible(pBot->v_goal, pEdict)));
+			// KTS ball-chasing: when the ball is loose, direct-steer toward it.
+			// For close balls (< 300u) skip FVisible — the ball sits at floor
+			// level causing the eye-to-ground trace to clip geometry, which
+			// would leave bGoGoal false and create a yaw/direction mismatch
+			// (bot faces ball but direction points at waypoint → cos(dgrad) ≈ 0
+			// → zero forward speed → bot stalls).
+			// For far balls, still require FVisible to avoid wall-walking.
 			bool ktsBallChase = (is_gameplay == GAME_KTS && !pBot->b_kts_has_ball
 				&& pBot->v_goal != g_vecZero
-				&& FVisible(pBot->v_goal, pEdict));
+				&& ((pBot->v_goal - pEdict->v.origin).Length() < 300.0f
+					|| FVisible(pBot->v_goal, pEdict)));
 			// Cold Skulls: direct-steer toward the target skull.
 			// For close skulls (< 300u) skip FVisible — the skull is
 			// magnetising toward the bot and its origin can sit at floor

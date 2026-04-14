@@ -338,18 +338,158 @@ bool BotKtsThink( bot_t *pBot )
 			Vector dir    = goalTarget - pEdict->v.origin;
 			float  dist   = dir.Length();
 
-			// Override ideal_yaw toward the goal when the bot can see it.
-			// When the goal is not visible (behind walls / around a corner),
-			// let BotHeadTowardWaypoint's yaw toward the current routing
-			// waypoint stand so the bot faces its path through the map.
-			// This matches the FVisible gate on ktsDirectSteer in the
-			// movement direction block — both switch to direct navigation
-			// at the same moment.
-			if (FVisible(goalTarget, pEdict))
+			// Override ideal_yaw toward the goal when close (< 300u) or
+			// visible.  The kts_goal trigger volume origin can sit at floor
+			// level, causing FVisible to fail even when the goal is clearly
+			// reachable.  The distance fallback must match ktsDirectSteer in
+			// the movement direction block so that yaw and direction switch
+			// to direct navigation at the same moment — a mismatch would
+			// make cos(dgrad) ≈ 0 and stall the bot.
+			if (dist < 300.0f || FVisible(goalTarget, pEdict))
 			{
 				Vector angles = UTIL_VecToAngles(dir);
 				pEdict->v.ideal_yaw = angles.y;
 				BotFixIdealYaw(pEdict);
+			}
+
+			// ---------------------------------------------------------
+			// Elevated-goal scoring: if the goal is significantly above
+			// the bot, try jumping first.  After a few failed jumps,
+			// back up and kick the ball (impulse 206) toward the goal.
+			// ---------------------------------------------------------
+			float heightDiff = goalTarget.z - pEdict->v.origin.z;
+			bool goalElevated = (heightDiff > 36.0f && dist < 300.0f);
+
+			if (goalElevated)
+			{
+				// Phase 1 — attempt jumps toward the goal
+				if (!pBot->b_kts_kick_pending && pBot->i_kts_jump_count < 3)
+				{
+					if (pBot->f_kts_jump_time < gpGlobals->time)
+					{
+						pEdict->v.button |= IN_JUMP;
+						pBot->i_kts_jump_count++;
+						pBot->f_kts_jump_time = gpGlobals->time + 0.6f;
+					}
+				}
+				// Phase 2 — jumps exhausted, back up and kick the ball
+				else
+				{
+					if (!pBot->b_kts_kick_pending)
+					{
+						// Begin the kick sequence: schedule it 0.8s from now
+						// so the bot has time to back away first.
+						pBot->b_kts_kick_pending = true;
+						pBot->f_kts_kick_time = gpGlobals->time + 0.8f;
+					}
+
+					if (pBot->f_kts_kick_time > gpGlobals->time)
+					{
+						// Backing up: reverse movement and look up at the goal
+						pBot->f_move_speed = -(pBot->f_max_speed);
+
+						Vector aimDir = goalTarget - (pEdict->v.origin + pEdict->v.view_ofs);
+						Vector aimAng = UTIL_VecToAngles(aimDir);
+						pEdict->v.ideal_yaw = aimAng.y;
+						BotFixIdealYaw(pEdict);
+						pEdict->v.idealpitch = -aimAng.x;
+						BotFixIdealPitch(pEdict);
+					}
+					else
+					{
+						// Time to kick — aim at the goal and fire impulse 206
+						Vector aimDir = goalTarget - (pEdict->v.origin + pEdict->v.view_ofs);
+						Vector aimAng = UTIL_VecToAngles(aimDir);
+						pEdict->v.ideal_yaw = aimAng.y;
+						BotFixIdealYaw(pEdict);
+						pEdict->v.idealpitch = -aimAng.x;
+						BotFixIdealPitch(pEdict);
+
+						pEdict->v.impulse = 206;
+
+						// Reset state so the bot resumes normal play
+						pBot->b_kts_kick_pending = false;
+						pBot->i_kts_jump_count   = 0;
+						pBot->f_kts_kick_time    = 0.0f;
+					}
+
+					return true;  // skip normal movement while in kick sequence
+				}
+			}
+			else
+			{
+				// Goal is at the same level — reset elevated-goal state
+				pBot->i_kts_jump_count   = 0;
+
+				// ---------------------------------------------------------
+				// Same-level stall detection: the bot is very close to the
+				// goal but the score trigger hasn't fired.  Track how long
+				// the bot stays within 100u — if it lingers for 1.5s without
+				// scoring it's stuck (fidgeting/oscillating), regardless of
+				// instantaneous velocity.
+				// ---------------------------------------------------------
+				bool nearGoal = (dist < 100.0f);
+
+				if (nearGoal && !pBot->b_kts_kick_pending)
+				{
+					// Start or maintain the stall timer
+					if (pBot->f_kts_stall_time == 0.0f)
+						pBot->f_kts_stall_time = gpGlobals->time;
+
+					float stallDuration = gpGlobals->time - pBot->f_kts_stall_time;
+
+					if (stallDuration < 1.5f)
+					{
+						// Phase 1 — try walking straight into the goal
+						pBot->f_move_speed = pBot->f_max_speed;
+					}
+					else
+					{
+						// Phase 2 — walking-in failed, begin kick sequence
+						pBot->b_kts_kick_pending = true;
+						pBot->f_kts_kick_time = gpGlobals->time + 0.8f;
+					}
+				}
+				else if (!nearGoal && !pBot->b_kts_kick_pending)
+				{
+					// Moving normally — reset stall timer
+					pBot->f_kts_stall_time = 0.0f;
+				}
+
+				if (pBot->b_kts_kick_pending)
+				{
+					if (pBot->f_kts_kick_time > gpGlobals->time)
+					{
+						// Backing up: reverse movement and aim at the goal
+						pBot->f_move_speed = -(pBot->f_max_speed);
+
+						Vector aimDir = goalTarget - (pEdict->v.origin + pEdict->v.view_ofs);
+						Vector aimAng = UTIL_VecToAngles(aimDir);
+						pEdict->v.ideal_yaw = aimAng.y;
+						BotFixIdealYaw(pEdict);
+						pEdict->v.idealpitch = -aimAng.x;
+						BotFixIdealPitch(pEdict);
+					}
+					else
+					{
+						// Time to kick — aim at the goal and fire impulse 206
+						Vector aimDir = goalTarget - (pEdict->v.origin + pEdict->v.view_ofs);
+						Vector aimAng = UTIL_VecToAngles(aimDir);
+						pEdict->v.ideal_yaw = aimAng.y;
+						BotFixIdealYaw(pEdict);
+						pEdict->v.idealpitch = -aimAng.x;
+						BotFixIdealPitch(pEdict);
+
+						pEdict->v.impulse = 206;
+
+						// Reset all state so the bot resumes normal play
+						pBot->b_kts_kick_pending = false;
+						pBot->f_kts_stall_time   = 0.0f;
+						pBot->f_kts_kick_time    = 0.0f;
+					}
+
+					return true;  // skip normal movement while in kick sequence
+				}
 			}
 
 			if (b_chat_debug)
@@ -373,6 +513,12 @@ bool BotKtsThink( bot_t *pBot )
 	// Bot no longer has the ball — clear v_goal so the movement block
 	// doesn't keep steering toward the old goal position.
 	pBot->v_goal = g_vecZero;
+
+	// Reset elevated-goal kick state in case the bot lost the ball mid-sequence
+	pBot->i_kts_jump_count   = 0;
+	pBot->b_kts_kick_pending = false;
+	pBot->f_kts_kick_time    = 0.0f;
+	pBot->f_kts_stall_time   = 0.0f;
 
 	// -----------------------------------------------------------------
 	// Case 2: An OPPONENT is dribbling — target them as enemy so the
