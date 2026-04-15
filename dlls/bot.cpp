@@ -317,6 +317,12 @@ void BotSpawnInit( bot_t *pBot )
 	pBot->f_kts_kick_time    = 0.0f;
 	pBot->b_kts_kick_pending = false;
 	pBot->f_kts_stall_time   = 0.0f;
+	// Clear per-life CtC possession state.
+	pBot->b_ctc_has_chumtoad     = false;
+	pBot->f_ctc_escape_time      = 0.0f;
+	pBot->f_ctc_drop_consider_time = 0.0f;
+	pBot->f_ctc_next_juke_time   = 0.0f;
+	pBot->f_ctc_next_move_time   = 0.0f;
 
 	pBot->respawn_time = 0;
 	pBot->respawn_set = FALSE;
@@ -999,6 +1005,16 @@ void BotFindItem( bot_t *pBot )
 	// BotFindItem's small search radius (256u) and low priority for skulls
 	// makes it ineffective — skulls need global scanning and value weighting.
 	if (is_gameplay == GAME_COLDSKULL)
+	{
+		pBot->pBotPickupItem = NULL;
+		pBot->item_waypoint  = -1;
+		return;
+	}
+
+	// CtC: navigation handled by BotCtcThink + BotFindWaypointGoal.
+	// The chumtoad needs global scanning (holder or loose entity) and
+	// objective-aware routing that BotFindItem cannot provide.
+	if (is_gameplay == GAME_CTC)
 	{
 		pBot->pBotPickupItem = NULL;
 		pBot->item_waypoint  = -1;
@@ -1961,6 +1977,58 @@ void BotThink( bot_t *pBot )
 			}
 		}
 
+		// CtC: detect carrier status BEFORE BotFindEnemy so the enemy
+		// filtering can read b_ctc_has_chumtoad.  Pre-set v_goal toward
+		// the holder or loose chumtoad so the movement block always has
+		// a target, even on ticks where the enemy branch runs.
+		if (is_gameplay == GAME_CTC)
+		{
+			pBot->b_ctc_has_chumtoad = (pEdict->v.fuser4 > 0);
+
+			if (pBot->b_ctc_has_chumtoad)
+			{
+				// Carrier: don't chase items — we can only hold the chumtoad weapon
+				pBot->pBotPickupItem = NULL;
+				pBot->item_waypoint  = -1;
+				pBot->v_goal         = g_vecZero; // BotCtcThink will set escape direction
+			}
+			else
+			{
+				// Chaser: find the holder or the loose chumtoad
+				edict_t *pHolder = NULL;
+				for (int i = 1; i <= gpGlobals->maxClients; i++)
+				{
+					edict_t *pPlayer = INDEXENT(i);
+					if (!FNullEnt(pPlayer) && pPlayer != pEdict
+						&& pPlayer->v.fuser4 > 0 && IsAlive(pPlayer))
+					{
+						pHolder = pPlayer;
+						break;
+					}
+				}
+				if (pHolder)
+				{
+					pBot->v_goal           = pHolder->v.origin;
+					pBot->f_goal_proximity = 0.0f;
+				}
+				else
+				{
+					// No holder — find the loose chumtoad entity
+					edict_t *pToad = UTIL_FindEntityByClassname(
+						(edict_t *)NULL, "monster_ctctoad");
+					if (!FNullEnt(pToad) && !(pToad->v.effects & EF_NODRAW))
+					{
+						pBot->v_goal           = pToad->v.origin;
+						pBot->f_goal_proximity = 20.0f;
+					}
+					else
+					{
+						pBot->v_goal = g_vecZero;
+					}
+				}
+			}
+		}
+
 		if (b_botdontshoot == 0)
 		{
 			pBot->pBotEnemy = BotFindEnemy( pBot );
@@ -2016,6 +2084,14 @@ void BotThink( bot_t *pBot )
 					pBot->old_waypoint_goal = -1;
 					pBot->f_waypoint_goal_time = 0.0f;
 				}
+				// CtC: same reset — after combat the bot should pursue the
+				// chumtoad objective, not return to a stale waypoint.
+				else if (is_gameplay == GAME_CTC)
+				{
+					pBot->waypoint_goal     = -1;
+					pBot->old_waypoint_goal = -1;
+					pBot->f_waypoint_goal_time = 0.0f;
+				}
 				else if (pBot->old_waypoint_goal != -1)
 				{
 					pBot->waypoint_goal = pBot->old_waypoint_goal;
@@ -2055,6 +2131,13 @@ void BotThink( bot_t *pBot )
 				pBot->item_waypoint  = -1;
 			}
 
+			// CtC: same clearing pattern — navigation handled by BotCtcThink.
+			if (is_gameplay == GAME_CTC && pBot->pBotPickupItem)
+			{
+				pBot->pBotPickupItem = NULL;
+				pBot->item_waypoint  = -1;
+			}
+
 			if (is_gameplay == GAME_KTS && BotKtsThink(pBot))
 			{
 				// BotKtsThink sets v_goal + f_move_speed for all KTS cases.
@@ -2062,6 +2145,10 @@ void BotThink( bot_t *pBot )
 			else if (is_gameplay == GAME_COLDSKULL && BotColdskullThink(pBot))
 			{
 				// BotColdskullThink sets v_goal + f_move_speed when skulls found.
+			}
+			else if (is_gameplay == GAME_CTC && BotCtcThink(pBot))
+			{
+				// BotCtcThink sets v_goal + f_move_speed for all CtC cases.
 			}
 			else if (pBot->pBotPickupItem)
 			{
@@ -2514,10 +2601,10 @@ void BotThink( bot_t *pBot )
 	}
 
 	// always forget goal
-	// Cold Skulls / KTS: v_goal is refreshed every tick by the pre-scan
+	// Cold Skulls / KTS / CtC: v_goal is refreshed every tick by the pre-scan
 	// and the mode's Think function — don't wipe it here or the movement
 	// block will never see the target and the bot follows waypoints instead.
-	if (is_gameplay != GAME_COLDSKULL && is_gameplay != GAME_KTS)
+	if (is_gameplay != GAME_COLDSKULL && is_gameplay != GAME_KTS && is_gameplay != GAME_CTC)
 		pBot->v_goal = g_vecZero;
 	// is our goal ent still around?
 	if (pBot->pGoalEnt != NULL)
@@ -2683,7 +2770,16 @@ void BotThink( bot_t *pBot )
 				&& pBot->v_goal != g_vecZero
 				&& ((pBot->v_goal - pEdict->v.origin).Length() < 300.0f
 					|| FVisible(pBot->v_goal, pEdict)));
-			if (ktsDirectSteer || ktsBallChase || skullChase)
+			// CtC: direct-steer toward the chumtoad objective.
+			// Carrier: steer toward escape direction set by BotCtcThink.
+			// Chaser: steer toward holder or loose chumtoad.
+			// For close targets (< 300u) skip FVisible — the chumtoad
+			// entity or player may be at an awkward elevation.
+			bool ctcChase = (is_gameplay == GAME_CTC
+				&& pBot->v_goal != g_vecZero
+				&& ((pBot->v_goal - pEdict->v.origin).Length() < 300.0f
+					|| FVisible(pBot->v_goal, pEdict)));
+			if (ktsDirectSteer || ktsBallChase || skullChase || ctcChase)
 				bGoGoal = true;
 			else if (goalDist < 256 && FVisible(pBot->v_goal, pEdict))
 				bGoGoal = true;
