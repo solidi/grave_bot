@@ -526,7 +526,7 @@ bool BotHeadTowardWaypoint( bot_t *pBot )
 	// is defending a sci/rsrc currently being stolen AND
 	// our waypoint time allows all of this
 	if ((pBot->waypoint_goal == -1 || pBot->b_engaging_enemy || is_gameplay == GAME_KTS ||
-		is_gameplay == GAME_COLDSKULL || is_gameplay == GAME_CTC ||
+		is_gameplay == GAME_COLDSKULL || is_gameplay == GAME_CTC || is_gameplay == GAME_CTF ||
 		(pBot->role == ROLE_ATTACK &&
 		pBot->subrole == ROLE_SUB_DEF_ALLY) || (pBot->role == ROLE_DEFEND &&
 		(pBot->subrole == ROLE_SUB_DEF_SCIS || pBot->subrole == ROLE_SUB_DEF_RSRC) && pBot->pGoalEnt &&
@@ -536,7 +536,7 @@ bool BotHeadTowardWaypoint( bot_t *pBot )
 		// tracking something, pick goal much more often
 		if (pBot->b_engaging_enemy || pBot->pGoalEnt != NULL || pBot->v_defend != g_vecZero ||
 			pBot->defend_wpt != -1 || is_gameplay == GAME_KTS || is_gameplay == GAME_COLDSKULL ||
-			is_gameplay == GAME_CTC)
+			is_gameplay == GAME_CTC || is_gameplay == GAME_CTF)
 			pBot->f_waypoint_goal_time = gpGlobals->time + 0.5;
 		else // don't pick a goal more often than every 120 seconds...
 			pBot->f_waypoint_goal_time = gpGlobals->time + 120.0;
@@ -588,6 +588,20 @@ bool BotHeadTowardWaypoint( bot_t *pBot )
 			// nearest reachable so the bot doesn't walk to a stale
 			// weapon/ammo waypoint before re-routing.
 			if (is_gameplay == GAME_CTC && index != pBot->waypoint_goal)
+			{
+				int fresh = WaypointFindReachable(pEdict, REACHABLE_RANGE, team);
+				if (fresh != -1)
+				{
+					pBot->curr_waypoint_index = fresh;
+					pBot->waypoint_origin = waypoints[fresh].origin;
+					pBot->f_waypoint_time = gpGlobals->time;
+				}
+			}
+
+			// CTF: same waypoint reset — when the goal changes (flag moved
+			// or role changed), snap curr_waypoint_index to nearest
+			// reachable so the bot doesn't walk to a stale waypoint.
+			if (is_gameplay == GAME_CTF && index != pBot->waypoint_goal)
 			{
 				int fresh = WaypointFindReachable(pEdict, REACHABLE_RANGE, team);
 				if (fresh != -1)
@@ -853,7 +867,7 @@ bool BotHeadTowardWaypoint( bot_t *pBot )
 					i = final_lj_wpt;
 			}
 
-			if (i != WAYPOINT_UNREACHABLE && i < num_waypoints && i > 0)  // can we get to the goal from here?
+			if (i != WAYPOINT_UNREACHABLE && i < num_waypoints && i >= 0)  // can we get to the goal from here?
 			{
 				waypoint_found = TRUE;
 				pBot->curr_waypoint_index = i;
@@ -1758,6 +1772,74 @@ int BotFindWaypointGoal( bot_t *pBot )
 			if (index != -1)
 			{
 				pBot->wpt_goal_type = WPT_GOAL_ITEM;
+				pBot->waypoint_goal = index;
+				return index;
+			}
+		}
+
+		// No target — clear stale goal
+		pBot->waypoint_goal = -1;
+		return -1;
+	}
+
+	// CTF: route toward the objective dictated by the bot's current role.
+	// CARRIER → own base (to score), RETRIEVER → own flag (to return it),
+	// ESCORT → flag carrier teammate, DEFENDER → own base, SEEKER → enemy flag.
+	if (is_gameplay == GAME_CTF)
+	{
+		Vector vecTarget = g_vecZero;
+		bool hasTarget = false;
+
+		switch (pBot->i_ctf_role)
+		{
+		case CTF_ROLE_CARRIER:
+		{
+			// Route toward own base to score
+			// Use v_goal which was set by BotCtfThink/BotCtfPreUpdate
+			vecTarget = pBot->v_goal;
+			hasTarget = (vecTarget != g_vecZero);
+
+			// Carrier with low health: try to find health waypoints
+			if (pEdict->v.health < 50)
+			{
+				int healthIdx = WaypointFindNearestGoal(pEdict, pBot->curr_waypoint_index,
+					team, W_FL_HEALTH);
+				if (healthIdx != -1)
+				{
+					pBot->wpt_goal_type = WPT_GOAL_HEALTH;
+					return healthIdx;
+				}
+			}
+			break;
+		}
+		case CTF_ROLE_RETRIEVER:
+		case CTF_ROLE_ESCORT:
+		case CTF_ROLE_DEFENDER:
+		case CTF_ROLE_SEEKER:
+		default:
+			// All these roles use v_goal set by BotCtfThink/BotCtfPreUpdate
+			vecTarget = pBot->v_goal;
+			hasTarget = (vecTarget != g_vecZero);
+			break;
+		}
+
+		if (hasTarget)
+		{
+			// Find nearest waypoint to target by pure distance (no LOS).
+			float nearDist = 9e9f;
+			for (int w = 0; w < num_waypoints; w++)
+			{
+				if (waypoints[w].flags & W_FL_DELETED) continue;
+				if (waypoints[w].flags & W_FL_AIMING)  continue;
+				if ((team != -1) && (waypoints[w].flags & W_FL_TEAM_SPECIFIC) &&
+					((waypoints[w].flags & W_FL_TEAM) != team)) continue;
+				float d = (waypoints[w].origin - vecTarget).Length();
+				if (d < nearDist) { nearDist = d; index = w; }
+			}
+
+			if (index != -1)
+			{
+				pBot->wpt_goal_type = WPT_GOAL_LOCATION;
 				pBot->waypoint_goal = index;
 				return index;
 			}

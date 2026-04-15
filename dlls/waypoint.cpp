@@ -2817,8 +2817,10 @@ unsigned short WaypointRouteFromTo(int src, int dest, int team)
 	
 	pFromTo = from_to[team];
 
-	if (pFromTo[team] == 0)  // no info, return
-		return -1;
+	// NOTE: removed "pFromTo[team] == 0" check — false positive for team 0.
+	// pFromTo[0] is the self-route from waypoint 0 to itself (always 0),
+	// which is NOT an indicator of an empty table.  The NULL checks above
+	// are sufficient to verify the routing table exists.
 
 	unsigned short result = pFromTo[src * route_num_waypoints + dest];
 

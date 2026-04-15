@@ -153,6 +153,16 @@ enum
 	CARRY_RSRC
 };
 
+enum
+{
+	CTF_ROLE_NONE = 0,
+	CTF_ROLE_CARRIER,    // has enemy flag → run to own base to score
+	CTF_ROLE_RETRIEVER,  // own flag dropped → rush to return it
+	CTF_ROLE_ESCORT,     // teammate has flag → follow and protect
+	CTF_ROLE_DEFENDER,   // guard own flag/base area
+	CTF_ROLE_SEEKER      // go grab enemy flag
+};
+
 extern double pi;
 
 typedef struct
@@ -383,6 +393,16 @@ typedef struct
 	float f_ctc_drop_consider_time; // cooldown for strategic drop evaluation
 	float f_ctc_next_juke_time;    // next time to jump or duck evasively
 	float f_ctc_next_move_time;    // next time to do a special move (slide/flip/kick)
+
+	// CTF — Capture The Flag state
+	bool  b_ctf_has_flag;          // TRUE when bot carries enemy flag
+	int   i_ctf_role;              // current CTF role (CTF_ROLE_*)
+	float f_ctf_role_eval_time;    // timer for re-evaluating CTF role
+
+	// Multi-jump toward elevated goals (general purpose)
+	int   i_goal_jump_phase;       // 0=none, 1=1st jump fired, 2=2nd jump pending, 3=3rd jump pending
+	float f_goal_jump_time;        // next time the bot may fire the next jump phase
+	float f_goal_jump_stall_time;  // time the bot first detected it was close but below the goal
 
 } bot_t;
 
