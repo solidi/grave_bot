@@ -411,7 +411,6 @@ bool BotCtcThink( bot_t *pBot )
 	// -----------------------------------------------------------------
 	{
 		edict_t *pHolder = NULL;
-		float flHolderDist = 9e9f;
 
 		for (int i = 1; i <= gpGlobals->maxClients; i++)
 		{
@@ -423,7 +422,6 @@ bool BotCtcThink( bot_t *pBot )
 			if (pPlayer->v.fuser4 > 0)
 			{
 				pHolder = pPlayer;
-				flHolderDist = (pPlayer->v.origin - pEdict->v.origin).Length();
 				break; // only one holder at a time
 			}
 		}
