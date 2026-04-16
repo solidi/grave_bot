@@ -370,11 +370,6 @@ void BotCtfPreUpdate( bot_t *pBot )
 	edict_t *pEdict = pBot->pEdict;
 	int botTeam = UTIL_GetTeam(pEdict);
 
-	// Clear any stale goal from a previous frame so that missing entities
-	// (e.g., flag not yet spawned, base not found) never leave an old
-	// objective driving navigation.
-	pBot->v_goal = g_vecZero;
-
 	BotCtfFindEntities();
 
 	edict_t *pEnemyFlag = BotCtfGetEnemyFlag(botTeam);
