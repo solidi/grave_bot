@@ -492,9 +492,9 @@ static bool BotGoalElevatedJump( bot_t *pBot, Vector vecGoal )
 	// Phase 1: Double jump (2nd press while airborne)
 	if (pBot->i_goal_jump_phase == 1 && pBot->f_goal_jump_time < gpGlobals->time)
 	{
-		// Must NOT press IN_JUMP this frame to release the button, then
-		// press it next time — the engine needs m_afButtonPressed transition.
-		// Use the doublejump timer mechanism: schedule the 2nd jump press.
+		// Timer expired: perform the 2nd jump press now while airborne.
+		// This phase delays the press until the scheduled time; it does not
+		// insert a separate release-only frame before advancing to Phase 2.
 		pEdict->v.button |= IN_JUMP;
 		pBot->i_goal_jump_phase = 2;
 		pBot->f_goal_jump_time = gpGlobals->time + 0.15f;
