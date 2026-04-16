@@ -200,7 +200,8 @@ void BotSpawnInit( bot_t *pBot )
 	
 	pBot->f_random_waypoint_time = gpGlobals->time;
 	pBot->waypoint_goal = -1;
-	pBot->f_waypoint_goal_time = gpGlobals->time + 1.0;
+	pBot->old_waypoint_goal = -1;
+	pBot->f_waypoint_goal_time = 0.0;
 	pBot->waypoint_near_flag = FALSE;
 	pBot->waypoint_flag_origin = Vector(0, 0, 0);
 	pBot->prev_waypoint_distance = 0.0;
@@ -323,6 +324,16 @@ void BotSpawnInit( bot_t *pBot )
 	pBot->f_ctc_drop_consider_time = 0.0f;
 	pBot->f_ctc_next_juke_time   = 0.0f;
 	pBot->f_ctc_next_move_time   = 0.0f;
+
+	// Clear per-life CTF state.
+	pBot->b_ctf_has_flag       = false;
+	pBot->i_ctf_role           = CTF_ROLE_NONE;
+	pBot->f_ctf_role_eval_time = 0.0f;
+
+	// Clear multi-jump state.
+	pBot->i_goal_jump_phase     = 0;
+	pBot->f_goal_jump_time      = 0.0f;
+	pBot->f_goal_jump_stall_time = 0.0f;
 
 	pBot->respawn_time = 0;
 	pBot->respawn_set = FALSE;
@@ -1824,7 +1835,15 @@ void BotThink( bot_t *pBot )
 
 				
 	found_waypoint = FALSE;
-				
+
+	// CTF: set v_goal early so BotFindWaypointGoal (inside
+	// BotHeadTowardWaypoint) already has a valid target on the
+	// first frame after spawn.  Without this, v_goal is still
+	// g_vecZero and the goal finder returns -1 with a 0.5 s
+	// cooldown, causing the bot to wander aimlessly.
+	if (is_gameplay == GAME_CTF)
+		BotCtfPreUpdate(pBot);
+
 	// it is time to look for a waypoint AND
 	// there are waypoints in this level...
 				
@@ -2029,6 +2048,14 @@ void BotThink( bot_t *pBot )
 			}
 		}
 
+		// CTF: detect carrier status and pre-set v_goal BEFORE BotFindEnemy
+		// so that the movement block always has a target, even on ticks where
+		// the enemy branch runs instead of BotCtfThink.
+		if (is_gameplay == GAME_CTF)
+		{
+			BotCtfPreUpdate(pBot);
+		}
+
 		if (b_botdontshoot == 0)
 		{
 			pBot->pBotEnemy = BotFindEnemy( pBot );
@@ -2092,6 +2119,14 @@ void BotThink( bot_t *pBot )
 					pBot->old_waypoint_goal = -1;
 					pBot->f_waypoint_goal_time = 0.0f;
 				}
+				// CTF: same reset — after combat the bot should resume
+				// flag/base objective, not return to a stale waypoint.
+				else if (is_gameplay == GAME_CTF)
+				{
+					pBot->waypoint_goal     = -1;
+					pBot->old_waypoint_goal = -1;
+					pBot->f_waypoint_goal_time = 0.0f;
+				}
 				else if (pBot->old_waypoint_goal != -1)
 				{
 					pBot->waypoint_goal = pBot->old_waypoint_goal;
@@ -2138,6 +2173,13 @@ void BotThink( bot_t *pBot )
 				pBot->item_waypoint  = -1;
 			}
 
+			// CTF: same clearing pattern — navigation handled by BotCtfThink.
+			if (is_gameplay == GAME_CTF && pBot->pBotPickupItem)
+			{
+				pBot->pBotPickupItem = NULL;
+				pBot->item_waypoint  = -1;
+			}
+
 			if (is_gameplay == GAME_KTS && BotKtsThink(pBot))
 			{
 				// BotKtsThink sets v_goal + f_move_speed for all KTS cases.
@@ -2149,6 +2191,10 @@ void BotThink( bot_t *pBot )
 			else if (is_gameplay == GAME_CTC && BotCtcThink(pBot))
 			{
 				// BotCtcThink sets v_goal + f_move_speed for all CtC cases.
+			}
+			else if (is_gameplay == GAME_CTF && BotCtfThink(pBot))
+			{
+				// BotCtfThink sets v_goal + f_move_speed for all CTF cases.
 			}
 			else if (pBot->pBotPickupItem)
 			{
@@ -2604,7 +2650,7 @@ void BotThink( bot_t *pBot )
 	// Cold Skulls / KTS / CtC: v_goal is refreshed every tick by the pre-scan
 	// and the mode's Think function — don't wipe it here or the movement
 	// block will never see the target and the bot follows waypoints instead.
-	if (is_gameplay != GAME_COLDSKULL && is_gameplay != GAME_KTS && is_gameplay != GAME_CTC)
+	if (is_gameplay != GAME_COLDSKULL && is_gameplay != GAME_KTS && is_gameplay != GAME_CTC && is_gameplay != GAME_CTF)
 		pBot->v_goal = g_vecZero;
 	// is our goal ent still around?
 	if (pBot->pGoalEnt != NULL)
@@ -2779,7 +2825,20 @@ void BotThink( bot_t *pBot )
 				&& pBot->v_goal != g_vecZero
 				&& ((pBot->v_goal - pEdict->v.origin).Length() < 300.0f
 					|| FVisible(pBot->v_goal, pEdict)));
-			if (ktsDirectSteer || ktsBallChase || skullChase || ctcChase)
+			// CTF: direct-steer toward the flag/base objective.
+			// Two tiers: visible within 500u (safe approach), or
+			// very close (< 128u) regardless of visibility so the
+			// bot doesn't stall at the last waypoint.
+			bool ctfChase = false;
+			if (is_gameplay == GAME_CTF && pBot->v_goal != g_vecZero)
+			{
+				float ctfDist = (pBot->v_goal - pEdict->v.origin).Length();
+				if (ctfDist < 128.0f)
+					ctfChase = true;
+				else if (ctfDist < 500.0f && FVisible(pBot->v_goal, pEdict))
+					ctfChase = true;
+			}
+			if (ktsDirectSteer || ktsBallChase || skullChase || ctcChase || ctfChase)
 				bGoGoal = true;
 			else if (goalDist < 256 && FVisible(pBot->v_goal, pEdict))
 				bGoGoal = true;

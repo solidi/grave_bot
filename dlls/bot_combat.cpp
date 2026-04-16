@@ -266,6 +266,490 @@ bool BotColdskullThink( bot_t *pBot )
 }
 
 //=========================================================
+// CTF radar constants — defined in the game DLL's const.h
+// but not in the bot's copy.  The flag and base entities
+// use pev->fuser4 set to these values.
+//=========================================================
+#define RADAR_FLAG_BLUE  10
+#define RADAR_FLAG_RED   11
+#define RADAR_BASE_BLUE  12
+#define RADAR_BASE_RED   13
+
+//=========================================================
+// BotCtfFindEntities — per-frame cached scan for the two
+// flag entities and two base entities used by CTF mode.
+// Output pointers are set to the matching edicts or NULL.
+//=========================================================
+static float   s_ctf_cache_time = -1.0f;
+static edict_t *s_pBlueFlag = NULL;
+static edict_t *s_pRedFlag  = NULL;
+static edict_t *s_pBlueBase = NULL;
+static edict_t *s_pRedBase  = NULL;
+
+static void BotCtfFindEntities()
+{
+	if (s_ctf_cache_time == gpGlobals->time)
+		return;  // already scanned this frame
+
+	s_ctf_cache_time = gpGlobals->time;
+	s_pBlueFlag = NULL;
+	s_pRedFlag  = NULL;
+	s_pBlueBase = NULL;
+	s_pRedBase  = NULL;
+
+	edict_t *pEnt = NULL;
+
+	// Scan for flag entities
+	while ((pEnt = UTIL_FindEntityByClassname(pEnt, "flag")) != NULL)
+	{
+		int radar = (int)pEnt->v.fuser4;
+		if (radar == RADAR_FLAG_BLUE)
+			s_pBlueFlag = pEnt;
+		else if (radar == RADAR_FLAG_RED)
+			s_pRedFlag = pEnt;
+	}
+
+	// Scan for base entities
+	pEnt = NULL;
+	while ((pEnt = UTIL_FindEntityByClassname(pEnt, "base")) != NULL)
+	{
+		int radar = (int)pEnt->v.fuser4;
+		if (radar == RADAR_BASE_BLUE)
+			s_pBlueBase = pEnt;
+		else if (radar == RADAR_BASE_RED)
+			s_pRedBase = pEnt;
+	}
+}
+
+// Return the flag entity belonging to the given team (1=blue, 2=red)
+static edict_t *BotCtfGetTeamFlag( int botTeam )
+{
+	return (botTeam == 1) ? s_pBlueFlag : s_pRedFlag;
+}
+
+// Return the enemy flag entity for the given team
+static edict_t *BotCtfGetEnemyFlag( int botTeam )
+{
+	return (botTeam == 1) ? s_pRedFlag : s_pBlueFlag;
+}
+
+// Return the base entity belonging to the given team
+static edict_t *BotCtfGetOwnBase( int botTeam )
+{
+	return (botTeam == 1) ? s_pBlueBase : s_pRedBase;
+}
+
+// Return the enemy base entity for the given team
+static edict_t *BotCtfGetEnemyBase( int botTeam )
+{
+	return (botTeam == 1) ? s_pRedBase : s_pBlueBase;
+}
+
+// Return the edict carrying a flag, or NULL if the flag is loose/home.
+// The carrier is stored in pev->aiment by the game rules code.
+static edict_t *BotCtfGetFlagCarrier( edict_t *pFlag )
+{
+	if (FNullEnt(pFlag))
+		return NULL;
+	edict_t *pCarrier = pFlag->v.aiment;
+	if (FNullEnt(pCarrier))
+		return NULL;
+	if (!IsAlive(pCarrier))
+		return NULL;
+	return pCarrier;
+}
+
+//=========================================================
+// BotCtfPreUpdate — called from bot.cpp BEFORE BotFindEnemy
+// every frame.  Sets b_ctf_has_flag, bot_has_flag, and
+// pre-sets v_goal so the movement block has a target even
+// on ticks where the enemy branch runs instead of BotCtfThink.
+//=========================================================
+void BotCtfPreUpdate( bot_t *pBot )
+{
+	edict_t *pEdict = pBot->pEdict;
+	int botTeam = UTIL_GetTeam(pEdict);
+
+	BotCtfFindEntities();
+
+	edict_t *pEnemyFlag = BotCtfGetEnemyFlag(botTeam);
+	edict_t *pOwnFlag   = BotCtfGetTeamFlag(botTeam);
+	edict_t *pOwnBase   = BotCtfGetOwnBase(botTeam);
+
+	// Detect if this bot is carrying the enemy flag
+	edict_t *pEnemyFlagCarrier = BotCtfGetFlagCarrier(pEnemyFlag);
+	pBot->b_ctf_has_flag = (pEnemyFlagCarrier == pEdict);
+	pBot->bot_has_flag   = pBot->b_ctf_has_flag;
+
+	if (pBot->b_ctf_has_flag)
+	{
+		// Carrier: suppress item pickup, pre-set goal to own base
+		pBot->pBotPickupItem = NULL;
+		pBot->item_waypoint  = -1;
+		if (!FNullEnt(pOwnBase))
+		{
+			pBot->v_goal           = pOwnBase->v.origin;
+			pBot->f_goal_proximity = 0.0f;  // run through the trigger
+		}
+	}
+	else
+	{
+		// Non-carrier: pre-set v_goal based on current role
+		switch (pBot->i_ctf_role)
+		{
+		case CTF_ROLE_RETRIEVER:
+		{
+			if (!FNullEnt(pOwnFlag))
+			{
+				edict_t *pOwnFlagCarrier = BotCtfGetFlagCarrier(pOwnFlag);
+				if (pOwnFlagCarrier)
+					pBot->v_goal = pOwnFlagCarrier->v.origin;
+				else
+					pBot->v_goal = pOwnFlag->v.origin;
+			}
+			break;
+		}
+		case CTF_ROLE_ESCORT:
+		{
+			if (pEnemyFlagCarrier && pEnemyFlagCarrier != pEdict)
+				pBot->v_goal = pEnemyFlagCarrier->v.origin;
+			break;
+		}
+		case CTF_ROLE_DEFENDER:
+		{
+			if (!FNullEnt(pOwnBase))
+				pBot->v_goal = pOwnBase->v.origin;
+			break;
+		}
+		case CTF_ROLE_SEEKER:
+		default:
+		{
+			if (!FNullEnt(pEnemyFlag))
+				pBot->v_goal = pEnemyFlag->v.origin;
+			break;
+		}
+		}
+	}
+}
+
+//=========================================================
+// BotGoalElevatedJump — general-purpose multi-jump toward
+// an elevated goal.  Call every frame when the bot is close
+// horizontally but the goal is above.
+//
+// Uses a 3-phase jump sequence matching the mod's jump system:
+//   phase 0 → detect stall, start 1st jump
+//   phase 1 → 2nd jump (double-jump, while airborne)
+//   phase 2 → 3rd jump (triple-jump / flip, while airborne)
+//   phase 3 → sequence complete, reset after cooldown
+//
+// Returns true if the bot is currently in a jump sequence
+// (caller should keep running forward).
+//=========================================================
+static bool BotGoalElevatedJump( bot_t *pBot, Vector vecGoal )
+{
+	edict_t *pEdict = pBot->pEdict;
+
+	float heightDiff = vecGoal.z - pEdict->v.origin.z;
+	Vector vecFlat = vecGoal - pEdict->v.origin;
+	vecFlat.z = 0;
+	float horzDist = vecFlat.Length();
+
+	// Only start a new jump sequence when close horizontally (< 300u) and
+	// goal is above step height (> 20u).  Once a sequence is in-progress
+	// (phase 1-2), skip this check because the bot's own Z rises during
+	// the jump, making heightDiff temporarily drop below the threshold.
+	if (pBot->i_goal_jump_phase == 0 && (horzDist > 300.0f || heightDiff < 20.0f))
+	{
+		pBot->f_goal_jump_stall_time = 0.0f;
+		return false;
+	}
+
+	// Track how long we've been stuck below the goal
+	if (pBot->f_goal_jump_stall_time == 0.0f)
+		pBot->f_goal_jump_stall_time = gpGlobals->time;
+
+	// Wait 0.5s before starting jump sequence (gives waypoint nav a chance)
+	if (gpGlobals->time - pBot->f_goal_jump_stall_time < 0.5f)
+		return false;
+
+	// Face the goal and run toward it
+	Vector vecDir = vecGoal - pEdict->v.origin;
+	Vector vecAngles = UTIL_VecToAngles(vecDir);
+	pEdict->v.ideal_yaw = vecAngles.y;
+	BotFixIdealYaw(pEdict);
+	pBot->f_move_speed = pBot->f_max_speed;
+
+	// Phase 0: Start first jump (ground jump)
+	if (pBot->i_goal_jump_phase == 0 && pBot->f_goal_jump_time < gpGlobals->time)
+	{
+		pEdict->v.button |= IN_JUMP;
+		pBot->i_goal_jump_phase = 1;
+		pBot->f_goal_jump_time = gpGlobals->time + 0.15f;
+		return true;
+	}
+
+	// Phase 1: Double jump (2nd press while airborne)
+	if (pBot->i_goal_jump_phase == 1 && pBot->f_goal_jump_time < gpGlobals->time)
+	{
+		// Timer expired: perform the 2nd jump press now while airborne.
+		// This phase delays the press until the scheduled time; it does not
+		// insert a separate release-only frame before advancing to Phase 2.
+		pEdict->v.button |= IN_JUMP;
+		pBot->i_goal_jump_phase = 2;
+		pBot->f_goal_jump_time = gpGlobals->time + 0.15f;
+		return true;
+	}
+
+	// Phase 2: Triple jump / flip (3rd press while airborne)
+	if (pBot->i_goal_jump_phase == 2 && pBot->f_goal_jump_time < gpGlobals->time)
+	{
+		pEdict->v.button |= IN_JUMP;
+		pBot->i_goal_jump_phase = 3;
+		pBot->f_goal_jump_time = gpGlobals->time + 1.0f;  // cooldown before retrying
+		return true;
+	}
+
+	// Phase 3: Sequence complete — wait for cooldown then retry
+	if (pBot->i_goal_jump_phase == 3 && pBot->f_goal_jump_time < gpGlobals->time)
+	{
+		pBot->i_goal_jump_phase      = 0;
+		pBot->f_goal_jump_stall_time = gpGlobals->time;  // re-arm the 0.5s wait
+		return false;
+	}
+
+	return (pBot->i_goal_jump_phase > 0);
+}
+
+//=========================================================
+// BotCtfThink — called from BotThink when in CTF mode.
+//
+// Role-based objective AI:
+//  1. CARRIER  — bot has enemy flag → run to own base to score
+//  2. RETRIEVER — own flag is not at home → rush to touch/return it
+//  3. ESCORT   — teammate has enemy flag → follow and protect
+//  4. DEFENDER — guard own flag/base area
+//  5. SEEKER   — go grab enemy flag (default)
+//
+// Returns true when movement intent has been set; false to
+// fall back to normal nav/combat.
+//=========================================================
+bool BotCtfThink( bot_t *pBot )
+{
+	if (is_gameplay != GAME_CTF)
+		return false;
+
+	edict_t *pEdict = pBot->pEdict;
+	int botTeam = UTIL_GetTeam(pEdict);
+
+	// Refresh the cached flag/base entity pointers
+	BotCtfFindEntities();
+
+	edict_t *pOwnFlag   = BotCtfGetTeamFlag(botTeam);
+	edict_t *pEnemyFlag = BotCtfGetEnemyFlag(botTeam);
+	edict_t *pOwnBase   = BotCtfGetOwnBase(botTeam);
+
+	// If flags/bases don't exist yet, fall back to normal nav
+	if (FNullEnt(pEnemyFlag) || FNullEnt(pOwnBase))
+		return false;
+
+	// ------------------------------------------------------------------
+	// Detect carrier status (authoritative — set every frame)
+	// ------------------------------------------------------------------
+	edict_t *pEnemyFlagCarrier = BotCtfGetFlagCarrier(pEnemyFlag);
+	pBot->b_ctf_has_flag = (pEnemyFlagCarrier == pEdict);
+	pBot->bot_has_flag   = pBot->b_ctf_has_flag;
+
+	// ------------------------------------------------------------------
+	// Role evaluation — every 0.5 seconds to avoid thrashing
+	// ------------------------------------------------------------------
+	if (pBot->f_ctf_role_eval_time < gpGlobals->time)
+	{
+		pBot->f_ctf_role_eval_time = gpGlobals->time + 0.5f;
+
+		// Priority 1: Am I carrying the enemy flag?
+		if (pBot->b_ctf_has_flag)
+		{
+			pBot->i_ctf_role = CTF_ROLE_CARRIER;
+		}
+		// Priority 2: Is our own flag NOT at home? (someone stole it / it's dropped)
+		// base pev->iuser4 == TRUE means flag is at home
+		else if (!FNullEnt(pOwnFlag) && !FNullEnt(pOwnBase) && !pOwnBase->v.iuser4)
+		{
+			// Check if the own flag is being carried by an enemy or is on the ground
+			edict_t *pOwnFlagCarrier = BotCtfGetFlagCarrier(pOwnFlag);
+			if (pOwnFlagCarrier != NULL)
+			{
+				// Enemy is carrying our flag — chase them to kill and force a drop
+				pBot->i_ctf_role = CTF_ROLE_RETRIEVER;
+			}
+			else
+			{
+				// Flag is on the ground — rush to touch it and return it
+				pBot->i_ctf_role = CTF_ROLE_RETRIEVER;
+			}
+		}
+		// Priority 3: Is a teammate carrying the enemy flag?
+		else if (pEnemyFlagCarrier != NULL && pEnemyFlagCarrier != pEdict
+			&& UTIL_GetTeam(pEnemyFlagCarrier) == botTeam)
+		{
+			// Cap escorts at roughly 50% of team bots — others become seekers/defenders
+			// Simple approach: alternate based on bot edict index
+			int idx = ENTINDEX(pEdict);
+			if (idx % 2 == 0)
+				pBot->i_ctf_role = CTF_ROLE_ESCORT;
+			else
+				pBot->i_ctf_role = CTF_ROLE_DEFENDER;
+		}
+		// Priority 4: Default — go seek enemy flag.
+		// DEFENDER is only assigned under Priority 3 (when a teammate
+		// carries the flag and we split escort/defense).  Proximity-based
+		// auto-defend was removed because with few bots (or right after
+		// spawning near the base) it caused the only bot to idle at base.
+		else
+		{
+			pBot->i_ctf_role = CTF_ROLE_SEEKER;
+		}
+	}
+
+	// Force CARRIER role immediately when flag is held (don't wait for timer)
+	if (pBot->b_ctf_has_flag)
+		pBot->i_ctf_role = CTF_ROLE_CARRIER;
+
+	// ------------------------------------------------------------------
+	// Execute behavior based on role
+	// ------------------------------------------------------------------
+	switch (pBot->i_ctf_role)
+	{
+	// =================================================================
+	// CARRIER — run to own base to score
+	// =================================================================
+	case CTF_ROLE_CARRIER:
+	{
+		pBot->f_pause_time = 0;
+		pBot->f_move_speed = pBot->f_max_speed;
+
+		// Suppress item pickup — don't get distracted
+		pBot->pBotPickupItem = NULL;
+		pBot->item_waypoint  = -1;
+
+		// Set goal to own base
+		pBot->v_goal           = pOwnBase->v.origin;
+		pBot->f_goal_proximity = 0.0f;  // run through the trigger — don't stop short
+
+		// Multi-jump if base is elevated above us
+		BotGoalElevatedJump(pBot, pOwnBase->v.origin);
+
+		return true;
+	}
+
+	// =================================================================
+	// RETRIEVER — rush to return own flag
+	// =================================================================
+	case CTF_ROLE_RETRIEVER:
+	{
+		if (FNullEnt(pOwnFlag))
+			return false;
+
+		pBot->f_pause_time = 0;
+		pBot->f_move_speed = pBot->f_max_speed;
+
+		edict_t *pOwnFlagCarrier = BotCtfGetFlagCarrier(pOwnFlag);
+		Vector vecTarget;
+
+		if (pOwnFlagCarrier != NULL)
+		{
+			// Enemy is carrying our flag — chase the carrier
+			vecTarget = pOwnFlagCarrier->v.origin;
+			pBot->f_goal_proximity = 0.0f;
+		}
+		else
+		{
+			// Flag is dropped on the ground — rush to touch it
+			vecTarget = pOwnFlag->v.origin;
+			pBot->f_goal_proximity = 0.0f;  // run through the trigger
+
+			// Suppress combat when very close to prioritize returning flag
+			float distToFlag = (pOwnFlag->v.origin - pEdict->v.origin).Length();
+			if (distToFlag < 200.0f && pBot->pBotEnemy)
+			{
+				pBot->pBotEnemy = NULL;
+			}
+		}
+
+		pBot->v_goal = vecTarget;
+
+		// Multi-jump if the flag is elevated above us
+		BotGoalElevatedJump(pBot, vecTarget);
+
+		return true;
+	}
+
+	// =================================================================
+	// ESCORT — follow and protect the flag carrier teammate
+	// =================================================================
+	case CTF_ROLE_ESCORT:
+	{
+		// If no teammate is carrying, fall through to seeker
+		if (FNullEnt(pEnemyFlagCarrier) || pEnemyFlagCarrier == pEdict
+			|| UTIL_GetTeam(pEnemyFlagCarrier) != botTeam)
+		{
+			// Teammate lost the flag — become seeker
+			pBot->i_ctf_role = CTF_ROLE_SEEKER;
+			break;  // will fall through to SEEKER below via re-entry next frame
+		}
+
+		pBot->f_move_speed = pBot->f_max_speed;
+
+		// Stay near the carrier with a slight offset
+		pBot->v_goal           = pEnemyFlagCarrier->v.origin;
+		pBot->f_goal_proximity = 128.0f;
+
+		return true;
+	}
+
+	// =================================================================
+	// DEFENDER — patrol near own base
+	// =================================================================
+	case CTF_ROLE_DEFENDER:
+	{
+		if (FNullEnt(pOwnBase))
+			return false;
+
+		pBot->f_move_speed = pBot->f_max_speed;
+
+		// Set goal to own base area
+		pBot->v_goal           = pOwnBase->v.origin;
+		pBot->f_goal_proximity = 256.0f;
+
+
+
+		return true;
+	}
+
+	// =================================================================
+	// SEEKER — go grab enemy flag (default)
+	// =================================================================
+	case CTF_ROLE_SEEKER:
+	default:
+	{
+		pBot->f_move_speed = pBot->f_max_speed;
+
+		// Head to enemy flag location
+		pBot->v_goal           = pEnemyFlag->v.origin;
+		pBot->f_goal_proximity = 0.0f;  // run through the trigger
+
+		// Multi-jump if the flag is elevated above us
+		BotGoalElevatedJump(pBot, pEnemyFlag->v.origin);
+
+		return true;
+	}
+	}
+
+	return false;
+}
+
+//=========================================================
 // BotCtcThink — called from BotThink when in Capture The
 // Chumtoad mode and no combat is active.
 //
@@ -927,7 +1411,7 @@ edict_t *BotFindEnemy( bot_t *pBot )
 			}
 		}
 		else if ((!FInViewCone( &vecEnd, pEdict ) ||
-			!FVisible( vecEnd, pEdict )) && (!pBot->b_engaging_enemy))
+			!FVisible( vecEnd, pEdict )) && (!pBot->b_engaging_enemy || is_gameplay == GAME_CTF))
 		{	// remember our enemy for 2 seconds even if they're not visible
 			if (pBot->f_bot_see_enemy_time > (gpGlobals->time - 2))
 				pRemember = pBot->pBotEnemy;
@@ -1144,7 +1628,8 @@ edict_t *BotFindEnemy( bot_t *pBot )
 	if (pNewEnemy == NULL && pRemember != NULL)
 		pNewEnemy = pRemember;
 	// are we engaging an enemy?  Don't forget about them
-	if (pNewEnemy == NULL && pBot->b_engaging_enemy && pBot->pBotEnemy != NULL)
+	// In CTF, let the enemy go so the bot returns to objective play.
+	if (pNewEnemy == NULL && pBot->b_engaging_enemy && pBot->pBotEnemy != NULL && is_gameplay != GAME_CTF)
 		pNewEnemy = pBot->pBotEnemy;
 
 	if (pNewEnemy)

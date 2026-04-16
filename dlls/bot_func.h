@@ -71,6 +71,8 @@ float BotAssessSecondaryAmmo( bot_t *pBot, int weapon_id );
 bool BotKtsThink( bot_t *pBot );
 bool BotColdskullThink( bot_t *pBot );
 bool BotCtcThink( bot_t *pBot );
+bool BotCtfThink( bot_t *pBot );
+void BotCtfPreUpdate( bot_t *pBot );
 edict_t *BotFindBestSkull( edict_t *pBotEdict, float *pflDist = NULL );
 
 #endif // BOT_FUNC_H
