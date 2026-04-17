@@ -44,6 +44,7 @@ extern bot_research_t g_Researched[2][NUM_RESEARCH_OPTIONS];
 extern char *RoleToString(int role);
 extern char *SubroleToString(int subrole);
 extern bool b_chat_debug;
+extern PATH *paths[MAX_WAYPOINTS];
 static FILE *fp;
 extern int is_gameplay;
 
@@ -428,6 +429,43 @@ bool BotHeadTowardWaypoint( bot_t *pBot )
 		{
 			// find the nearest reachable waypoint
 			i = WaypointFindReachable(pEdict, REACHABLE_RANGE, team);
+		}
+		
+		// If the nearest waypoint has no outgoing paths (dead-end / orphan),
+		// find the closest visible, same-level waypoint that DOES have paths.
+		if (i != -1 && paths[i] == NULL)
+		{
+			int best = -1;
+			float bestDist = 9999.0f;
+			TraceResult tr;
+			for (int w = 0; w < num_waypoints; w++)
+			{
+				if (w == i)
+					continue;
+				if (waypoints[w].flags & W_FL_DELETED)
+					continue;
+				if (waypoints[w].flags & W_FL_AIMING)
+					continue;
+				if (paths[w] == NULL)  // skip other dead-ends
+					continue;
+				// same level: within 45 units vertically
+				if (fabs(waypoints[w].origin.z - pEdict->v.origin.z) > 45.0f)
+					continue;
+				float dist = (waypoints[w].origin - pEdict->v.origin).Length();
+				if (dist > REACHABLE_RANGE || dist >= bestDist)
+					continue;
+				// must be visible
+				UTIL_TraceLine(pEdict->v.origin + pEdict->v.view_ofs,
+					waypoints[w].origin, ignore_monsters,
+					pEdict->v.pContainingEntity, &tr);
+				if (tr.flFraction >= 1.0)
+				{
+					best = w;
+					bestDist = dist;
+				}
+			}
+			if (best != -1)
+				i = best;
 		}
 		
 		if (i == -1)
@@ -908,6 +946,48 @@ bool BotHeadTowardWaypoint( bot_t *pBot )
 			
 			if (status == FALSE)
 			{
+				// Dead-end escape: current waypoint has no outgoing paths.
+				// Find the closest visible, same-level waypoint that has paths.
+				if (pBot->curr_waypoint_index != -1 && paths[pBot->curr_waypoint_index] == NULL)
+				{
+					int escape = -1;
+					float escapeDist = 9999.0f;
+					TraceResult tr;
+					for (int w = 0; w < num_waypoints; w++)
+					{
+						if (w == pBot->curr_waypoint_index)
+							continue;
+						if (waypoints[w].flags & W_FL_DELETED)
+							continue;
+						if (waypoints[w].flags & W_FL_AIMING)
+							continue;
+						if (paths[w] == NULL)
+							continue;
+						if (fabs(waypoints[w].origin.z - pEdict->v.origin.z) > 45.0f)
+							continue;
+						float dist = (waypoints[w].origin - pEdict->v.origin).Length();
+						if (dist > REACHABLE_RANGE || dist >= escapeDist)
+							continue;
+						UTIL_TraceLine(pEdict->v.origin + pEdict->v.view_ofs,
+							waypoints[w].origin, ignore_monsters,
+							pEdict->v.pContainingEntity, &tr);
+						if (tr.flFraction >= 1.0)
+						{
+							escape = w;
+							escapeDist = dist;
+						}
+					}
+					if (escape != -1)
+					{
+						pBot->curr_waypoint_index = escape;
+						pBot->waypoint_origin = waypoints[escape].origin;
+						pBot->f_waypoint_time = gpGlobals->time;
+						for (index = 0; index < 5; index++)
+							pBot->prev_waypoint_index[index] = -1;
+						return TRUE;
+					}
+				}
+
 				if (b_chat_debug)
 				{
 					sprintf(pBot->debugchat, "BotHeadTowardWaypoint fail\n");
