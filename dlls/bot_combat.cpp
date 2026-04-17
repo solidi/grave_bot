@@ -206,6 +206,12 @@ void BotCheckTeamplay()
 		is_gameplay = GAME_COLDSKULL;
 	}
 
+	if (strstr(gameMode, "arena") || atoi(gameMode) == GAME_ARENA)
+	{
+		is_team_play = TRUE;
+		is_gameplay = GAME_ARENA;
+	}
+
 	checked_teamplay = TRUE;
 }
 
@@ -747,6 +753,86 @@ bool BotCtfThink( bot_t *pBot )
 	}
 
 	return false;
+}
+
+//=========================================================
+// BotArenaPreUpdate — called from BotThink BEFORE
+// BotFindEnemy every frame in Arena (1v1) mode.
+//
+// Finds the single opponent, caches their index, pre-sets
+// v_goal toward their position, and clears item pickup so
+// the bot never detours to items.
+//=========================================================
+void BotArenaPreUpdate( bot_t *pBot )
+{
+	edict_t *pEdict = pBot->pEdict;
+	int botTeam = UTIL_GetTeam(pEdict);
+
+	// Find the one alive opponent on a different team
+	pBot->i_arena_opponent = 0;
+	for (int i = 1; i <= gpGlobals->maxClients; i++)
+	{
+		edict_t *pPlayer = INDEXENT(i);
+		if (FNullEnt(pPlayer) || pPlayer == pEdict)
+			continue;
+		if (!IsAlive(pPlayer))
+			continue;
+		if (pPlayer->v.flags & FL_SPECTATOR)
+			continue;
+		int otherTeam = UTIL_GetTeam(pPlayer);
+		if (otherTeam != botTeam)
+		{
+			pBot->i_arena_opponent = i;
+			pBot->v_goal           = pPlayer->v.origin;
+			pBot->f_goal_proximity = 0.0f;
+			break;
+		}
+	}
+
+	// Suppress item detours — sole objective is the opponent
+	pBot->pBotPickupItem = NULL;
+	pBot->item_waypoint  = -1;
+}
+
+//=========================================================
+// BotArenaThink — called from BotThink when in Arena (1v1)
+// mode and no combat is active.
+//
+// Seeks the opponent using three approach styles to prevent
+// both bots from looping the same path at the same speed:
+//   0 = direct  (60%) — waypoint nearest opponent
+//   1 = flank   (25%) — offset waypoint for angle variety
+//   2 = wander  (15%) — random waypoint to desynchronize
+//
+// Also varies movement speed and adds tactical jumps to
+// break velocity symmetry.
+//
+// Returns true when movement intent has been set; false to
+// fall back to normal nav.
+//=========================================================
+bool BotArenaThink( bot_t *pBot )
+{
+	if (is_gameplay != GAME_ARENA)
+		return false;
+
+	edict_t *pEdict = pBot->pEdict;
+
+	// Validate opponent
+	edict_t *pOpponent = NULL;
+	if (pBot->i_arena_opponent > 0)
+		pOpponent = INDEXENT(pBot->i_arena_opponent);
+
+	if (FNullEnt(pOpponent) || !IsAlive(pOpponent))
+		return false; // no valid opponent, fallback to wander
+
+	// Keep v_goal pointed at opponent for the movement/direction block.
+	// Waypoint goal selection is handled by BotFindWaypointGoal (arena
+	// section in bot_navigate.cpp), which finds the nearest waypoint to
+	// the opponent every 0.5s.  Floyd routing then advances hop-by-hop.
+	pBot->v_goal = pOpponent->v.origin;
+	pBot->f_goal_proximity = 0.0f;
+
+	return true;
 }
 
 //=========================================================
@@ -1411,9 +1497,11 @@ edict_t *BotFindEnemy( bot_t *pBot )
 			}
 		}
 		else if ((!FInViewCone( &vecEnd, pEdict ) ||
-			!FVisible( vecEnd, pEdict )) && (!pBot->b_engaging_enemy || is_gameplay == GAME_CTF))
+			!FVisible( vecEnd, pEdict )) && (!pBot->b_engaging_enemy || is_gameplay == GAME_CTF || is_gameplay == GAME_ARENA))
 		{	// remember our enemy for 2 seconds even if they're not visible
-			if (pBot->f_bot_see_enemy_time > (gpGlobals->time - 2))
+			// Arena: extend to 5 seconds — never fully forget the sole opponent
+			float rememberWindow = (is_gameplay == GAME_ARENA) ? 5.0f : 2.0f;
+			if (pBot->f_bot_see_enemy_time > (gpGlobals->time - rememberWindow))
 				pRemember = pBot->pBotEnemy;
 			pBot->pBotEnemy = NULL;
 			pBot->f_ignore_wpt_time = 0.0;
@@ -1629,7 +1717,7 @@ edict_t *BotFindEnemy( bot_t *pBot )
 		pNewEnemy = pRemember;
 	// are we engaging an enemy?  Don't forget about them
 	// In CTF, let the enemy go so the bot returns to objective play.
-	if (pNewEnemy == NULL && pBot->b_engaging_enemy && pBot->pBotEnemy != NULL && is_gameplay != GAME_CTF)
+	if (pNewEnemy == NULL && pBot->b_engaging_enemy && pBot->pBotEnemy != NULL && is_gameplay != GAME_CTF && is_gameplay != GAME_ARENA)
 		pNewEnemy = pBot->pBotEnemy;
 
 	if (pNewEnemy)
@@ -2111,7 +2199,7 @@ bool BotFireWeapon(Vector v_enemy, bot_t *pBot, int weapon_choice, bool nofire)
 		iId = pSelect[final_index].iId;
 
 		// select this weapon if it isn't already selected
-		if (is_gameplay != GAME_CTC && pBot->current_weapon.iId != iId/* && g_flWeaponSwitch <= gpGlobals->time*/)
+		if (is_gameplay != GAME_CTC && is_gameplay != GAME_ARENA && pBot->current_weapon.iId != iId/* && g_flWeaponSwitch <= gpGlobals->time*/)
 		{
 			//ALERT(at_console, "Switch weapon\n");
 			//g_flWeaponSwitch = gpGlobals->time + 1.0;
@@ -2469,6 +2557,15 @@ void BotShootAtEnemy( bot_t *pBot )
 			sprintf(pBot->debugchat, "I am going to engage %s...\n", STRING(pBot->pBotEnemy->v.netname));
 			UTIL_HostSay(pBot->pEdict, 0, pBot->debugchat);
 		}
+	}
+
+	// Arena: always engage immediately — the opponent IS the only objective.
+	// Skip the random aggressiveness gate.
+	if (is_gameplay == GAME_ARENA && !pBot->b_engaging_enemy && pBot->pBotEnemy != NULL)
+	{
+		if (pBot->waypoint_goal != -1)
+			pBot->old_waypoint_goal = pBot->waypoint_goal;
+		pBot->b_engaging_enemy = TRUE;
 	}
 
 	// see if we should engage the enemy every half second

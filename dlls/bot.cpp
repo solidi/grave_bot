@@ -330,6 +330,14 @@ void BotSpawnInit( bot_t *pBot )
 	pBot->i_ctf_role           = CTF_ROLE_NONE;
 	pBot->f_ctf_role_eval_time = 0.0f;
 
+	// Clear per-life Arena (1v1) state.
+	pBot->i_arena_opponent             = 0;
+	pBot->f_arena_seek_time            = 0.0f;
+	pBot->f_arena_vary_time            = 0.0f;
+	pBot->i_arena_approach_style       = 0;
+	pBot->f_arena_approach_switch_time = 0.0f;
+	pBot->f_arena_speed_factor         = 1.0f;
+
 	// Clear multi-jump state.
 	pBot->i_goal_jump_phase     = 0;
 	pBot->f_goal_jump_time      = 0.0f;
@@ -1031,6 +1039,14 @@ void BotFindItem( bot_t *pBot )
 		pBot->item_waypoint  = -1;
 		return;
 	}
+
+	// Arena: sole objective is the opponent — skip all item scanning.
+	if (is_gameplay == GAME_ARENA)
+	{
+		pBot->pBotPickupItem = NULL;
+		pBot->item_waypoint  = -1;
+		return;
+	}
 	
 	// forget about our item if it's been three seconds
 	// forget about item if it we picked it up
@@ -1679,6 +1695,16 @@ void BotThink( bot_t *pBot )
 	// if the bot is dead, randomly press fire to respawn...
 	if ((pEdict->v.health < 1) || (pEdict->v.deadflag != DEAD_NO))
 	{
+		// Arena: immediately drop enemy/goal state so the bot doesn't
+		// keep tracking the opponent during its death animation.
+		if (is_gameplay == GAME_ARENA)
+		{
+			pBot->pBotEnemy = NULL;
+			pBot->b_engaging_enemy = FALSE;
+			pBot->v_goal = g_vecZero;
+			pBot->i_arena_opponent = -1;
+		}
+
 		if (pBot->need_to_initialize)
 		{
 			pBot->weapons2 = 0;
@@ -1836,13 +1862,15 @@ void BotThink( bot_t *pBot )
 				
 	found_waypoint = FALSE;
 
-	// CTF: set v_goal early so BotFindWaypointGoal (inside
+	// CTF / Arena: set v_goal early so BotFindWaypointGoal (inside
 	// BotHeadTowardWaypoint) already has a valid target on the
 	// first frame after spawn.  Without this, v_goal is still
 	// g_vecZero and the goal finder returns -1 with a 0.5 s
 	// cooldown, causing the bot to wander aimlessly.
 	if (is_gameplay == GAME_CTF)
 		BotCtfPreUpdate(pBot);
+	else if (is_gameplay == GAME_ARENA)
+		BotArenaPreUpdate(pBot);
 
 	// it is time to look for a waypoint AND
 	// there are waypoints in this level...
@@ -2056,6 +2084,13 @@ void BotThink( bot_t *pBot )
 			BotCtfPreUpdate(pBot);
 		}
 
+		// Arena (1v1): find the sole opponent and pre-set v_goal toward them
+		// BEFORE BotFindEnemy so the movement block always has a target.
+		if (is_gameplay == GAME_ARENA)
+		{
+			BotArenaPreUpdate(pBot);
+		}
+
 		if (b_botdontshoot == 0)
 		{
 			pBot->pBotEnemy = BotFindEnemy( pBot );
@@ -2127,6 +2162,14 @@ void BotThink( bot_t *pBot )
 					pBot->old_waypoint_goal = -1;
 					pBot->f_waypoint_goal_time = 0.0f;
 				}
+				// Arena: same reset — after combat the bot should seek
+				// the opponent, not return to a stale waypoint.
+				else if (is_gameplay == GAME_ARENA)
+				{
+					pBot->waypoint_goal     = -1;
+					pBot->old_waypoint_goal = -1;
+					pBot->f_waypoint_goal_time = 0.0f;
+				}
 				else if (pBot->old_waypoint_goal != -1)
 				{
 					pBot->waypoint_goal = pBot->old_waypoint_goal;
@@ -2180,6 +2223,13 @@ void BotThink( bot_t *pBot )
 				pBot->item_waypoint  = -1;
 			}
 
+			// Arena: same clearing pattern — navigation handled by BotArenaThink.
+			if (is_gameplay == GAME_ARENA && pBot->pBotPickupItem)
+			{
+				pBot->pBotPickupItem = NULL;
+				pBot->item_waypoint  = -1;
+			}
+
 			if (is_gameplay == GAME_KTS && BotKtsThink(pBot))
 			{
 				// BotKtsThink sets v_goal + f_move_speed for all KTS cases.
@@ -2195,6 +2245,10 @@ void BotThink( bot_t *pBot )
 			else if (is_gameplay == GAME_CTF && BotCtfThink(pBot))
 			{
 				// BotCtfThink sets v_goal + f_move_speed for all CTF cases.
+			}
+			else if (is_gameplay == GAME_ARENA && BotArenaThink(pBot))
+			{
+				// BotArenaThink sets v_goal + f_move_speed for arena opponent seeking.
 			}
 			else if (pBot->pBotPickupItem)
 			{
@@ -2647,10 +2701,11 @@ void BotThink( bot_t *pBot )
 	}
 
 	// always forget goal
-	// Cold Skulls / KTS / CtC: v_goal is refreshed every tick by the pre-scan
-	// and the mode's Think function — don't wipe it here or the movement
-	// block will never see the target and the bot follows waypoints instead.
-	if (is_gameplay != GAME_COLDSKULL && is_gameplay != GAME_KTS && is_gameplay != GAME_CTC && is_gameplay != GAME_CTF)
+	// Cold Skulls / KTS / CtC / CTF / Arena: v_goal is refreshed every tick
+	// by the pre-scan and the mode's Think function — don't wipe it here
+	// or the movement block will never see the target and the bot follows
+	// waypoints instead.
+	if (is_gameplay != GAME_COLDSKULL && is_gameplay != GAME_KTS && is_gameplay != GAME_CTC && is_gameplay != GAME_CTF && is_gameplay != GAME_ARENA)
 		pBot->v_goal = g_vecZero;
 	// is our goal ent still around?
 	if (pBot->pGoalEnt != NULL)
@@ -2838,7 +2893,19 @@ void BotThink( bot_t *pBot )
 				else if (ctfDist < 500.0f && FVisible(pBot->v_goal, pEdict))
 					ctfChase = true;
 			}
-			if (ktsDirectSteer || ktsBallChase || skullChase || ctcChase || ctfChase)
+			// Arena: direct-steer toward the opponent only at close range.
+			// At longer distances, rely on waypoint routing — FVisible
+			// can pass through windows/gaps the bot can't walk through.
+			bool arenaChase = false;
+			if (is_gameplay == GAME_ARENA && pBot->v_goal != g_vecZero)
+			{
+				float arenaDist = (pBot->v_goal - pEdict->v.origin).Length();
+				if (arenaDist < 300.0f)
+					arenaChase = true;
+				else if (arenaDist < 500.0f && FVisible(pBot->v_goal, pEdict))
+					arenaChase = true;
+			}
+			if (ktsDirectSteer || ktsBallChase || skullChase || ctcChase || ctfChase || arenaChase)
 				bGoGoal = true;
 			else if (goalDist < 256 && FVisible(pBot->v_goal, pEdict))
 				bGoGoal = true;
@@ -2892,6 +2959,33 @@ void BotThink( bot_t *pBot )
 		// send our movement toward our goal
 		pBot->f_move_speed = (pBot->f_max_speed) * (cos(dgrad));
 		pBot->f_strafe_speed = -(pBot->f_max_speed) * (sin(dgrad));
+	}
+
+	// Arena: apply movement variation AFTER synthesis (runs in both combat and seek phases)
+	if (is_gameplay == GAME_ARENA)
+	{
+		if (pBot->f_arena_vary_time < gpGlobals->time)
+		{
+			int speedRoll = RANDOM_LONG(1, 100);
+			if (speedRoll <= 40)
+				pBot->f_arena_speed_factor = 1.0f;
+			else if (speedRoll <= 65)
+				pBot->f_arena_speed_factor = 0.8f;
+			else if (speedRoll <= 85)
+				pBot->f_arena_speed_factor = 0.6f;
+			else
+			{
+				pBot->f_arena_speed_factor = 1.0f;
+				pEdict->v.button |= IN_JUMP; // speed burst with jump
+			}
+			// Tactical jump chance (~12%)
+			if (RANDOM_LONG(1, 100) <= 12)
+				pEdict->v.button |= IN_JUMP;
+			// Next variation in 0.5-2 seconds
+			pBot->f_arena_vary_time = gpGlobals->time + RANDOM_FLOAT(0.5f, 2.0f);
+		}
+		pBot->f_move_speed *= pBot->f_arena_speed_factor;
+		pBot->f_strafe_speed *= pBot->f_arena_speed_factor;
 	}
 
 	// stop moving if we're close to our goal

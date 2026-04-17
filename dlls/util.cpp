@@ -285,6 +285,15 @@ int UTIL_GetTeam(edict_t *pEntity)
 			return 1;
 		}
 
+		if (is_gameplay == GAME_ARENA)
+		{
+			// RADAR_ARENA_RED = 14, RADAR_ARENA_BLUE = 15
+			if (pEntity->v.fuser4 == 14)
+				return 2;
+
+			return 1;
+		}
+
 		char *infobuffer;
 		char model_name[32];
 		
