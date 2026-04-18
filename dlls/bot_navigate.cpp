@@ -44,6 +44,7 @@ extern bot_research_t g_Researched[2][NUM_RESEARCH_OPTIONS];
 extern char *RoleToString(int role);
 extern char *SubroleToString(int subrole);
 extern bool b_chat_debug;
+extern PATH *paths[MAX_WAYPOINTS];
 static FILE *fp;
 extern int is_gameplay;
 
@@ -430,6 +431,43 @@ bool BotHeadTowardWaypoint( bot_t *pBot )
 			i = WaypointFindReachable(pEdict, REACHABLE_RANGE, team);
 		}
 		
+		// If the nearest waypoint has no outgoing paths (dead-end / orphan),
+		// find the closest visible, same-level waypoint that DOES have paths.
+		if (i != -1 && paths[i] == NULL)
+		{
+			int best = -1;
+			float bestDist = 9999.0f;
+			TraceResult tr;
+			for (int w = 0; w < num_waypoints; w++)
+			{
+				if (w == i)
+					continue;
+				if (waypoints[w].flags & W_FL_DELETED)
+					continue;
+				if (waypoints[w].flags & W_FL_AIMING)
+					continue;
+				if (paths[w] == NULL)  // skip other dead-ends
+					continue;
+				// same level: within 45 units vertically
+				if (fabs(waypoints[w].origin.z - pEdict->v.origin.z) > 45.0f)
+					continue;
+				float dist = (waypoints[w].origin - pEdict->v.origin).Length();
+				if (dist > REACHABLE_RANGE || dist >= bestDist)
+					continue;
+				// must be visible
+				UTIL_TraceLine(pEdict->v.origin + pEdict->v.view_ofs,
+					waypoints[w].origin, ignore_monsters,
+					pEdict->v.pContainingEntity, &tr);
+				if (tr.flFraction >= 1.0)
+				{
+					best = w;
+					bestDist = dist;
+				}
+			}
+			if (best != -1)
+				i = best;
+		}
+		
 		if (i == -1)
 		{
 			pBot->curr_waypoint_index = -1;
@@ -527,6 +565,7 @@ bool BotHeadTowardWaypoint( bot_t *pBot )
 	// our waypoint time allows all of this
 	if ((pBot->waypoint_goal == -1 || pBot->b_engaging_enemy || is_gameplay == GAME_KTS ||
 		is_gameplay == GAME_COLDSKULL || is_gameplay == GAME_CTC || is_gameplay == GAME_CTF ||
+		is_gameplay == GAME_ARENA ||
 		(pBot->role == ROLE_ATTACK &&
 		pBot->subrole == ROLE_SUB_DEF_ALLY) || (pBot->role == ROLE_DEFEND &&
 		(pBot->subrole == ROLE_SUB_DEF_SCIS || pBot->subrole == ROLE_SUB_DEF_RSRC) && pBot->pGoalEnt &&
@@ -536,7 +575,7 @@ bool BotHeadTowardWaypoint( bot_t *pBot )
 		// tracking something, pick goal much more often
 		if (pBot->b_engaging_enemy || pBot->pGoalEnt != NULL || pBot->v_defend != g_vecZero ||
 			pBot->defend_wpt != -1 || is_gameplay == GAME_KTS || is_gameplay == GAME_COLDSKULL ||
-			is_gameplay == GAME_CTC || is_gameplay == GAME_CTF)
+			is_gameplay == GAME_CTC || is_gameplay == GAME_CTF || is_gameplay == GAME_ARENA)
 			pBot->f_waypoint_goal_time = gpGlobals->time + 0.5;
 		else // don't pick a goal more often than every 120 seconds...
 			pBot->f_waypoint_goal_time = gpGlobals->time + 120.0;
@@ -602,6 +641,20 @@ bool BotHeadTowardWaypoint( bot_t *pBot )
 			// or role changed), snap curr_waypoint_index to nearest
 			// reachable so the bot doesn't walk to a stale waypoint.
 			if (is_gameplay == GAME_CTF && index != pBot->waypoint_goal)
+			{
+				int fresh = WaypointFindReachable(pEdict, REACHABLE_RANGE, team);
+				if (fresh != -1)
+				{
+					pBot->curr_waypoint_index = fresh;
+					pBot->waypoint_origin = waypoints[fresh].origin;
+					pBot->f_waypoint_time = gpGlobals->time;
+				}
+			}
+
+			// Arena: same waypoint reset — when the goal changes (opponent
+			// moved), snap curr_waypoint_index to nearest reachable so
+			// the bot doesn't walk to a stale waypoint.
+			if (is_gameplay == GAME_ARENA && index != pBot->waypoint_goal)
 			{
 				int fresh = WaypointFindReachable(pEdict, REACHABLE_RANGE, team);
 				if (fresh != -1)
@@ -893,6 +946,48 @@ bool BotHeadTowardWaypoint( bot_t *pBot )
 			
 			if (status == FALSE)
 			{
+				// Dead-end escape: current waypoint has no outgoing paths.
+				// Find the closest visible, same-level waypoint that has paths.
+				if (pBot->curr_waypoint_index != -1 && paths[pBot->curr_waypoint_index] == NULL)
+				{
+					int escape = -1;
+					float escapeDist = 9999.0f;
+					TraceResult tr;
+					for (int w = 0; w < num_waypoints; w++)
+					{
+						if (w == pBot->curr_waypoint_index)
+							continue;
+						if (waypoints[w].flags & W_FL_DELETED)
+							continue;
+						if (waypoints[w].flags & W_FL_AIMING)
+							continue;
+						if (paths[w] == NULL)
+							continue;
+						if (fabs(waypoints[w].origin.z - pEdict->v.origin.z) > 45.0f)
+							continue;
+						float dist = (waypoints[w].origin - pEdict->v.origin).Length();
+						if (dist > REACHABLE_RANGE || dist >= escapeDist)
+							continue;
+						UTIL_TraceLine(pEdict->v.origin + pEdict->v.view_ofs,
+							waypoints[w].origin, ignore_monsters,
+							pEdict->v.pContainingEntity, &tr);
+						if (tr.flFraction >= 1.0)
+						{
+							escape = w;
+							escapeDist = dist;
+						}
+					}
+					if (escape != -1)
+					{
+						pBot->curr_waypoint_index = escape;
+						pBot->waypoint_origin = waypoints[escape].origin;
+						pBot->f_waypoint_time = gpGlobals->time;
+						for (index = 0; index < 5; index++)
+							pBot->prev_waypoint_index[index] = -1;
+						return TRUE;
+					}
+				}
+
 				if (b_chat_debug)
 				{
 					sprintf(pBot->debugchat, "BotHeadTowardWaypoint fail\n");
@@ -1850,6 +1945,55 @@ int BotFindWaypointGoal( bot_t *pBot )
 		return -1;
 	}
 
+	// Arena (1v1): route toward the opponent's position.
+	// The bot knows where its opponent is at all times — find the nearest
+	// waypoint to the opponent by pure distance so Floyd routing can
+	// advance hop-by-hop across the entire map.
+	if (is_gameplay == GAME_ARENA)
+	{
+		int botTeam = UTIL_GetTeam(pEdict);
+		edict_t *pOpponent = NULL;
+		for (int p = 1; p <= gpGlobals->maxClients; p++)
+		{
+			edict_t *pPlayer = INDEXENT(p);
+			if (FNullEnt(pPlayer) || pPlayer == pEdict)
+				continue;
+			if (!IsAlive(pPlayer))
+				continue;
+			if (pPlayer->v.flags & FL_SPECTATOR)
+				continue;
+			if (UTIL_GetTeam(pPlayer) != botTeam)
+			{
+				pOpponent = pPlayer;
+				break;
+			}
+		}
+
+		if (pOpponent)
+		{
+			Vector vecTarget = pOpponent->v.origin;
+			pBot->v_goal = vecTarget;
+
+			// Find nearest waypoint to opponent by pure distance (no LOS).
+			float nearDist = 9e9f;
+			for (int w = 0; w < num_waypoints; w++)
+			{
+				if (waypoints[w].flags & W_FL_DELETED) continue;
+				if (waypoints[w].flags & W_FL_AIMING)  continue;
+				float d = (waypoints[w].origin - vecTarget).Length();
+				if (d < nearDist) { nearDist = d; index = w; }
+			}
+
+			if (index != -1)
+			{
+				pBot->wpt_goal_type = WPT_GOAL_LOCATION;
+				pBot->waypoint_goal = index;
+				return index;
+			}
+
+			return -1;
+		}
+	}
 	if (random < health_chance)
 	{	// look for health if we're pretty dead
 		index = WaypointFindNearestGoal(pEdict, pBot->curr_waypoint_index,

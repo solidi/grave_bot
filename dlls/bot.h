@@ -399,6 +399,11 @@ typedef struct
 	int   i_ctf_role;              // current CTF role (CTF_ROLE_*)
 	float f_ctf_role_eval_time;    // timer for re-evaluating CTF role
 
+	// Arena (1v1) — active opponent and movement variation state
+	int   i_arena_opponent;        // entity index of the 1v1 opponent (cached per round)
+	float f_arena_vary_time;       // timer for next speed/movement variation event
+	float f_arena_speed_factor;    // post-synthesis speed multiplier (0.6-1.0)
+
 	// Multi-jump toward elevated goals (general purpose)
 	int   i_goal_jump_phase;       // 0=none, 1=1st jump fired, 2=2nd jump pending, 3=3rd jump pending
 	float f_goal_jump_time;        // next time the bot may fire the next jump phase
