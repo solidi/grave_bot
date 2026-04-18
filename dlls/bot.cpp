@@ -332,10 +332,7 @@ void BotSpawnInit( bot_t *pBot )
 
 	// Clear per-life Arena (1v1) state.
 	pBot->i_arena_opponent             = 0;
-	pBot->f_arena_seek_time            = 0.0f;
 	pBot->f_arena_vary_time            = 0.0f;
-	pBot->i_arena_approach_style       = 0;
-	pBot->f_arena_approach_switch_time = 0.0f;
 	pBot->f_arena_speed_factor         = 1.0f;
 
 	// Clear multi-jump state.
