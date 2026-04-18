@@ -798,17 +798,13 @@ void BotArenaPreUpdate( bot_t *pBot )
 // BotArenaThink — called from BotThink when in Arena (1v1)
 // mode and no combat is active.
 //
-// Seeks the opponent using three approach styles to prevent
-// both bots from looping the same path at the same speed:
-//   0 = direct  (60%) — waypoint nearest opponent
-//   1 = flank   (25%) — offset waypoint for angle variety
-//   2 = wander  (15%) — random waypoint to desynchronize
+// Validates the cached Arena opponent and, when valid, keeps
+// the bot's goal pointed at that opponent so the normal
+// movement/direction code can continue pursuing them.
 //
-// Also varies movement speed and adds tactical jumps to
-// break velocity symmetry.
-//
-// Returns true when movement intent has been set; false to
-// fall back to normal nav.
+// Returns true when a valid Arena opponent is available and
+// v_goal/f_goal_proximity have been refreshed; false to fall
+// back to normal navigation behavior.
 //=========================================================
 bool BotArenaThink( bot_t *pBot )
 {
@@ -1499,7 +1495,7 @@ edict_t *BotFindEnemy( bot_t *pBot )
 		else if ((!FInViewCone( &vecEnd, pEdict ) ||
 			!FVisible( vecEnd, pEdict )) && (!pBot->b_engaging_enemy || is_gameplay == GAME_CTF || is_gameplay == GAME_ARENA))
 		{	// remember our enemy for 2 seconds even if they're not visible
-			// Arena: extend to 5 seconds — never fully forget the sole opponent
+			// Arena: extend the remember window to 5 seconds for the sole opponent
 			float rememberWindow = (is_gameplay == GAME_ARENA) ? 5.0f : 2.0f;
 			if (pBot->f_bot_see_enemy_time > (gpGlobals->time - rememberWindow))
 				pRemember = pBot->pBotEnemy;
@@ -2199,7 +2195,7 @@ bool BotFireWeapon(Vector v_enemy, bot_t *pBot, int weapon_choice, bool nofire)
 		iId = pSelect[final_index].iId;
 
 		// select this weapon if it isn't already selected
-		if (is_gameplay != GAME_CTC && is_gameplay != GAME_ARENA && pBot->current_weapon.iId != iId/* && g_flWeaponSwitch <= gpGlobals->time*/)
+		if (is_gameplay != GAME_CTC && pBot->current_weapon.iId != iId/* && g_flWeaponSwitch <= gpGlobals->time*/)
 		{
 			//ALERT(at_console, "Switch weapon\n");
 			//g_flWeaponSwitch = gpGlobals->time + 1.0;

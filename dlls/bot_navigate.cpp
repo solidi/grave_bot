@@ -1969,38 +1969,31 @@ int BotFindWaypointGoal( bot_t *pBot )
 			}
 		}
 
-		if (!pOpponent)
+		if (pOpponent)
 		{
-			// Opponent is temporarily dead — fall through to normal
-			// FFA waypoint logic so the bot keeps navigating instead
-			// of standing still with no goal.
-			goto arena_fallthrough;
+			Vector vecTarget = pOpponent->v.origin;
+			pBot->v_goal = vecTarget;
+
+			// Find nearest waypoint to opponent by pure distance (no LOS).
+			float nearDist = 9e9f;
+			for (int w = 0; w < num_waypoints; w++)
+			{
+				if (waypoints[w].flags & W_FL_DELETED) continue;
+				if (waypoints[w].flags & W_FL_AIMING)  continue;
+				float d = (waypoints[w].origin - vecTarget).Length();
+				if (d < nearDist) { nearDist = d; index = w; }
+			}
+
+			if (index != -1)
+			{
+				pBot->wpt_goal_type = WPT_GOAL_LOCATION;
+				pBot->waypoint_goal = index;
+				return index;
+			}
+
+			return -1;
 		}
-
-		Vector vecTarget = pOpponent->v.origin;
-		pBot->v_goal = vecTarget;
-
-		// Find nearest waypoint to opponent by pure distance (no LOS).
-		float nearDist = 9e9f;
-		for (int w = 0; w < num_waypoints; w++)
-		{
-			if (waypoints[w].flags & W_FL_DELETED) continue;
-			if (waypoints[w].flags & W_FL_AIMING)  continue;
-			float d = (waypoints[w].origin - vecTarget).Length();
-			if (d < nearDist) { nearDist = d; index = w; }
-		}
-
-		if (index != -1)
-		{
-			pBot->wpt_goal_type = WPT_GOAL_LOCATION;
-			pBot->waypoint_goal = index;
-			return index;
-		}
-
-		return -1;
 	}
-
-arena_fallthrough:
 	if (random < health_chance)
 	{	// look for health if we're pretty dead
 		index = WaypointFindNearestGoal(pEdict, pBot->curr_waypoint_index,

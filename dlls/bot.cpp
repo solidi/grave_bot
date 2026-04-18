@@ -2248,7 +2248,7 @@ void BotThink( bot_t *pBot )
 			}
 			else if (is_gameplay == GAME_ARENA && BotArenaThink(pBot))
 			{
-				// BotArenaThink sets v_goal + f_move_speed for arena opponent seeking.
+				// BotArenaThink sets v_goal + f_goal_proximity for arena opponent seeking.
 			}
 			else if (pBot->pBotPickupItem)
 			{
