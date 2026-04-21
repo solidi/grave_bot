@@ -2012,9 +2012,9 @@ int BotFindWaypointGoal( bot_t *pBot )
 	}
 
 	// Cold Spot: route toward the scoring zone.  v_goal is set every tick
-	// by BotColdSpotPreUpdate to the coldspot entity origin (or slightly
-	// offset for DEFENDER's perimeter), so all roles share the same
-	// "nearest waypoint by distance" routing.
+	// by BotColdSpotPreUpdate to the current Cold Spot target position,
+ 	// and all roles share the same "nearest waypoint by distance"
+ 	// routing toward that target.
 	if (is_gameplay == GAME_COLDSPOT)
 	{
 		Vector vecTarget = pBot->v_goal;
@@ -2035,7 +2035,12 @@ int BotFindWaypointGoal( bot_t *pBot )
 			if (index != -1)
 			{
 				pBot->wpt_goal_type = WPT_GOAL_LOCATION;
-				pBot->waypoint_goal = index;
+				// NOTE: do NOT assign pBot->waypoint_goal here — the caller
+				// (BotHeadTowardWaypoint) compares `index` against the previous
+				// `pBot->waypoint_goal` to detect a goal change and snap
+				// curr_waypoint_index to the nearest reachable waypoint.  If we
+				// mutate waypoint_goal first, that compare is always false and
+				// stale routing is never cleared after a spot relocation.
 				return index;
 			}
 		}
