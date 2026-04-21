@@ -163,6 +163,15 @@ enum
 	CTF_ROLE_SEEKER      // go grab enemy flag
 };
 
+enum
+{
+	CSPOT_ROLE_NONE = 0,
+	CSPOT_ROLE_SEEKER,     // no other bot in zone, go take the spot
+	CSPOT_ROLE_HOLDER,     // already in zone, stay to score
+	CSPOT_ROLE_DEFENDER,   // ally scoring in zone, approach perimeter to intercept
+	CSPOT_ROLE_HUNTER      // enemy holding zone, rush in to clear
+};
+
 extern double pi;
 
 typedef struct
@@ -408,6 +417,12 @@ typedef struct
 	int   i_goal_jump_phase;       // 0=none, 1=1st jump fired, 2=2nd jump pending, 3=3rd jump pending
 	float f_goal_jump_time;        // next time the bot may fire the next jump phase
 	float f_goal_jump_stall_time;  // time the bot first detected it was close but below the goal
+
+	// Cold Spot — zone-hold state
+	int   i_coldspot_role;           // current role (CSPOT_ROLE_*)
+	float f_coldspot_role_eval_time; // timer for re-evaluating role
+	float f_coldspot_last_in_zone;   // last gpGlobals->time the bot was inside the 256u zone
+	Vector v_coldspot_last_origin;   // last known coldspot origin (for relocation detection)
 
 } bot_t;
 

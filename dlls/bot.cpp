@@ -340,6 +340,12 @@ void BotSpawnInit( bot_t *pBot )
 	pBot->f_goal_jump_time      = 0.0f;
 	pBot->f_goal_jump_stall_time = 0.0f;
 
+	// Clear per-life Cold Spot state.
+	pBot->i_coldspot_role           = CSPOT_ROLE_NONE;
+	pBot->f_coldspot_role_eval_time = 0.0f;
+	pBot->f_coldspot_last_in_zone   = 0.0f;
+	pBot->v_coldspot_last_origin    = g_vecZero;
+
 	pBot->respawn_time = 0;
 	pBot->respawn_set = FALSE;
 	pBot->b_hasgrenade = FALSE;
@@ -1868,6 +1874,8 @@ void BotThink( bot_t *pBot )
 		BotCtfPreUpdate(pBot);
 	else if (is_gameplay == GAME_ARENA)
 		BotArenaPreUpdate(pBot);
+	else if (is_gameplay == GAME_COLDSPOT)
+		BotColdSpotPreUpdate(pBot);
 
 	// it is time to look for a waypoint AND
 	// there are waypoints in this level...
@@ -2088,6 +2096,14 @@ void BotThink( bot_t *pBot )
 			BotArenaPreUpdate(pBot);
 		}
 
+		// Cold Spot: refresh entity cache, evaluate role, and pre-set v_goal
+		// toward the scoring zone BEFORE BotFindEnemy so the movement block
+		// always has a target, and so enemies in the zone are prioritized.
+		if (is_gameplay == GAME_COLDSPOT)
+		{
+			BotColdSpotPreUpdate(pBot);
+		}
+
 		if (b_botdontshoot == 0)
 		{
 			pBot->pBotEnemy = BotFindEnemy( pBot );
@@ -2227,6 +2243,13 @@ void BotThink( bot_t *pBot )
 				pBot->item_waypoint  = -1;
 			}
 
+			// Cold Spot: same clearing pattern — navigation handled by BotColdSpotThink.
+			if (is_gameplay == GAME_COLDSPOT && pBot->pBotPickupItem)
+			{
+				pBot->pBotPickupItem = NULL;
+				pBot->item_waypoint  = -1;
+			}
+
 			if (is_gameplay == GAME_KTS && BotKtsThink(pBot))
 			{
 				// BotKtsThink sets v_goal + f_move_speed for all KTS cases.
@@ -2246,6 +2269,10 @@ void BotThink( bot_t *pBot )
 			else if (is_gameplay == GAME_ARENA && BotArenaThink(pBot))
 			{
 				// BotArenaThink sets v_goal + f_goal_proximity for arena opponent seeking.
+			}
+			else if (is_gameplay == GAME_COLDSPOT && BotColdSpotThink(pBot))
+			{
+				// BotColdSpotThink sets v_goal + f_move_speed for all Cold Spot cases.
 			}
 			else if (pBot->pBotPickupItem)
 			{
@@ -2698,11 +2725,11 @@ void BotThink( bot_t *pBot )
 	}
 
 	// always forget goal
-	// Cold Skulls / KTS / CtC / CTF / Arena: v_goal is refreshed every tick
-	// by the pre-scan and the mode's Think function — don't wipe it here
-	// or the movement block will never see the target and the bot follows
-	// waypoints instead.
-	if (is_gameplay != GAME_COLDSKULL && is_gameplay != GAME_KTS && is_gameplay != GAME_CTC && is_gameplay != GAME_CTF && is_gameplay != GAME_ARENA)
+	// Cold Skulls / KTS / CtC / CTF / Arena / Cold Spot: v_goal is refreshed
+	// every tick by the pre-scan and the mode's Think function — don't wipe
+	// it here or the movement block will never see the target and the bot
+	// follows waypoints instead.
+	if (is_gameplay != GAME_COLDSKULL && is_gameplay != GAME_KTS && is_gameplay != GAME_CTC && is_gameplay != GAME_CTF && is_gameplay != GAME_ARENA && is_gameplay != GAME_COLDSPOT)
 		pBot->v_goal = g_vecZero;
 	// is our goal ent still around?
 	if (pBot->pGoalEnt != NULL)
@@ -2902,7 +2929,20 @@ void BotThink( bot_t *pBot )
 				else if (arenaDist < 500.0f && FVisible(pBot->v_goal, pEdict))
 					arenaChase = true;
 			}
-			if (ktsDirectSteer || ktsBallChase || skullChase || ctcChase || ctfChase || arenaChase)
+			// Cold Spot: direct-steer toward the scoring zone on final
+			// approach.  Two tiers mirror CTF: very close regardless of
+			// visibility (< 128u) so bots don't stall at the last waypoint
+			// inside the zone, and visible approach up to 500u.
+			bool coldspotChase = false;
+			if (is_gameplay == GAME_COLDSPOT && pBot->v_goal != g_vecZero)
+			{
+				float csDist = (pBot->v_goal - pEdict->v.origin).Length();
+				if (csDist < 128.0f)
+					coldspotChase = true;
+				else if (csDist < 500.0f && FVisible(pBot->v_goal, pEdict))
+					coldspotChase = true;
+			}
+			if (ktsDirectSteer || ktsBallChase || skullChase || ctcChase || ctfChase || arenaChase || coldspotChase)
 				bGoGoal = true;
 			else if (goalDist < 256 && FVisible(pBot->v_goal, pEdict))
 				bGoGoal = true;

@@ -1374,6 +1374,328 @@ bool BotKtsThink( bot_t *pBot )
 }
 
 
+//=========================================================
+// Cold Spot — zone-hold mode
+//
+// Gamerules: a single "coldspot" entity spawns on the map
+// (classname "coldspot", pev->fuser4 == RADAR_COLD_SPOT).
+// Players within 256 units, alive, with clear line of sight
+// to the spot center earn team points every 2 seconds.  If
+// both teams are present the zone is contested and nobody
+// scores.  The spot may relocate during the match.
+//=========================================================
+#define RADAR_COLD_SPOT        5
+#define CSPOT_ZONE_RADIUS      256.0f
+#define CSPOT_HOLDER_RADIUS    128.0f
+#define CSPOT_DEFEND_RADIUS    200.0f
+#define CSPOT_NEARBY_RADIUS    512.0f
+#define CSPOT_DIRECT_STEER     300.0f
+
+static float   s_coldspot_cache_time = -1.0f;
+static edict_t *s_pColdSpot = NULL;
+
+static void BotColdSpotFindEntity()
+{
+	if (s_coldspot_cache_time == gpGlobals->time)
+		return;
+
+	s_coldspot_cache_time = gpGlobals->time;
+	s_pColdSpot = NULL;
+
+	edict_t *pEnt = NULL;
+	while ((pEnt = UTIL_FindEntityByClassname(pEnt, "coldspot")) != NULL)
+	{
+		if ((int)pEnt->v.fuser4 == RADAR_COLD_SPOT)
+		{
+			s_pColdSpot = pEnt;
+			break;
+		}
+	}
+}
+
+static edict_t *BotColdSpotGetEntity()
+{
+	BotColdSpotFindEntity();
+	return s_pColdSpot;
+}
+
+// Find the nearest living enemy player inside the scoring zone so HOLDER
+// bots can face the most pressing intruder.  Returns NULL when the zone
+// is clear of enemies.
+static edict_t *BotColdSpotFindZoneIntruder( edict_t *pSpot, int botTeam )
+{
+	if (FNullEnt(pSpot))
+		return NULL;
+
+	edict_t *pBest = NULL;
+	float flBestDist = CSPOT_ZONE_RADIUS + 1.0f;
+	for (int i = 1; i <= gpGlobals->maxClients; i++)
+	{
+		edict_t *pPlayer = INDEXENT(i);
+		if (!pPlayer || pPlayer->free || !(pPlayer->v.flags & FL_CLIENT))
+			continue;
+		if (!IsAlive(pPlayer))
+			continue;
+		if (pPlayer->v.iuser1)
+			continue;
+		if (UTIL_GetTeam(pPlayer) == botTeam)
+			continue;
+		float d = (pPlayer->v.origin - pSpot->v.origin).Length();
+		if (d < flBestDist)
+		{
+			flBestDist = d;
+			pBest = pPlayer;
+		}
+	}
+	return pBest;
+}
+
+//=========================================================
+// BotColdSpotPreUpdate — called from bot.cpp BEFORE
+// BotFindEnemy every frame in Cold Spot mode.
+//
+// Refreshes the entity cache, detects spot relocation (to
+// invalidate stale waypoint routing), evaluates the bot's
+// role at ~0.75s intervals, and pre-sets v_goal so the
+// movement block always has a current destination even on
+// ticks where the enemy branch runs instead of the Think.
+//=========================================================
+void BotColdSpotPreUpdate( bot_t *pBot )
+{
+	if (is_gameplay != GAME_COLDSPOT)
+		return;
+
+	edict_t *pSpot = BotColdSpotGetEntity();
+	if (FNullEnt(pSpot))
+		return;
+
+	edict_t *pEdict = pBot->pEdict;
+	int botTeam = UTIL_GetTeam(pEdict);
+
+	// Detect spot relocation — wipe stale waypoint routing so the bot
+	// re-pathfinds to the new origin on the next BotHeadTowardWaypoint.
+	// Clear every field that could otherwise pin the bot to the old
+	// spot's waypoint: curr_waypoint_index, the prev-waypoint history,
+	// route-tracking timers, and any lingering goal or pause state.
+	Vector vecSpot = pSpot->v.origin;
+	if (pBot->v_coldspot_last_origin != g_vecZero &&
+		(pBot->v_coldspot_last_origin - vecSpot).Length() > 32.0f)
+	{
+		pBot->waypoint_goal        = -1;
+		pBot->old_waypoint_goal    = -1;
+		pBot->f_waypoint_goal_time = 0.0f;
+		pBot->curr_waypoint_index  = -1;
+		pBot->f_waypoint_time      = 0.0f;
+		pBot->prev_waypoint_distance = 0.0f;
+		for (int p = 0; p < 5; p++)
+			pBot->prev_waypoint_index[p] = -1;
+		pBot->f_pause_time         = 0.0f;
+		pBot->wpt_goal_type        = WPT_GOAL_NONE;
+	}
+	pBot->v_coldspot_last_origin = vecSpot;
+
+	float botDist = (pEdict->v.origin - vecSpot).Length();
+	bool  bInZone = (botDist < CSPOT_ZONE_RADIUS);
+	if (bInZone)
+		pBot->f_coldspot_last_in_zone = gpGlobals->time;
+
+	// Role evaluation — throttled to ~0.75s.
+	if (pBot->f_coldspot_role_eval_time < gpGlobals->time)
+	{
+		pBot->f_coldspot_role_eval_time = gpGlobals->time + 0.75f;
+
+		int  enemiesInZone = 0;
+		int  alliesInZone  = 0;
+
+		for (int i = 1; i <= gpGlobals->maxClients; i++)
+		{
+			edict_t *pPlayer = INDEXENT(i);
+			if (!pPlayer || pPlayer->free || !(pPlayer->v.flags & FL_CLIENT))
+				continue;
+			if (pPlayer == pEdict)
+				continue;
+			if (!IsAlive(pPlayer) || pPlayer->v.iuser1)
+				continue;
+			if ((pPlayer->v.origin - vecSpot).Length() > CSPOT_ZONE_RADIUS)
+				continue;
+			if (UTIL_GetTeam(pPlayer) == botTeam)
+				alliesInZone++;
+			else
+				enemiesInZone++;
+		}
+
+		if (bInZone && enemiesInZone > 0)
+			pBot->i_coldspot_role = CSPOT_ROLE_HOLDER;       // kill intruders, stay
+		else if (bInZone)
+			pBot->i_coldspot_role = CSPOT_ROLE_HOLDER;       // keep scoring
+		else if (!bInZone && enemiesInZone > 0 && alliesInZone == 0)
+			pBot->i_coldspot_role = CSPOT_ROLE_HUNTER;       // rush in to clear
+		else if (!bInZone && alliesInZone > 0 && enemiesInZone == 0)
+			pBot->i_coldspot_role = CSPOT_ROLE_DEFENDER;     // cover perimeter
+		else
+			pBot->i_coldspot_role = CSPOT_ROLE_SEEKER;       // take the spot
+	}
+
+	// Pre-set v_goal so the movement block heads somewhere sane every frame,
+	// even on ticks where combat runs instead of BotColdSpotThink.  The
+	// target and proximity must match the evaluated role so that combat-tick
+	// routing doesn't contradict BotColdSpotThink (e.g. a DEFENDER getting
+	// direct-steered into the zone and causing a contest).
+	switch (pBot->i_coldspot_role)
+	{
+	case CSPOT_ROLE_HOLDER:
+		pBot->v_goal           = vecSpot;
+		pBot->f_goal_proximity = CSPOT_HOLDER_RADIUS;
+		break;
+
+	case CSPOT_ROLE_DEFENDER:
+	{
+		// Perimeter point between the bot and the spot — same offset logic
+		// used by BotColdSpotThink for DEFENDER so both paths agree.
+		Vector vecToSpot = pEdict->v.origin - vecSpot;
+		if (vecToSpot.Length() < 1.0f)
+			pBot->v_goal = vecSpot;
+		else
+			pBot->v_goal = vecSpot + vecToSpot.Normalize() * CSPOT_DEFEND_RADIUS;
+		pBot->f_goal_proximity = 64.0f;
+		break;
+	}
+
+	case CSPOT_ROLE_HUNTER:
+	case CSPOT_ROLE_SEEKER:
+	default:
+		pBot->v_goal           = vecSpot;
+		pBot->f_goal_proximity = 0.0f;
+		break;
+	}
+
+	// Advance the multi-jump sequence toward the spot even on combat ticks
+	// (when BotColdSpotThink is skipped).  Without this, a bot engaged with
+	// an enemy while standing directly below an elevated coldspot never
+	// progresses through the double/triple-jump phases and can never reach
+	// the scoring zone.  DEFENDER intentionally stays on the perimeter so
+	// don't try to jump up to the spot for that role.
+	if (pBot->i_coldspot_role != CSPOT_ROLE_DEFENDER)
+		BotGoalElevatedJump(pBot, vecSpot);
+
+	// Suppress random item detours — the spot is the objective.
+	pBot->pBotPickupItem = NULL;
+	pBot->item_waypoint  = -1;
+}
+
+//=========================================================
+// BotColdSpotThink — called from BotThink when in Cold Spot
+// mode and no combat is active.
+//
+// Role-based movement:
+//  SEEKER   — no bot in zone → rush the spot
+//  HUNTER   — enemy in zone → rush the spot to clear them
+//  HOLDER   — bot is in zone → stay near center, face nearest threat
+//  DEFENDER — ally scoring alone → patrol the perimeter
+//
+// Returns true when movement intent has been set; false to
+// fall back to normal nav (e.g. if no spot exists yet).
+//=========================================================
+bool BotColdSpotThink( bot_t *pBot )
+{
+	if (is_gameplay != GAME_COLDSPOT)
+		return false;
+
+	edict_t *pSpot = BotColdSpotGetEntity();
+	if (FNullEnt(pSpot))
+		return false;
+
+	edict_t *pEdict = pBot->pEdict;
+	int botTeam = UTIL_GetTeam(pEdict);
+
+	Vector vecSpot = pSpot->v.origin;
+	float  botDist = (pEdict->v.origin - vecSpot).Length();
+
+	pBot->f_pause_time = 0;
+
+	switch (pBot->i_coldspot_role)
+	{
+	// =================================================================
+	// HOLDER — stay inside the zone to score
+	// =================================================================
+	case CSPOT_ROLE_HOLDER:
+	{
+		// Anchor toward the spot center.  If far enough from center,
+		// keep moving in; once inside holder radius, slow to a prowl so
+		// the bot can acquire enemies without drifting out of LoS.
+		if (botDist > CSPOT_HOLDER_RADIUS)
+		{
+			pBot->f_move_speed     = pBot->f_max_speed;
+			pBot->v_goal           = vecSpot;
+			pBot->f_goal_proximity = CSPOT_HOLDER_RADIUS * 0.5f;
+		}
+		else
+		{
+			pBot->f_move_speed     = pBot->f_max_speed * 0.35f;
+			pBot->v_goal           = vecSpot;
+			pBot->f_goal_proximity = CSPOT_HOLDER_RADIUS;
+		}
+
+		// Face the nearest zone intruder if any; otherwise face the
+		// center so the bot keeps LoS to the scoring point.
+		edict_t *pIntruder = BotColdSpotFindZoneIntruder(pSpot, botTeam);
+		Vector   vecFace   = pIntruder ? pIntruder->v.origin : vecSpot;
+		Vector   vecDir    = vecFace - pEdict->v.origin;
+		if (vecDir.Length() > 1.0f)
+		{
+			Vector angles = UTIL_VecToAngles(vecDir);
+			pEdict->v.ideal_yaw = angles.y;
+			BotFixIdealYaw(pEdict);
+		}
+
+		BotGoalElevatedJump(pBot, vecSpot);
+		return true;
+	}
+
+	// =================================================================
+	// DEFENDER — patrol perimeter so ally in zone can keep scoring
+	// =================================================================
+	case CSPOT_ROLE_DEFENDER:
+	{
+		pBot->f_move_speed = pBot->f_max_speed;
+
+		// Aim for a perimeter point between the bot and the spot so the
+		// bot stays outside the scoring circle (avoids turning into a
+		// contest) but within engagement range.
+		Vector vecToSpot = pEdict->v.origin - vecSpot;
+		if (vecToSpot.Length() < 1.0f)
+		{
+			pBot->v_goal = vecSpot;
+		}
+		else
+		{
+			vecToSpot = vecToSpot.Normalize();
+			pBot->v_goal = vecSpot + vecToSpot * CSPOT_DEFEND_RADIUS;
+		}
+		pBot->f_goal_proximity = 64.0f;
+
+		BotGoalElevatedJump(pBot, vecSpot);
+		return true;
+	}
+
+	// =================================================================
+	// HUNTER / SEEKER — rush the spot
+	// =================================================================
+	case CSPOT_ROLE_HUNTER:
+	case CSPOT_ROLE_SEEKER:
+	default:
+	{
+		pBot->f_move_speed     = pBot->f_max_speed;
+		pBot->v_goal           = vecSpot;
+		pBot->f_goal_proximity = 0.0f;
+
+		BotGoalElevatedJump(pBot, vecSpot);
+		return true;
+	}
+	}
+}
+
+
 edict_t *BotFindEnemy( bot_t *pBot )
 {
 //	ALERT(at_console, "BotFindEnemy\n");
@@ -1697,6 +2019,24 @@ edict_t *BotFindEnemy( bot_t *pBot )
 					FVisible( vecEnd, pEdict ))
 				{
 					float distance = (pPlayer->v.origin - pEdict->v.origin).Length();
+
+					// Cold Spot: prefer enemies inside or near the scoring zone
+					// over random frag targets by shrinking their effective
+					// selection distance.  Large bonus for in-zone intruders,
+					// smaller bonus for perimeter threats.
+					if (is_gameplay == GAME_COLDSPOT)
+					{
+						edict_t *pSpot = BotColdSpotGetEntity();
+						if (!FNullEnt(pSpot))
+						{
+							float spotDist = (pPlayer->v.origin - pSpot->v.origin).Length();
+							if (spotDist < CSPOT_ZONE_RADIUS)
+								distance -= 1500.0f;
+							else if (spotDist < CSPOT_NEARBY_RADIUS)
+								distance -= 500.0f;
+						}
+					}
+
 					if (distance < nearestdistance)
 					{
 						nearestdistance = distance;
@@ -1712,8 +2052,9 @@ edict_t *BotFindEnemy( bot_t *pBot )
 	if (pNewEnemy == NULL && pRemember != NULL)
 		pNewEnemy = pRemember;
 	// are we engaging an enemy?  Don't forget about them
-	// In CTF, let the enemy go so the bot returns to objective play.
-	if (pNewEnemy == NULL && pBot->b_engaging_enemy && pBot->pBotEnemy != NULL && is_gameplay != GAME_CTF && is_gameplay != GAME_ARENA)
+	// In CTF / Arena / Cold Spot, let the enemy go so the bot returns to objective play.
+	if (pNewEnemy == NULL && pBot->b_engaging_enemy && pBot->pBotEnemy != NULL
+		&& is_gameplay != GAME_CTF && is_gameplay != GAME_ARENA && is_gameplay != GAME_COLDSPOT)
 		pNewEnemy = pBot->pBotEnemy;
 
 	if (pNewEnemy)
