@@ -1569,6 +1569,15 @@ void BotColdSpotPreUpdate( bot_t *pBot )
 		break;
 	}
 
+	// Advance the multi-jump sequence toward the spot even on combat ticks
+	// (when BotColdSpotThink is skipped).  Without this, a bot engaged with
+	// an enemy while standing directly below an elevated coldspot never
+	// progresses through the double/triple-jump phases and can never reach
+	// the scoring zone.  DEFENDER intentionally stays on the perimeter so
+	// don't try to jump up to the spot for that role.
+	if (pBot->i_coldspot_role != CSPOT_ROLE_DEFENDER)
+		BotGoalElevatedJump(pBot, vecSpot);
+
 	// Suppress random item detours — the spot is the objective.
 	pBot->pBotPickupItem = NULL;
 	pBot->item_waypoint  = -1;
