@@ -24,6 +24,8 @@
 #endif
 
 #include <ctime>
+#include <cstdlib>
+#include <cmath>
 #include "bot.h"
 #include "bot_func.h"
 #include "bot_weapons.h"
@@ -142,6 +144,11 @@ float msecval;
 cvar_t sv_bot = {"gravebot",""};
 cvar_t sv_defaultbots = {"sv_defaultbots","0"};
 cvar_t sv_botsmelee = {"sv_botsmelee","1"};
+
+// Master scalar for combat lethality (aim error + reaction delay).
+// 0.0 = perfect aim / instant reaction (hardest), 1.0 = tuned human feel,
+// 2.0 = very sloppy (easiest).  Clamped on read.
+float bot_aim_difficulty = 1.0f;
 
 char *show_menu_1 =
    {"Waypoint Tags\n\n1. Team Specific\n2. Wait for Lift\n3. Door\n4. Sniper Spot\n5. More..."};
@@ -1960,6 +1967,31 @@ bool ProcessCommand( edict_t *pEntity, const char *pcmd, const char *arg1, const
 			
 			SERVER_PRINT( msg);
 			
+			return TRUE;
+		}
+		else if (FStrEq(pcmd, "bot_aim_difficulty"))
+		{
+			if ((arg1 != NULL) && (*arg1 != 0))
+			{
+				// Use strtof with end-pointer check + explicit finite test
+				// so non-numeric input ("nan", "inf", "abc") is rejected
+				// instead of silently storing 0.0 / NaN / Inf and corrupting
+				// downstream aim math.
+				char *endp = NULL;
+				float temp = strtof(arg1, &endp);
+				bool parsed_ok = (endp != arg1) && (endp != NULL) && (*endp == '\0')
+					&& std::isfinite(temp);
+
+				if (!parsed_ok || temp < 0.0f || temp > 2.0f)
+					SERVER_PRINT( "invalid bot_aim_difficulty value (0.0 - 2.0)!\n");
+				else
+					bot_aim_difficulty = temp;
+			}
+
+			sprintf(msg, "bot_aim_difficulty is %f (0=perfect, 1=default, 2=sloppy)\n",
+				bot_aim_difficulty);
+			SERVER_PRINT( msg);
+
 			return TRUE;
 		}
 		else if (FStrEq(pcmd, "bot_reaction_time_min"))

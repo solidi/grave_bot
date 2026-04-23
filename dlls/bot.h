@@ -327,7 +327,13 @@ typedef struct
 	float	f_aim_tracking_time;
 	float	f_aim_x_angle_delta;
 	float	f_aim_y_angle_delta;
-	
+
+	// human-feel combat softening
+	float	f_last_enemy_los_time;  // last time this bot had LOS on pBotEnemy
+	int		i_burst_count;          // BotFireWeapon ticks with trigger held for an auto at range >350u (not 1:1 with rounds)
+	float	f_burst_pause_until;    // gpGlobals->time until trigger release resumes
+	int		i_burst_last_weapon;    // last weapon id counted for burst; reset i_burst_count when this changes
+
 	float	f_mindray_regen_time;
 
 	edict_t	*pBotUser;

@@ -34,6 +34,7 @@ extern int is_gameplay;
 extern bool checked_teamplay;
 extern edict_t *listenserver_edict;
 extern bool b_chat_debug;
+extern float bot_aim_difficulty;
 FILE *fp;
 
 static edict_t *BotGetKtsSnowballCached()
@@ -110,8 +111,12 @@ edict_t *BotFindBestSkull( edict_t *pBotEdict, float *pflDist )
 	return pBest;
 }
 
-float aim_tracking_x_scale[5] = {1.0, 2.0, 4.0, 5.0, 6.0};
-float aim_tracking_y_scale[5] = {1.0, 2.0, 4.0, 5.0, 6.0};
+float aim_tracking_x_scale[5] = {2.0, 3.0, 4.5, 6.0, 7.5};
+float aim_tracking_y_scale[5] = {2.0, 3.0, 4.5, 6.0, 7.5};
+// continuous per-frame aim jitter magnitude (degrees) by skill — layered
+// on top of the step-error above so tracking is never pixel-perfect
+// between refreshes.  Scaled by bot_aim_difficulty at use time.
+float aim_jitter_scale[5] = {0.15f, 0.25f, 0.35f, 0.50f, 0.60f};
 // who is vomiting?
 float g_flVomiting[32];
 // reaction time multiplier
@@ -1709,6 +1714,11 @@ edict_t *BotFindEnemy( bot_t *pBot )
 	
 	edict_t *pEdict = pBot->pEdict;
 
+	// Capture the previous frame's enemy up-front so the re-acquire penalty
+	// below can detect it even after the function has nulled pBotEnemy on
+	// LOS loss.
+	edict_t *pPrevEnemy = pBot->pBotEnemy;
+
 	if (is_gameplay == GAME_PROPHUNT)
 	{
 		if (pBot->f_pause_time >= gpGlobals->time)
@@ -1806,13 +1816,12 @@ edict_t *BotFindEnemy( bot_t *pBot )
 		else if (FInViewCone( &vecEnd, pEdict ) &&
 			FVisible( vecEnd, pEdict ))
 		{
-			{
-				// if enemy is still visible and in field of view, keep it
-				// keep track of when we last saw an enemy
-				pBot->f_bot_see_enemy_time = gpGlobals->time;
-				// remember our current enemy and check for a new one
-				pRemember = pBot->pBotEnemy;
-			}
+			// if enemy is still visible and in field of view, keep it
+			// keep track of when we last saw an enemy
+			pBot->f_bot_see_enemy_time = gpGlobals->time;
+			pBot->f_last_enemy_los_time = gpGlobals->time;
+			// remember our current enemy and check for a new one
+			pRemember = pBot->pBotEnemy;
 		}
 		else if ((!FInViewCone( &vecEnd, pEdict ) ||
 			!FVisible( vecEnd, pEdict )) && (!pBot->b_engaging_enemy || is_gameplay == GAME_CTF || is_gameplay == GAME_ARENA))
@@ -2085,13 +2094,54 @@ edict_t *BotFindEnemy( bot_t *pBot )
 
 			//SERVER_PRINT( "%s reacting in %f seconds!\n", STRING(pEdict->v.netname), react_delay);
 		}
+		// Re-acquire penalty: when the bot picks this enemy back up after
+		// line-of-sight was broken >= 0.5s ago, apply a shorter hesitation
+		// and bump the aim error to the per-skill max.  This removes the
+		// "corner-snap" where a bot that saw you 1.9s ago insta-lasers you
+		// the moment you reappear.  Arena (1v1) mode is exempt so duels
+		// stay snappy.
+		//
+		// Keyed off pPrevEnemy (captured before pBotEnemy is nulled on LOS
+		// loss) so it also fires in the common "remembered enemy reappears"
+		// case, not just the rare keep-through-LOS-break branch.
+		else if ((bot_reaction_time > 0) && (pPrevEnemy != NULL) &&
+			(pNewEnemy == pPrevEnemy) &&
+			(is_gameplay != GAME_ARENA) &&
+			(pBot->f_last_enemy_los_time > 0.0f) &&
+			((gpGlobals->time - pBot->f_last_enemy_los_time) >= 0.5f))
+		{
+			float difficulty = bot_aim_difficulty;
+			if (difficulty < 0.0f) difficulty = 0.0f;
+			if (difficulty > 2.0f) difficulty = 2.0f;
+
+			float delay_min = react_time_min[pBot->bot_skill] * bot_reaction_time * 0.6f;
+			float delay_max = react_time_max[pBot->bot_skill] * bot_reaction_time * 0.6f;
+			float react_delay = RANDOM_FLOAT(delay_min, delay_max) * difficulty;
+
+			if (gpGlobals->time + react_delay > pBot->f_reaction_target_time)
+				pBot->f_reaction_target_time = gpGlobals->time + react_delay;
+
+			// Snap aim off-target so the first shot after re-acquire misses.
+			float xscale = aim_tracking_x_scale[pBot->bot_skill] * difficulty;
+			float yscale = aim_tracking_y_scale[pBot->bot_skill] * difficulty;
+			pBot->f_aim_x_angle_delta = (RANDOM_LONG(0, 1) ? xscale : -xscale);
+			pBot->f_aim_y_angle_delta = (RANDOM_LONG(0, 1) ? yscale : -yscale);
+			pBot->f_aim_tracking_time = gpGlobals->time + RANDOM_FLOAT(0.2f, 0.5f);
+
+			// Reset burst counter so the bot does a short burst-then-pause
+			// rather than dumping a full magazine on re-appearance.
+			pBot->i_burst_count = 0;
+		}
 		// get our origin
 		vecEnd = UTIL_GetOrigin(pNewEnemy) + pNewEnemy->v.view_ofs;
 
 		// keep track of when we last saw an enemy
 		if (FInViewCone( &vecEnd, pEdict ) &&
-			FVisible( vecEnd, pEdict ))	
+			FVisible( vecEnd, pEdict ))
+		{
 			pBot->f_bot_see_enemy_time = gpGlobals->time;
+			pBot->f_last_enemy_los_time = gpGlobals->time;
+		}
 	}
 	
 	// has the bot NOT seen an ememy for at least 5 seconds (time to reload)?
@@ -2585,6 +2635,63 @@ bool BotFireWeapon(Vector v_enemy, bot_t *pBot, int weapon_choice, bool nofire)
 
 		if (use_primary[final_index])
 		{
+			// Fire discipline: automatic weapons (primary_fire_hold) at mid/long
+			// range shoot in short bursts with a brief pause, instead of holding
+			// the trigger.  Makes sustained-fire weapons feel human.
+			//
+			// NOTE: i_burst_count increments once per call to BotFireWeapon (which
+			// runs once per think frame while the trigger is held for a
+			// primary_fire_hold auto at range > 350).  It is NOT a per-bullet
+			// counter; the engine's weapon-fire timing decides how many rounds
+			// actually leave the barrel per tick.  The threshold of 3-6 is
+			// tuned for feel, not ballistic accuracy.
+			bool burst_active = pSelect[final_index].primary_fire_hold &&
+				!pSelect[final_index].primary_fire_charge &&
+				distance > 350.0f;
+
+			// Weapon / range switch → drop any leftover burst state so stale
+			// counters from a previous weapon can't cause an immediate pause
+			// on the first frame of the next auto burst.
+			if (!burst_active || pBot->i_burst_last_weapon != iId)
+			{
+				pBot->i_burst_count = 0;
+				pBot->f_burst_pause_until = 0.0f;
+				pBot->i_burst_last_weapon = burst_active ? iId : 0;
+			}
+
+			bool burst_pausing = false;
+			if (burst_active)
+			{
+				if (pBot->f_burst_pause_until > gpGlobals->time)
+				{
+					// Currently in a burst pause — don't fire this frame.
+					burst_pausing = true;
+				}
+				else if (pBot->i_burst_count >= RANDOM_LONG(3, 6))
+				{
+					// Burst complete — enter a short pause.
+					float difficulty = bot_aim_difficulty;
+					if (difficulty < 0.5f) difficulty = 0.5f;
+					if (difficulty > 2.0f) difficulty = 2.0f;
+
+					// Lower-skill bots pause a touch longer (more human).
+					float skill_boost = 1.0f + (pBot->bot_skill * 0.1f);
+					float pause = RANDOM_FLOAT(0.25f, 0.60f) * difficulty * skill_boost;
+
+					pBot->f_burst_pause_until = gpGlobals->time + pause;
+					pBot->i_burst_count = 0;
+					pBot->f_shoot_time = pBot->f_burst_pause_until;
+					burst_pausing = true;
+				}
+			}
+
+			if (burst_pausing)
+			{
+				// Skip firing this frame; leave f_shoot_time set to the pause
+				// deadline so BotShootAtEnemy's gate keeps the trigger up.
+				return FALSE;
+			}
+
 			if (!UTIL_MutatorEnabled(MUTATOR_DONTSHOOT))
 				pEdict->v.button |= IN_ATTACK;  // use primary attack
 			else
@@ -2597,6 +2704,17 @@ bool BotFireWeapon(Vector v_enemy, bot_t *pBot, int weapon_choice, bool nofire)
 
 			if (sv_botsmelee.value > 0 && is_gameplay != GAME_GUNGAME)
 			{
+				// Scale melee-impulse frequency with bot_aim_difficulty so
+				// softened bots don't become lethal the moment a player closes
+				// in.  Linear: 0.0 -> 100% (unchanged), 1.0 -> ~55%, 2.0 -> 10%.
+				float melee_difficulty = bot_aim_difficulty;
+				if (melee_difficulty < 0.0f) melee_difficulty = 0.0f;
+				if (melee_difficulty > 2.0f) melee_difficulty = 2.0f;
+				float melee_chance = 1.0f - 0.45f * melee_difficulty;
+				if (melee_chance < 0.10f) melee_chance = 0.10f;
+
+				if (RANDOM_FLOAT(0.0f, 1.0f) <= melee_chance)
+				{
 				if (distance <= 80) {
 					// ALERT(at_aiconsole, "Kick or punch time!");
 					pEdict->v.impulse = 206 + RANDOM_LONG(0, 1);
@@ -2619,6 +2737,7 @@ bool BotFireWeapon(Vector v_enemy, bot_t *pBot, int weapon_choice, bool nofire)
 							pEdict->v.impulse = 216; // drop explosive weapon
 					}
 				}
+				}
 			}
 
 			if (pSelect[final_index].primary_fire_charge)
@@ -2635,7 +2754,16 @@ bool BotFireWeapon(Vector v_enemy, bot_t *pBot, int weapon_choice, bool nofire)
 			{
 				// set next time to shoot
 				if (pSelect[final_index].primary_fire_hold)
+				{
 					pBot->f_shoot_time = gpGlobals->time;  // don't let button up
+					// Count this frame's trigger-hold tick toward the burst
+					// budget for autos at range.  Reset outside the burst
+					// window so state cannot leak into close-range fights.
+					if (distance > 350.0f)
+						pBot->i_burst_count++;
+					else
+						pBot->i_burst_count = 0;
+				}
 				else
 				{
 					int skill = pBot->bot_skill;
@@ -2759,25 +2887,43 @@ void BotShootAtEnemy( bot_t *pBot )
 	d_x = (enemy_angle.x - pEdict->v.v_angle.x);
 	d_y = (enemy_angle.y - pEdict->v.v_angle.y);
 
-	if (pBot->f_aim_tracking_time < gpGlobals->time && pBot->bot_skill > 0)
+	if (pBot->f_aim_tracking_time < gpGlobals->time)
 	{
-		pBot->f_aim_tracking_time = gpGlobals->time + RANDOM_FLOAT(0.5, 3.0);
+		// Shorter refresh window so aim doesn't "lock" for up to 3 seconds;
+		// the old value let bots hold a perfect lead for too long.
+		pBot->f_aim_tracking_time = gpGlobals->time + RANDOM_FLOAT(0.25f, 1.25f);
 
-		pBot->f_aim_x_angle_delta = 
-			RANDOM_FLOAT(-aim_tracking_x_scale[pBot->bot_skill],aim_tracking_x_scale[pBot->bot_skill]);
-		pBot->f_aim_y_angle_delta = 
-			RANDOM_FLOAT(-aim_tracking_y_scale[pBot->bot_skill],aim_tracking_y_scale[pBot->bot_skill]);
+		float difficulty = bot_aim_difficulty;
+		if (difficulty < 0.0f) difficulty = 0.0f;
+		if (difficulty > 2.0f) difficulty = 2.0f;
+
+		float xscale = aim_tracking_x_scale[pBot->bot_skill] * difficulty;
+		float yscale = aim_tracking_y_scale[pBot->bot_skill] * difficulty;
+
+		pBot->f_aim_x_angle_delta = RANDOM_FLOAT(-xscale, xscale);
+		pBot->f_aim_y_angle_delta = RANDOM_FLOAT(-yscale, yscale);
 
 //		SERVER_PRINT( "%s x delta is %.2f, y delta is %.2f\n", pBot->name,
 //			pBot->f_aim_x_angle_delta, pBot->f_aim_y_angle_delta);
 	}
-	// bot skill 1 (0 for indexes) has perfect aim
-	if (pBot->bot_skill > 0)
-	{	// speed of enemy matters (don't let it be less than 1)
+	{	// All skill tiers get aim error applied — no more perfect-aim skill-0
+		// bots.  Enemy velocity still amplifies tracking error so fast strafing
+		// matters.  Continuous per-frame jitter is layered on top so aim is
+		// never pixel-perfect between step refreshes.
 		f_velocity = fmax(pBot->pBotEnemy->v.velocity.Length() * 0.01, 1);
-		// multiple our deltas by the velocity
 		d_x += pBot->f_aim_x_angle_delta * f_velocity;
 		d_y += pBot->f_aim_y_angle_delta * f_velocity;
+
+		float difficulty = bot_aim_difficulty;
+		if (difficulty < 0.0f) difficulty = 0.0f;
+		if (difficulty > 2.0f) difficulty = 2.0f;
+
+		float jitter = aim_jitter_scale[pBot->bot_skill] * difficulty;
+		if (jitter > 0.0f)
+		{
+			d_x += RANDOM_FLOAT(-jitter, jitter);
+			d_y += RANDOM_FLOAT(-jitter, jitter);
+		}
 	}
 
 	if (d_x > 180.0f)
