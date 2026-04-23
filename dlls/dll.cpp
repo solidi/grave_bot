@@ -24,6 +24,8 @@
 #endif
 
 #include <ctime>
+#include <cstdlib>
+#include <cmath>
 #include "bot.h"
 #include "bot_func.h"
 #include "bot_weapons.h"
@@ -1971,9 +1973,16 @@ bool ProcessCommand( edict_t *pEntity, const char *pcmd, const char *arg1, const
 		{
 			if ((arg1 != NULL) && (*arg1 != 0))
 			{
-				float temp = atof(arg1);
+				// Use strtof with end-pointer check + explicit finite test
+				// so non-numeric input ("nan", "inf", "abc") is rejected
+				// instead of silently storing 0.0 / NaN / Inf and corrupting
+				// downstream aim math.
+				char *endp = NULL;
+				float temp = strtof(arg1, &endp);
+				bool parsed_ok = (endp != arg1) && (endp != NULL) && (*endp == '\0')
+					&& std::isfinite(temp);
 
-				if (temp < 0.0f || temp > 2.0f)
+				if (!parsed_ok || temp < 0.0f || temp > 2.0f)
 					SERVER_PRINT( "invalid bot_aim_difficulty value (0.0 - 2.0)!\n");
 				else
 					bot_aim_difficulty = temp;

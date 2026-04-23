@@ -272,6 +272,7 @@ void BotSpawnInit( bot_t *pBot )
 	pBot->f_last_enemy_los_time = 0.0;
 	pBot->i_burst_count = 0;
 	pBot->f_burst_pause_until = 0.0;
+	pBot->i_burst_last_weapon = 0;
 	pBot->f_assess_grenade_time = 0.0;
 	pBot->f_reload_time = 0.0;
 	pBot->f_combat_longjump = 0.0;

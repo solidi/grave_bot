@@ -1714,6 +1714,11 @@ edict_t *BotFindEnemy( bot_t *pBot )
 	
 	edict_t *pEdict = pBot->pEdict;
 
+	// Capture the previous frame's enemy up-front so the re-acquire penalty
+	// below can detect it even after the function has nulled pBotEnemy on
+	// LOS loss.
+	edict_t *pPrevEnemy = pBot->pBotEnemy;
+
 	if (is_gameplay == GAME_PROPHUNT)
 	{
 		if (pBot->f_pause_time >= gpGlobals->time)
@@ -1811,14 +1816,12 @@ edict_t *BotFindEnemy( bot_t *pBot )
 		else if (FInViewCone( &vecEnd, pEdict ) &&
 			FVisible( vecEnd, pEdict ))
 		{
-			{
-				// if enemy is still visible and in field of view, keep it
-				// keep track of when we last saw an enemy
-				pBot->f_bot_see_enemy_time = gpGlobals->time;
-				pBot->f_last_enemy_los_time = gpGlobals->time;
-				// remember our current enemy and check for a new one
-				pRemember = pBot->pBotEnemy;
-			}
+			// if enemy is still visible and in field of view, keep it
+			// keep track of when we last saw an enemy
+			pBot->f_bot_see_enemy_time = gpGlobals->time;
+			pBot->f_last_enemy_los_time = gpGlobals->time;
+			// remember our current enemy and check for a new one
+			pRemember = pBot->pBotEnemy;
 		}
 		else if ((!FInViewCone( &vecEnd, pEdict ) ||
 			!FVisible( vecEnd, pEdict )) && (!pBot->b_engaging_enemy || is_gameplay == GAME_CTF || is_gameplay == GAME_ARENA))
@@ -2097,7 +2100,12 @@ edict_t *BotFindEnemy( bot_t *pBot )
 		// "corner-snap" where a bot that saw you 1.9s ago insta-lasers you
 		// the moment you reappear.  Arena (1v1) mode is exempt so duels
 		// stay snappy.
-		else if ((bot_reaction_time > 0) && (pNewEnemy == pBot->pBotEnemy) &&
+		//
+		// Keyed off pPrevEnemy (captured before pBotEnemy is nulled on LOS
+		// loss) so it also fires in the common "remembered enemy reappears"
+		// case, not just the rare keep-through-LOS-break branch.
+		else if ((bot_reaction_time > 0) && (pPrevEnemy != NULL) &&
+			(pNewEnemy == pPrevEnemy) &&
 			(is_gameplay != GAME_ARENA) &&
 			(pBot->f_last_enemy_los_time > 0.0f) &&
 			((gpGlobals->time - pBot->f_last_enemy_los_time) >= 0.5f))
@@ -2630,10 +2638,29 @@ bool BotFireWeapon(Vector v_enemy, bot_t *pBot, int weapon_choice, bool nofire)
 			// Fire discipline: automatic weapons (primary_fire_hold) at mid/long
 			// range shoot in short bursts with a brief pause, instead of holding
 			// the trigger.  Makes sustained-fire weapons feel human.
-			bool burst_pausing = false;
-			if (pSelect[final_index].primary_fire_hold &&
+			//
+			// NOTE: i_burst_count increments once per call to BotFireWeapon (which
+			// runs once per think frame while the trigger is held for a
+			// primary_fire_hold auto at range > 350).  It is NOT a per-bullet
+			// counter; the engine's weapon-fire timing decides how many rounds
+			// actually leave the barrel per tick.  The threshold of 3-6 is
+			// tuned for feel, not ballistic accuracy.
+			bool burst_active = pSelect[final_index].primary_fire_hold &&
 				!pSelect[final_index].primary_fire_charge &&
-				distance > 350.0f)
+				distance > 350.0f;
+
+			// Weapon / range switch → drop any leftover burst state so stale
+			// counters from a previous weapon can't cause an immediate pause
+			// on the first frame of the next auto burst.
+			if (!burst_active || pBot->i_burst_last_weapon != iId)
+			{
+				pBot->i_burst_count = 0;
+				pBot->f_burst_pause_until = 0.0f;
+				pBot->i_burst_last_weapon = burst_active ? iId : 0;
+			}
+
+			bool burst_pausing = false;
+			if (burst_active)
 			{
 				if (pBot->f_burst_pause_until > gpGlobals->time)
 				{
@@ -2729,7 +2756,9 @@ bool BotFireWeapon(Vector v_enemy, bot_t *pBot, int weapon_choice, bool nofire)
 				if (pSelect[final_index].primary_fire_hold)
 				{
 					pBot->f_shoot_time = gpGlobals->time;  // don't let button up
-					// Count shots toward the burst-pause budget for autos at range.
+					// Count this frame's trigger-hold tick toward the burst
+					// budget for autos at range.  Reset outside the burst
+					// window so state cannot leak into close-range fights.
 					if (distance > 350.0f)
 						pBot->i_burst_count++;
 					else
