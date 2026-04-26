@@ -350,6 +350,21 @@ void BotSpawnInit( bot_t *pBot )
 	pBot->f_coldspot_last_in_zone   = 0.0f;
 	pBot->v_coldspot_last_origin    = g_vecZero;
 
+	// Clear per-life Busters state.
+	pBot->i_busters_role           = BUSTERS_ROLE_NONE;
+	pBot->f_busters_role_eval_time = 0.0f;
+	pBot->v_busters_last_seen      = g_vecZero;
+	pBot->f_busters_last_seen_time = 0.0f;
+	pBot->f_busters_juke_time      = 0.0f;
+	pBot->f_busters_pace_time      = 0.0f;
+	pBot->f_busters_pace_scale     = 1.0f;
+	pBot->f_busters_stuck_check_time = 0.0f;
+	pBot->f_busters_stuck_last_dist  = 0.0f;
+	pBot->f_busters_stuck_since      = 0.0f;
+	pBot->f_combat_stuck_check_time  = 0.0f;
+	pBot->f_combat_stuck_last_dist   = 0.0f;
+	pBot->f_combat_stuck_since       = 0.0f;
+
 	pBot->respawn_time = 0;
 	pBot->respawn_set = FALSE;
 	pBot->b_hasgrenade = FALSE;
@@ -1054,7 +1069,18 @@ void BotFindItem( bot_t *pBot )
 		pBot->item_waypoint  = -1;
 		return;
 	}
-	
+
+	// Busters: the Buster (fuser4 > 0) cannot pick up anything other than
+	// the egon (gamerules-enforced via CanHavePlayerItem).  Clearing the
+	// pickup keeps BotBustersThink's hunt goal from being overridden.
+	// Ghosts fall through to normal item scanning — they still need guns.
+	if (is_gameplay == GAME_BUSTERS && pEdict->v.fuser4 > 0)
+	{
+		pBot->pBotPickupItem = NULL;
+		pBot->item_waypoint  = -1;
+		return;
+	}
+
 	// forget about our item if it's been three seconds
 	// forget about item if it we picked it up
 	if (pBot->f_last_item_found > 0 && pBot->f_last_item_found < (gpGlobals->time - 5.0))
@@ -2108,6 +2134,15 @@ void BotThink( bot_t *pBot )
 			BotColdSpotPreUpdate(pBot);
 		}
 
+		// Busters: evaluate role (Buster / Ghost Grabber / Ghost Hunter) and
+		// pre-set v_goal toward the egon weaponbox or Buster so the movement
+		// block always has a target, even on ticks where the enemy branch
+		// runs instead of BotBustersThink.
+		if (is_gameplay == GAME_BUSTERS)
+		{
+			BotBustersPreUpdate(pBot);
+		}
+
 		if (b_botdontshoot == 0)
 		{
 			pBot->pBotEnemy = BotFindEnemy( pBot );
@@ -2254,6 +2289,14 @@ void BotThink( bot_t *pBot )
 				pBot->item_waypoint  = -1;
 			}
 
+			// Busters: only clear pickup when the bot is the Buster — ghosts
+			// still need to grab guns that BotFindItem surfaces.
+			if (is_gameplay == GAME_BUSTERS && pEdict->v.fuser4 > 0 && pBot->pBotPickupItem)
+			{
+				pBot->pBotPickupItem = NULL;
+				pBot->item_waypoint  = -1;
+			}
+
 			if (is_gameplay == GAME_KTS && BotKtsThink(pBot))
 			{
 				// BotKtsThink sets v_goal + f_move_speed for all KTS cases.
@@ -2277,6 +2320,10 @@ void BotThink( bot_t *pBot )
 			else if (is_gameplay == GAME_COLDSPOT && BotColdSpotThink(pBot))
 			{
 				// BotColdSpotThink sets v_goal + f_move_speed for all Cold Spot cases.
+			}
+			else if (is_gameplay == GAME_BUSTERS && BotBustersThink(pBot))
+			{
+				// BotBustersThink sets v_goal + f_move_speed based on Buster vs Ghost role.
 			}
 			else if (pBot->pBotPickupItem)
 			{
@@ -2729,11 +2776,11 @@ void BotThink( bot_t *pBot )
 	}
 
 	// always forget goal
-	// Cold Skulls / KTS / CtC / CTF / Arena / Cold Spot: v_goal is refreshed
-	// every tick by the pre-scan and the mode's Think function — don't wipe
-	// it here or the movement block will never see the target and the bot
-	// follows waypoints instead.
-	if (is_gameplay != GAME_COLDSKULL && is_gameplay != GAME_KTS && is_gameplay != GAME_CTC && is_gameplay != GAME_CTF && is_gameplay != GAME_ARENA && is_gameplay != GAME_COLDSPOT)
+	// Cold Skulls / KTS / CtC / CTF / Arena / Cold Spot / Busters: v_goal
+	// is refreshed every tick by the pre-scan and the mode's Think function
+	// — don't wipe it here or the movement block will never see the target
+	// and the bot follows waypoints instead.
+	if (is_gameplay != GAME_COLDSKULL && is_gameplay != GAME_KTS && is_gameplay != GAME_CTC && is_gameplay != GAME_CTF && is_gameplay != GAME_ARENA && is_gameplay != GAME_COLDSPOT && is_gameplay != GAME_BUSTERS)
 		pBot->v_goal = g_vecZero;
 	// is our goal ent still around?
 	if (pBot->pGoalEnt != NULL)
@@ -2946,7 +2993,12 @@ void BotThink( bot_t *pBot )
 				else if (csDist < 500.0f && FVisible(pBot->v_goal, pEdict))
 					coldspotChase = true;
 			}
-			if (ktsDirectSteer || ktsBallChase || skullChase || ctcChase || ctfChase || arenaChase || coldspotChase)
+			// Busters: direct-steer toward egon weaponbox or Buster at close range.
+			bool bustersChase = (is_gameplay == GAME_BUSTERS
+				&& pBot->v_goal != g_vecZero
+				&& ((pBot->v_goal - pEdict->v.origin).Length() < 300.0f
+					|| FVisible(pBot->v_goal, pEdict)));
+			if (ktsDirectSteer || ktsBallChase || skullChase || ctcChase || ctfChase || arenaChase || coldspotChase || bustersChase)
 				bGoGoal = true;
 			else if (goalDist < 256 && FVisible(pBot->v_goal, pEdict))
 				bGoGoal = true;

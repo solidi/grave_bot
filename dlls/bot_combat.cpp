@@ -444,20 +444,60 @@ void BotCtfPreUpdate( bot_t *pBot )
 }
 
 //=========================================================
+// BotGoalJumpPhaseTick — advance an in-progress 3-jump combo
+// (phase 1 → 2 → 3 → reset).  Caller is responsible for kicking
+// off phase 0/1.  Used by BotGoalElevatedJump and the combat
+// stuck-jump path so both share the same timing.
+//=========================================================
+static bool BotGoalJumpPhaseTick( bot_t *pBot )
+{
+	edict_t *pEdict = pBot->pEdict;
+
+	if (pBot->i_goal_jump_phase == 1 && pBot->f_goal_jump_time < gpGlobals->time)
+	{
+		pEdict->v.button |= IN_JUMP;
+		pBot->i_goal_jump_phase = 2;
+		pBot->f_goal_jump_time = gpGlobals->time + 0.15f;
+		return true;
+	}
+	if (pBot->i_goal_jump_phase == 2 && pBot->f_goal_jump_time < gpGlobals->time)
+	{
+		pEdict->v.button |= IN_JUMP;
+		pBot->i_goal_jump_phase = 3;
+		pBot->f_goal_jump_time = gpGlobals->time + 1.0f;
+		return true;
+	}
+	if (pBot->i_goal_jump_phase == 3 && pBot->f_goal_jump_time < gpGlobals->time)
+	{
+		pBot->i_goal_jump_phase      = 0;
+		pBot->f_goal_jump_stall_time = gpGlobals->time;
+		return false;
+	}
+	return (pBot->i_goal_jump_phase > 0);
+}
+
+//=========================================================
 // BotGoalElevatedJump — general-purpose multi-jump toward
-// an elevated goal.  Call every frame when the bot is close
-// horizontally but the goal is above.
+// a goal.  Call every frame while pursuing.
 //
-// Uses a 3-phase jump sequence matching the mod's jump system:
+// Uses a 4-phase jump sequence matching the mod's jump system:
 //   phase 0 → detect stall, start 1st jump
 //   phase 1 → 2nd jump (double-jump, while airborne)
 //   phase 2 → 3rd jump (triple-jump / flip, while airborne)
 //   phase 3 → sequence complete, reset after cooldown
 //
+// bForceTrigger=true bypasses the "close horizontally + goal
+// above step height" gate so callers (e.g. combat stuck
+// detection) can fire the combo against same-level walls and
+// boxes.  Forward-facing + max forward speed are re-asserted
+// every frame so the flip's velocity.Length2D() > 100 check
+// passes — this is what makes CTF flag pursuit's combo
+// reliably clear ledges and is now reused for combat stalls.
+//
 // Returns true if the bot is currently in a jump sequence
 // (caller should keep running forward).
 //=========================================================
-static bool BotGoalElevatedJump( bot_t *pBot, Vector vecGoal )
+static bool BotGoalElevatedJump( bot_t *pBot, Vector vecGoal, bool bForceTrigger = false )
 {
 	edict_t *pEdict = pBot->pEdict;
 
@@ -470,7 +510,10 @@ static bool BotGoalElevatedJump( bot_t *pBot, Vector vecGoal )
 	// goal is above step height (> 20u).  Once a sequence is in-progress
 	// (phase 1-2), skip this check because the bot's own Z rises during
 	// the jump, making heightDiff temporarily drop below the threshold.
-	if (pBot->i_goal_jump_phase == 0 && (horzDist > 300.0f || heightDiff < 20.0f))
+	// Forced triggers (combat stall) skip the gate entirely — the caller
+	// has already validated that we're stuck and pursuing a real target.
+	if (pBot->i_goal_jump_phase == 0 && !bForceTrigger
+		&& (horzDist > 300.0f || heightDiff < 20.0f))
 	{
 		pBot->f_goal_jump_stall_time = 0.0f;
 		return false;
@@ -480,8 +523,11 @@ static bool BotGoalElevatedJump( bot_t *pBot, Vector vecGoal )
 	if (pBot->f_goal_jump_stall_time == 0.0f)
 		pBot->f_goal_jump_stall_time = gpGlobals->time;
 
-	// Wait 0.5s before starting jump sequence (gives waypoint nav a chance)
-	if (gpGlobals->time - pBot->f_goal_jump_stall_time < 0.5f)
+	// Wait 0.5s before starting jump sequence (gives waypoint nav a chance).
+	// Forced triggers skip the wait — the caller's own stall detector has
+	// already burned ~1s of stuck time before invoking us.
+	if (!bForceTrigger
+		&& gpGlobals->time - pBot->f_goal_jump_stall_time < 0.5f)
 		return false;
 
 	// Face the goal and run toward it
@@ -1040,6 +1086,359 @@ bool BotCtcThink( bot_t *pBot )
 	// -----------------------------------------------------------------
 	// Case 4: No chumtoad in play — fall back to normal nav.
 	// -----------------------------------------------------------------
+	return false;
+}
+
+//=========================================================
+// Busters — per-frame cached entity scan.
+//
+// Caches the live Buster (the one player on team "busters",
+// signalled by pev->fuser4 > 0) and the nearest dropped
+// weaponbox on the map.  When the Buster is dead, the egon
+// drops as a weaponbox (gamerules cannot re-grant to raw
+// weapon_egon entities).  Ghost bots race the nearest
+// weaponbox during that window — whoever touches the egon
+// weaponbox becomes the new Buster via PlayerGotWeapon.
+//=========================================================
+static float    s_busters_cache_time = -1.0f;
+static edict_t *s_pBuster = NULL;
+static edict_t *s_pBusterWeaponbox = NULL;
+
+static void BotBustersFindEntities()
+{
+	if (s_busters_cache_time == gpGlobals->time)
+		return;
+	s_busters_cache_time = gpGlobals->time;
+
+	s_pBuster = NULL;
+	s_pBusterWeaponbox = NULL;
+
+	// Find the live Buster (fuser4 > 0 and on a client edict)
+	for (int i = 1; i <= gpGlobals->maxClients; i++)
+	{
+		edict_t *pPlayer = INDEXENT(i);
+		if (FNullEnt(pPlayer) || !IsAlive(pPlayer))
+			continue;
+		if (!(pPlayer->v.flags & (FL_CLIENT | FL_FAKECLIENT)))
+			continue;
+		if (pPlayer->v.fuser4 > 0)
+		{
+			s_pBuster = pPlayer;
+			break;
+		}
+	}
+
+	// When the Buster is missing, the egon is loose.  Capture the
+	// first weaponbox on the map — gamerules guarantees there is at
+	// most one egon in play, and ghost-dropped weaponboxes are also
+	// useful pickups for hunters.  Prefer the freshest one by
+	// choosing the one with the earliest next-think (most recently
+	// dropped) when multiple exist.
+	if (!s_pBuster)
+	{
+		edict_t *pScan = NULL;
+		float flBestAge = 9e9f;
+		while ((pScan = UTIL_FindEntityByClassname(pScan, "weaponbox")) != NULL)
+		{
+			if (FNullEnt(pScan) || pScan->free)
+				continue;
+			if (pScan->v.effects & EF_NODRAW)
+				continue;
+			// nextthink holds the dissolve timer; earlier = fresher drop
+			float age = pScan->v.nextthink;
+			if (age < flBestAge)
+			{
+				flBestAge = age;
+				s_pBusterWeaponbox = pScan;
+			}
+		}
+	}
+}
+
+static edict_t *BotBustersGetBuster()
+{
+	BotBustersFindEntities();
+	return s_pBuster;
+}
+
+static edict_t *BotBustersGetDroppedEgonBox()
+{
+	BotBustersFindEntities();
+	return s_pBusterWeaponbox;
+}
+
+//=========================================================
+// BotBustersPreUpdate — called from BotThink BEFORE
+// BotFindEnemy every frame.  Refreshes entity cache and
+// pre-sets v_goal so the movement block has a target even
+// on ticks where the enemy branch runs instead of
+// BotBustersThink.
+//=========================================================
+void BotBustersPreUpdate( bot_t *pBot )
+{
+	edict_t *pEdict = pBot->pEdict;
+
+	BotBustersFindEntities();
+
+	// Reset egon-grab stuck detection whenever the weaponbox isn't the
+	// active goal so stale samples don't trigger spurious jumps later.
+	if (!s_pBusterWeaponbox)
+	{
+		pBot->f_busters_stuck_check_time = 0.0f;
+		pBot->f_busters_stuck_since      = 0.0f;
+	}
+
+	bool botIsBuster = (pEdict->v.fuser4 > 0);
+
+	if (botIsBuster)
+	{
+		// Buster can't pick anything up — clear pickup pointer every frame.
+		pBot->pBotPickupItem = NULL;
+		pBot->item_waypoint  = -1;
+		pBot->i_engage_aggressiveness = 100;
+
+		// Pre-set v_goal to nearest ghost so the movement block has a
+		// target even when BotFindEnemy claims this frame.
+		edict_t *pTarget = NULL;
+		float flBest = 9e9f;
+		for (int i = 1; i <= gpGlobals->maxClients; i++)
+		{
+			edict_t *p = INDEXENT(i);
+			if (FNullEnt(p) || p == pEdict)
+				continue;
+			if (!IsAlive(p))
+				continue;
+			if (!(p->v.flags & (FL_CLIENT | FL_FAKECLIENT)))
+				continue;
+			if (p->v.fuser4 > 0)
+				continue; // skip other busters (shouldn't happen, safety)
+			float d = (p->v.origin - pEdict->v.origin).Length();
+			if (d < flBest) { flBest = d; pTarget = p; }
+		}
+		if (pTarget)
+		{
+			pBot->v_goal           = pTarget->v.origin;
+			pBot->f_goal_proximity = 64.0f;
+		}
+		return;
+	}
+
+	// Ghost: pursue buster if alive, else race for dropped weaponbox.
+	if (s_pBuster)
+	{
+		pBot->v_busters_last_seen      = s_pBuster->v.origin;
+		pBot->f_busters_last_seen_time = gpGlobals->time;
+		pBot->v_goal                   = s_pBuster->v.origin;
+		pBot->f_goal_proximity         = 96.0f;
+	}
+	else if (s_pBusterWeaponbox)
+	{
+		pBot->v_goal           = s_pBusterWeaponbox->v.origin;
+		pBot->f_goal_proximity = 20.0f;
+		// Suppress generic item detours only when the grab target exists.
+		pBot->pBotPickupItem = NULL;
+		pBot->item_waypoint  = -1;
+	}
+	else if (pBot->f_busters_last_seen_time > 0
+		&& gpGlobals->time - pBot->f_busters_last_seen_time < 6.0f)
+	{
+		// Fall back to the Buster's last-known origin briefly.
+		pBot->v_goal           = pBot->v_busters_last_seen;
+		pBot->f_goal_proximity = 96.0f;
+	}
+}
+
+//=========================================================
+// BotBustersThink — called from BotThink when in Busters
+// mode and no combat is active.
+//
+// Priority hierarchy:
+//  1. Bot IS the Buster → hunt nearest ghost with the egon.
+//  2. Buster is alive (opponent) → pursue them; juke while
+//     en-route so two looping bots break their stalemate.
+//  3. Buster is missing & weaponbox is loose → race to it
+//     (use the elevated-jump helper for pedestals).
+//  4. Nothing in play → fall back to normal nav.
+//
+// Returns true when movement intent has been set; false to
+// fall back to normal nav/combat.
+//=========================================================
+bool BotBustersThink( bot_t *pBot )
+{
+	if (is_gameplay != GAME_BUSTERS)
+		return false;
+
+	edict_t *pEdict = pBot->pEdict;
+
+	BotBustersFindEntities();
+
+	// Per-bot pace oscillation — re-roll every 1.5-4s so two bots
+	// running the same waypoint loop don't orbit at identical speed.
+	if (pBot->f_busters_pace_time < gpGlobals->time)
+	{
+		pBot->f_busters_pace_scale = RANDOM_FLOAT(0.65f, 1.0f);
+		pBot->f_busters_pace_time  = gpGlobals->time + RANDOM_FLOAT(1.5f, 4.0f);
+	}
+
+	bool botIsBuster = (pEdict->v.fuser4 > 0);
+
+	// -----------------------------------------------------------------
+	// Case 1: Bot IS the Buster — hunt nearest ghost with the egon.
+	// -----------------------------------------------------------------
+	if (botIsBuster)
+	{
+		pBot->i_busters_role          = BUSTERS_ROLE_BUSTER;
+		pBot->f_pause_time            = 0;
+		pBot->pBotPickupItem          = NULL;
+		pBot->item_waypoint           = -1;
+		pBot->i_engage_aggressiveness = 100;
+
+		edict_t *pTarget = NULL;
+		float flBest = 9e9f;
+		for (int i = 1; i <= gpGlobals->maxClients; i++)
+		{
+			edict_t *p = INDEXENT(i);
+			if (FNullEnt(p) || p == pEdict)
+				continue;
+			if (!IsAlive(p))
+				continue;
+			if (!(p->v.flags & (FL_CLIENT | FL_FAKECLIENT)))
+				continue;
+			if (p->v.fuser4 > 0)
+				continue;
+			float d = (p->v.origin - pEdict->v.origin).Length();
+			if (d < flBest) { flBest = d; pTarget = p; }
+		}
+
+		if (pTarget)
+		{
+			pBot->v_goal           = pTarget->v.origin;
+			pBot->f_goal_proximity = 64.0f;
+			pBot->f_move_speed     = pBot->f_max_speed;
+
+			Vector vecDir    = pTarget->v.origin - pEdict->v.origin;
+			Vector vecAngles = UTIL_VecToAngles(vecDir);
+			pEdict->v.ideal_yaw = vecAngles.y;
+			BotFixIdealYaw(pEdict);
+			return true;
+		}
+
+		// No ghosts visible yet — keep moving, waypoint nav will route.
+		pBot->f_move_speed = pBot->f_max_speed;
+		return false;
+	}
+
+	// -----------------------------------------------------------------
+	// Case 2: Buster is alive — pursue them.
+	// -----------------------------------------------------------------
+	if (s_pBuster)
+	{
+		pBot->i_busters_role = BUSTERS_ROLE_GHOST_HUNTER;
+		if (pBot->i_engage_aggressiveness < 85)
+			pBot->i_engage_aggressiveness = 85;
+
+		pBot->v_busters_last_seen      = s_pBuster->v.origin;
+		pBot->f_busters_last_seen_time = gpGlobals->time;
+
+		pBot->v_goal           = s_pBuster->v.origin;
+		pBot->f_goal_proximity = 96.0f;
+		pBot->f_move_speed     = pBot->f_max_speed * pBot->f_busters_pace_scale;
+
+		// Anti-stalemate jukes while hunting (no enemy currently engaged)
+		if (!pBot->pBotEnemy && pBot->f_busters_juke_time < gpGlobals->time)
+		{
+			float r = RANDOM_FLOAT(0.0f, 1.0f);
+			if (r < 0.25f)
+				pEdict->v.button |= IN_JUMP;
+			else if (r < 0.45f)
+				pEdict->v.button |= IN_DUCK;
+			else if (r < 0.60f)
+				pEdict->v.button |= (RANDOM_LONG(0, 1) ? IN_MOVELEFT : IN_MOVERIGHT);
+			pBot->f_busters_juke_time = gpGlobals->time + RANDOM_FLOAT(0.8f, 2.0f);
+		}
+
+		Vector vecDir    = s_pBuster->v.origin - pEdict->v.origin;
+		Vector vecAngles = UTIL_VecToAngles(vecDir);
+		pEdict->v.ideal_yaw = vecAngles.y;
+		BotFixIdealYaw(pEdict);
+		return true;
+	}
+
+	// -----------------------------------------------------------------
+	// Case 3: Buster missing — race to nearest dropped weaponbox.
+	// -----------------------------------------------------------------
+	if (s_pBusterWeaponbox)
+	{
+		pBot->i_busters_role = BUSTERS_ROLE_GHOST_GRABBER;
+		pBot->pBotPickupItem = NULL;
+		pBot->item_waypoint  = -1;
+
+		Vector vecTarget = s_pBusterWeaponbox->v.origin;
+		pBot->v_goal           = vecTarget;
+		pBot->f_goal_proximity = 20.0f;
+		pBot->f_move_speed     = pBot->f_max_speed; // sprint, no pace scale
+
+		// Use the elevated-jump helper for pedestal/ledge placements.
+		BotGoalElevatedJump(pBot, vecTarget);
+
+		// Stuck detection: when the elevated-jump helper isn't engaged
+		// (already gates on horzDist < 300 && heightDiff > 20) but the
+		// bot still isn't reaching the egon — pinned on a step, blocked
+		// by a railing, low-headroom doorway, etc — force the same
+		// 3-jump combo so a double/triple-jump can clear the obstacle.
+		// Sample horizontal distance every 0.4s; if it hasn't dropped
+		// by at least 16u for 1.0s, we're stuck → trigger phase 0.
+		if (pBot->i_goal_jump_phase == 0)
+		{
+			Vector vecFlat = vecTarget - pEdict->v.origin;
+			vecFlat.z = 0;
+			float horzDist = vecFlat.Length();
+
+			if (pBot->f_busters_stuck_check_time < gpGlobals->time)
+			{
+				if (pBot->f_busters_stuck_check_time == 0.0f
+					|| pBot->f_busters_stuck_last_dist - horzDist >= 16.0f)
+				{
+					// Healthy progress (or first sample) — reset stall.
+					pBot->f_busters_stuck_since = 0.0f;
+				}
+				else if (pBot->f_busters_stuck_since == 0.0f)
+				{
+					// First time we noticed no progress — start the clock.
+					pBot->f_busters_stuck_since = gpGlobals->time;
+				}
+
+				pBot->f_busters_stuck_last_dist  = horzDist;
+				pBot->f_busters_stuck_check_time = gpGlobals->time + 0.4f;
+			}
+
+			// Stalled for 1.0s within reach? Kick off phase 0 of the
+			// jump combo.  Bypass the elevated-jump guard by seeding
+			// f_goal_jump_stall_time so the 0.5s pre-wait is already
+			// satisfied — ghosts have already been trying for 1s+.
+			if (pBot->f_busters_stuck_since > 0.0f
+				&& gpGlobals->time - pBot->f_busters_stuck_since >= 1.0f
+				&& horzDist < 256.0f)
+			{
+				pBot->f_goal_jump_stall_time = gpGlobals->time - 1.0f;
+				pEdict->v.button |= IN_JUMP;
+				pBot->i_goal_jump_phase = 1;
+				pBot->f_goal_jump_time  = gpGlobals->time + 0.15f;
+				pBot->f_busters_stuck_since = 0.0f; // reset; phase machinery takes over
+			}
+		}
+
+		Vector vecDir    = vecTarget - pEdict->v.origin;
+		Vector vecAngles = UTIL_VecToAngles(vecDir);
+		pEdict->v.ideal_yaw = vecAngles.y;
+		BotFixIdealYaw(pEdict);
+		return true;
+	}
+
+	// -----------------------------------------------------------------
+	// Case 4: Nothing in play — fall back to normal nav.
+	// -----------------------------------------------------------------
+	pBot->i_busters_role = BUSTERS_ROLE_NONE;
 	return false;
 }
 
@@ -2089,7 +2488,19 @@ edict_t *BotFindEnemy( bot_t *pBot )
 			if (distance_delay < 1.0) distance_delay = 1.0;
 
 			react_delay = RANDOM_FLOAT(delay_min, delay_max) * distance_delay;
-			
+
+			// Busters has constant new-enemy churn (cluster fights, role
+			// swaps on egon pickup, ghosts vs the lone buster).  The full
+			// react formula (~1.1s base * ~2.0 distance multiplier) makes
+			// every first contact look like a 2-3s frozen stand-off.
+			// Skip the distance multiplier and cap to a snappy floor so
+			// engagements start within ~0.3-0.5s.
+			if (is_gameplay == GAME_BUSTERS)
+			{
+				react_delay = RANDOM_FLOAT(delay_min, delay_max) * 0.4f;
+				if (react_delay > 0.5f) react_delay = 0.5f;
+			}
+
 			pBot->f_reaction_target_time = gpGlobals->time + react_delay;
 
 			//SERVER_PRINT( "%s reacting in %f seconds!\n", STRING(pEdict->v.netname), react_delay);
@@ -2949,6 +3360,92 @@ void BotShootAtEnemy( bot_t *pBot )
 	//v_enemy.z = 0;  // ignore z component (up & down)
 	
 	f_distance = v_enemy.Length();  // how far away is the enemy scum?
+
+	// -----------------------------------------------------------------
+	// Busters: prevent wall-mashing.  When the bot has spotted an enemy
+	// through a gap/sliver but cannot physically reach them (FHullClear
+	// false), the yaw lock above would point the bot at the wall; the
+	// movement system's cos(yaw - waypoint_dir) factor then collapses
+	// forward speed and the bot just grinds into the brush.  Restore
+	// the waypoint-driven facing so the bot keeps routing around toward
+	// the enemy.  Once FHullClear becomes TRUE (LOS opens / corner
+	// turned), the next frame's yaw lock takes over and the bot fires
+	// normally.  Busters-only so other modes' tactics aren't disturbed.
+	// -----------------------------------------------------------------
+	if (is_gameplay == GAME_BUSTERS && pBot->pBotEnemy &&
+		pBot->curr_waypoint_index != -1 && !pBot->b_combat_longjump &&
+		pBot->i_goal_jump_phase == 0 &&
+		!FHullClear(v_enemy_origin, pEdict))
+	{
+		Vector vecWpDir = pBot->v_curr_direction;
+		vecWpDir.z = 0;
+		if (vecWpDir.Length() > 1.0f)
+		{
+			Vector vecWpAngles = UTIL_VecToAngles(vecWpDir);
+			pEdict->v.ideal_yaw = vecWpAngles.y;
+			BotFixIdealYaw(pEdict);
+		}
+	}
+
+	// -----------------------------------------------------------------
+	// Combat stuck-jump: if the bot has a visible enemy but can't close
+	// the distance (crate/box/railing/elevated platform/wall between
+	// them), reuse the same multi-jump helper that drives CTF flag
+	// pursuit.  Sample horizontal distance every 0.4s; if it hasn't
+	// dropped 16u in 1.0s while the enemy is visible and within 512u,
+	// invoke BotGoalElevatedJump with bForceTrigger=true so the helper
+	// runs the full ground → double → triple-jump (flip) sequence,
+	// re-asserting forward facing + max forward speed each frame so
+	// velocity.Length2D() stays > 100 and the flip on phase 3 lands.
+	// -----------------------------------------------------------------
+	if (pBot->pBotEnemy &&
+		f_distance > 80.0f && f_distance < 512.0f &&
+		FVisible(v_enemy_origin, pEdict))
+	{
+		Vector vecFlat = pBot->pBotEnemy->v.origin - pEdict->v.origin;
+		vecFlat.z = 0;
+		float horzDist = vecFlat.Length();
+
+		if (pBot->f_combat_stuck_check_time < gpGlobals->time)
+		{
+			if (pBot->f_combat_stuck_check_time == 0.0f
+				|| pBot->f_combat_stuck_last_dist - horzDist >= 16.0f)
+			{
+				pBot->f_combat_stuck_since = 0.0f;
+			}
+			else if (pBot->f_combat_stuck_since == 0.0f)
+			{
+				pBot->f_combat_stuck_since = gpGlobals->time;
+			}
+
+			pBot->f_combat_stuck_last_dist  = horzDist;
+			pBot->f_combat_stuck_check_time = gpGlobals->time + 0.4f;
+		}
+
+		// Stalled for 1.0s + on the ground? Hand off to the multi-jump
+		// helper.  It owns the phase machine from here until phase 3 →
+		// reset (handled below by re-entering this branch).
+		if (pBot->i_goal_jump_phase == 0
+			&& pBot->f_combat_stuck_since > 0.0f
+			&& gpGlobals->time - pBot->f_combat_stuck_since >= 1.0f
+			&& (pEdict->v.flags & FL_ONGROUND))
+		{
+			pBot->f_combat_stuck_since = 0.0f;
+			BotGoalElevatedJump(pBot, pBot->pBotEnemy->v.origin, true /*force*/);
+		}
+		// Already mid-combo: keep advancing it every frame so phases
+		// 1 → 2 → 3 fire on schedule with f_move_speed re-asserted.
+		else if (pBot->i_goal_jump_phase > 0)
+		{
+			BotGoalElevatedJump(pBot, pBot->pBotEnemy->v.origin, true /*force*/);
+		}
+	}
+	else if (!pBot->pBotEnemy)
+	{
+		// No enemy → drop stale samples so a future encounter starts clean.
+		pBot->f_combat_stuck_check_time = 0.0f;
+		pBot->f_combat_stuck_since      = 0.0f;
+	}
 
 	// allow 15 seconds for the mindray to regen it's ammo if it's low
 	if (mod_id == SI_DLL && pBot->current_weapon.iId == SI_WEAPON_MINDRAY &&

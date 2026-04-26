@@ -336,11 +336,15 @@ bool BotFindWaypoint( bot_t *pBot )
 	
 	// about 20% of the time choose a waypoint at random
 	// (don't do this any more often than every 10 seconds)
-	
-	if ((RANDOM_LONG(1, 100) <= 20) &&
+	// Busters bumps this to 40% / 4s cooldown so two bots looping the
+	// same path break out of the stalemate faster.
+	int   randomChance   = (is_gameplay == GAME_BUSTERS) ? 40 : 20;
+	float randomCooldown = (is_gameplay == GAME_BUSTERS) ? 4.0f : 10.0f;
+
+	if ((RANDOM_LONG(1, 100) <= randomChance) &&
 		(pBot->f_random_waypoint_time <= gpGlobals->time))
 	{
-		pBot->f_random_waypoint_time = gpGlobals->time + 10.0;
+		pBot->f_random_waypoint_time = gpGlobals->time + randomCooldown;
 		
 		if (min_index[2] != -1)
 			index = RANDOM_LONG(0, 2);
@@ -565,7 +569,7 @@ bool BotHeadTowardWaypoint( bot_t *pBot )
 	// our waypoint time allows all of this
 	if ((pBot->waypoint_goal == -1 || pBot->b_engaging_enemy || is_gameplay == GAME_KTS ||
 		is_gameplay == GAME_COLDSKULL || is_gameplay == GAME_CTC || is_gameplay == GAME_CTF ||
-		is_gameplay == GAME_ARENA || is_gameplay == GAME_COLDSPOT ||
+		is_gameplay == GAME_ARENA || is_gameplay == GAME_COLDSPOT || is_gameplay == GAME_BUSTERS ||
 		(pBot->role == ROLE_ATTACK &&
 		pBot->subrole == ROLE_SUB_DEF_ALLY) || (pBot->role == ROLE_DEFEND &&
 		(pBot->subrole == ROLE_SUB_DEF_SCIS || pBot->subrole == ROLE_SUB_DEF_RSRC) && pBot->pGoalEnt &&
@@ -576,7 +580,7 @@ bool BotHeadTowardWaypoint( bot_t *pBot )
 		if (pBot->b_engaging_enemy || pBot->pGoalEnt != NULL || pBot->v_defend != g_vecZero ||
 			pBot->defend_wpt != -1 || is_gameplay == GAME_KTS || is_gameplay == GAME_COLDSKULL ||
 			is_gameplay == GAME_CTC || is_gameplay == GAME_CTF || is_gameplay == GAME_ARENA ||
-			is_gameplay == GAME_COLDSPOT)
+			is_gameplay == GAME_COLDSPOT || is_gameplay == GAME_BUSTERS)
 			pBot->f_waypoint_goal_time = gpGlobals->time + 0.5;
 		else // don't pick a goal more often than every 120 seconds...
 			pBot->f_waypoint_goal_time = gpGlobals->time + 120.0;
@@ -671,6 +675,21 @@ bool BotHeadTowardWaypoint( bot_t *pBot )
 			// curr_waypoint_index to nearest reachable so the bot
 			// doesn't walk to a stale waypoint.
 			if (is_gameplay == GAME_COLDSPOT && index != pBot->waypoint_goal)
+			{
+				int fresh = WaypointFindReachable(pEdict, REACHABLE_RANGE, team);
+				if (fresh != -1)
+				{
+					pBot->curr_waypoint_index = fresh;
+					pBot->waypoint_origin = waypoints[fresh].origin;
+					pBot->f_waypoint_time = gpGlobals->time;
+				}
+			}
+
+			// Busters: same waypoint reset — when the goal changes
+			// (Buster moved, egon dropped elsewhere, or role flipped),
+			// snap curr_waypoint_index to nearest reachable so the bot
+			// doesn't walk to a stale weapon/ammo waypoint.
+			if (is_gameplay == GAME_BUSTERS && index != pBot->waypoint_goal)
 			{
 				int fresh = WaypointFindReachable(pEdict, REACHABLE_RANGE, team);
 				if (fresh != -1)
@@ -1889,6 +1908,43 @@ int BotFindWaypointGoal( bot_t *pBot )
 		}
 
 		// No target — clear stale goal
+		pBot->waypoint_goal = -1;
+		return -1;
+	}
+
+	// Busters: route toward the active objective.
+	// Buster: chase the nearest ghost's position (set by v_goal in
+	// BotBustersPreUpdate/Think); find the nearest waypoint to it.
+	// Ghost: v_goal already points at the Buster or at the dropped
+	// egon weaponbox; route toward whichever v_goal is set.
+	if (is_gameplay == GAME_BUSTERS)
+	{
+		Vector vecTarget = pBot->v_goal;
+		if (vecTarget == g_vecZero)
+		{
+			// No target yet — fall through to default logic.
+			pBot->waypoint_goal = -1;
+			return -1;
+		}
+
+		float nearDist = 9e9f;
+		for (int w = 0; w < num_waypoints; w++)
+		{
+			if (waypoints[w].flags & W_FL_DELETED) continue;
+			if (waypoints[w].flags & W_FL_AIMING)  continue;
+			if ((team != -1) && (waypoints[w].flags & W_FL_TEAM_SPECIFIC) &&
+				((waypoints[w].flags & W_FL_TEAM) != team)) continue;
+			float d = (waypoints[w].origin - vecTarget).Length();
+			if (d < nearDist) { nearDist = d; index = w; }
+		}
+
+		if (index != -1)
+		{
+			pBot->wpt_goal_type = WPT_GOAL_ITEM;
+			pBot->waypoint_goal = index;
+			return index;
+		}
+
 		pBot->waypoint_goal = -1;
 		return -1;
 	}
