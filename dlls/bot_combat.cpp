@@ -444,39 +444,6 @@ void BotCtfPreUpdate( bot_t *pBot )
 }
 
 //=========================================================
-// BotGoalJumpPhaseTick — advance an in-progress 3-jump combo
-// (phase 1 → 2 → 3 → reset).  Caller is responsible for kicking
-// off phase 0/1.  Used by BotGoalElevatedJump and the combat
-// stuck-jump path so both share the same timing.
-//=========================================================
-static bool BotGoalJumpPhaseTick( bot_t *pBot )
-{
-	edict_t *pEdict = pBot->pEdict;
-
-	if (pBot->i_goal_jump_phase == 1 && pBot->f_goal_jump_time < gpGlobals->time)
-	{
-		pEdict->v.button |= IN_JUMP;
-		pBot->i_goal_jump_phase = 2;
-		pBot->f_goal_jump_time = gpGlobals->time + 0.15f;
-		return true;
-	}
-	if (pBot->i_goal_jump_phase == 2 && pBot->f_goal_jump_time < gpGlobals->time)
-	{
-		pEdict->v.button |= IN_JUMP;
-		pBot->i_goal_jump_phase = 3;
-		pBot->f_goal_jump_time = gpGlobals->time + 1.0f;
-		return true;
-	}
-	if (pBot->i_goal_jump_phase == 3 && pBot->f_goal_jump_time < gpGlobals->time)
-	{
-		pBot->i_goal_jump_phase      = 0;
-		pBot->f_goal_jump_stall_time = gpGlobals->time;
-		return false;
-	}
-	return (pBot->i_goal_jump_phase > 0);
-}
-
-//=========================================================
 // BotGoalElevatedJump — general-purpose multi-jump toward
 // a goal.  Call every frame while pursuing.
 //
@@ -1153,18 +1120,6 @@ static void BotBustersFindEntities()
 			}
 		}
 	}
-}
-
-static edict_t *BotBustersGetBuster()
-{
-	BotBustersFindEntities();
-	return s_pBuster;
-}
-
-static edict_t *BotBustersGetDroppedEgonBox()
-{
-	BotBustersFindEntities();
-	return s_pBusterWeaponbox;
 }
 
 //=========================================================

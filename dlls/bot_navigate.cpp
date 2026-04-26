@@ -1922,7 +1922,7 @@ int BotFindWaypointGoal( bot_t *pBot )
 		Vector vecTarget = pBot->v_goal;
 		if (vecTarget == g_vecZero)
 		{
-			// No target yet — fall through to default logic.
+			// No target yet — clear the current waypoint goal and abort.
 			pBot->waypoint_goal = -1;
 			return -1;
 		}
