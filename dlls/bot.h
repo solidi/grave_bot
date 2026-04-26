@@ -172,6 +172,14 @@ enum
 	CSPOT_ROLE_HUNTER      // enemy holding zone, rush in to clear
 };
 
+enum
+{
+	BUSTERS_ROLE_NONE = 0,
+	BUSTERS_ROLE_BUSTER,         // bot holds the egon, hunt ghosts
+	BUSTERS_ROLE_GHOST_GRABBER,  // egon is loose, sprint to grab it
+	BUSTERS_ROLE_GHOST_HUNTER    // buster alive, pursue them
+};
+
 extern double pi;
 
 typedef struct
@@ -430,6 +438,25 @@ typedef struct
 	float f_coldspot_last_in_zone;   // last gpGlobals->time the bot was inside the 256u zone
 	Vector v_coldspot_last_origin;   // last known coldspot origin (for relocation detection)
 
+	// Busters — role + anti-stalemate state
+	int    i_busters_role;             // current role (BUSTERS_ROLE_*)
+	float  f_busters_role_eval_time;   // cadence for role re-evaluation
+	Vector v_busters_last_seen;        // last observed Buster origin
+	float  f_busters_last_seen_time;   // when v_busters_last_seen was captured
+	float  f_busters_juke_time;        // next time to jump/duck/strafe evasively
+	float  f_busters_pace_time;        // next time to re-roll pace scale
+	float  f_busters_pace_scale;       // 0.65-1.0 multiplier on f_move_speed
+	// Egon-grab stuck detection: when a ghost is locked onto the dropped
+	// weaponbox but not making horizontal progress, force a 3-jump combo
+	// to clear ledges/geometry the waypoint nav can't route around.
+	float  f_busters_stuck_check_time; // next time to sample distance
+	float  f_busters_stuck_last_dist;  // horz dist to weaponbox at last sample
+	float  f_busters_stuck_since;      // 0 = not stuck; else gpGlobals->time when stalled
+	// Combat-stuck detection: same idea, but for visible enemies the bot
+	// is trying to engage but cannot reach (crate/ledge/box in the way).
+	float  f_combat_stuck_check_time;
+	float  f_combat_stuck_last_dist;
+	float  f_combat_stuck_since;
 } bot_t;
 
 
