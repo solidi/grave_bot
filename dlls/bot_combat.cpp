@@ -2059,7 +2059,8 @@ bool BotColdSpotThink( bot_t *pBot )
 // Horde — survivors-vs-monsters mode
 //
 // Gamerules: each wave spawns N monsters tagged with
-// pev->message == "horde" and pev->fuser4 == RADAR_HORDE.
+// pev->message == "horde" and the Horde radar/team marker
+// stored in pev->fuser3 at runtime.
 // All survivor players are on team "survivors"; FF is
 // blocked at gamerules.  Between waves there is a short
 // breather window (typically ~3-10s) during which surviving
@@ -2319,8 +2320,9 @@ edict_t *BotFindEnemy( bot_t *pBot )
 			pBot->pBotEnemy = NULL;
 			return NULL;
 		}
-		// Promote the sticky horde target into pPrevEnemy so the existing
-		// "remember enemy" branch keeps it as the preferred candidate.
+		// If the sticky horde target is still valid and currently visible,
+		// select it immediately instead of falling through to normal target
+		// acquisition.
 		if (!FNullEnt(pBot->p_horde_target) && IsAlive(pBot->p_horde_target)
 			&& pBot->f_horde_target_time > gpGlobals->time)
 		{

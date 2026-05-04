@@ -2121,11 +2121,11 @@ int BotFindWaypointGoal( bot_t *pBot )
 		return -1;
 	}
 
-	// Horde: route toward the picked monster (or retreat target).  v_goal
-	// is set every tick by BotHordePreUpdate / BotHordeThink to either the
-	// chosen monster's origin (HUNTER) or a fallback retreat / pickup
-	// position (RETREAT / RESUPPLY).  Same nearest-waypoint-by-distance
-	// strategy as Cold Spot so monsters at any reachable position route.
+	// Horde: route toward the current explicit Horde target when v_goal is
+	// set by BotHordePreUpdate / BotHordeThink (for example, a chosen
+	// monster's origin for HUNTER).  If v_goal is g_vecZero, this block
+	// intentionally does not pick a fallback retreat / pickup waypoint and
+	// instead falls through to the default goal-selection logic below.
 	if (is_gameplay == GAME_HORDE)
 	{
 		Vector vecTarget = pBot->v_goal;
