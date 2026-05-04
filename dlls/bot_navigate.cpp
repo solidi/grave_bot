@@ -570,6 +570,7 @@ bool BotHeadTowardWaypoint( bot_t *pBot )
 	if ((pBot->waypoint_goal == -1 || pBot->b_engaging_enemy || is_gameplay == GAME_KTS ||
 		is_gameplay == GAME_COLDSKULL || is_gameplay == GAME_CTC || is_gameplay == GAME_CTF ||
 		is_gameplay == GAME_ARENA || is_gameplay == GAME_COLDSPOT || is_gameplay == GAME_BUSTERS ||
+		is_gameplay == GAME_HORDE ||
 		(pBot->role == ROLE_ATTACK &&
 		pBot->subrole == ROLE_SUB_DEF_ALLY) || (pBot->role == ROLE_DEFEND &&
 		(pBot->subrole == ROLE_SUB_DEF_SCIS || pBot->subrole == ROLE_SUB_DEF_RSRC) && pBot->pGoalEnt &&
@@ -580,7 +581,7 @@ bool BotHeadTowardWaypoint( bot_t *pBot )
 		if (pBot->b_engaging_enemy || pBot->pGoalEnt != NULL || pBot->v_defend != g_vecZero ||
 			pBot->defend_wpt != -1 || is_gameplay == GAME_KTS || is_gameplay == GAME_COLDSKULL ||
 			is_gameplay == GAME_CTC || is_gameplay == GAME_CTF || is_gameplay == GAME_ARENA ||
-			is_gameplay == GAME_COLDSPOT || is_gameplay == GAME_BUSTERS)
+			is_gameplay == GAME_COLDSPOT || is_gameplay == GAME_BUSTERS || is_gameplay == GAME_HORDE)
 			pBot->f_waypoint_goal_time = gpGlobals->time + 0.5;
 		else // don't pick a goal more often than every 120 seconds...
 			pBot->f_waypoint_goal_time = gpGlobals->time + 120.0;
@@ -690,6 +691,21 @@ bool BotHeadTowardWaypoint( bot_t *pBot )
 			// snap curr_waypoint_index to nearest reachable so the bot
 			// doesn't walk to a stale weapon/ammo waypoint.
 			if (is_gameplay == GAME_BUSTERS && index != pBot->waypoint_goal)
+			{
+				int fresh = WaypointFindReachable(pEdict, REACHABLE_RANGE, team);
+				if (fresh != -1)
+				{
+					pBot->curr_waypoint_index = fresh;
+					pBot->waypoint_origin = waypoints[fresh].origin;
+					pBot->f_waypoint_time = gpGlobals->time;
+				}
+			}
+
+			// Horde: same waypoint reset — when the picked monster changes
+			// (last one died or threat priority shifted), snap
+			// curr_waypoint_index to nearest reachable so the bot doesn't
+			// walk to a stale waypoint before re-routing.
+			if (is_gameplay == GAME_HORDE && index != pBot->waypoint_goal)
 			{
 				int fresh = WaypointFindReachable(pEdict, REACHABLE_RANGE, team);
 				if (fresh != -1)
@@ -2103,6 +2119,40 @@ int BotFindWaypointGoal( bot_t *pBot )
 
 		pBot->waypoint_goal = -1;
 		return -1;
+	}
+
+	// Horde: route toward the picked monster (or retreat target).  v_goal
+	// is set every tick by BotHordePreUpdate / BotHordeThink to either the
+	// chosen monster's origin (HUNTER) or a fallback retreat / pickup
+	// position (RETREAT / RESUPPLY).  Same nearest-waypoint-by-distance
+	// strategy as Cold Spot so monsters at any reachable position route.
+	if (is_gameplay == GAME_HORDE)
+	{
+		Vector vecTarget = pBot->v_goal;
+		if (vecTarget != g_vecZero)
+		{
+			float nearDist = 9e9f;
+			for (int w = 0; w < num_waypoints; w++)
+			{
+				if (waypoints[w].flags & W_FL_DELETED) continue;
+				if (waypoints[w].flags & W_FL_AIMING)  continue;
+				if ((team != -1) && (waypoints[w].flags & W_FL_TEAM_SPECIFIC) &&
+					((waypoints[w].flags & W_FL_TEAM) != team)) continue;
+				float d = (waypoints[w].origin - vecTarget).Length();
+				if (d < nearDist) { nearDist = d; index = w; }
+			}
+
+			if (index != -1)
+			{
+				pBot->wpt_goal_type = WPT_GOAL_LOCATION;
+				// NOTE: do NOT assign pBot->waypoint_goal here — see Cold
+				// Spot block above for rationale.
+				return index;
+			}
+		}
+
+		// No target this frame (e.g. between waves with no pickup target):
+		// fall through to default goal selection so the bot still wanders.
 	}
 
 	if (random < health_chance)

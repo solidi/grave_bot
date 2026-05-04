@@ -350,6 +350,13 @@ void BotSpawnInit( bot_t *pBot )
 	pBot->f_coldspot_last_in_zone   = 0.0f;
 	pBot->v_coldspot_last_origin    = g_vecZero;
 
+	// Clear per-life Horde state.
+	pBot->i_horde_role            = HORDE_ROLE_NONE;
+	pBot->f_horde_role_eval_time  = 0.0f;
+	pBot->p_horde_target          = NULL;
+	pBot->f_horde_target_time     = 0.0f;
+	pBot->v_horde_last_target_org = g_vecZero;
+
 	// Clear per-life Busters state.
 	pBot->i_busters_role           = BUSTERS_ROLE_NONE;
 	pBot->f_busters_role_eval_time = 0.0f;
@@ -1906,6 +1913,8 @@ void BotThink( bot_t *pBot )
 		BotArenaPreUpdate(pBot);
 	else if (is_gameplay == GAME_COLDSPOT)
 		BotColdSpotPreUpdate(pBot);
+	else if (is_gameplay == GAME_HORDE)
+		BotHordePreUpdate(pBot);
 
 	// it is time to look for a waypoint AND
 	// there are waypoints in this level...
@@ -2143,6 +2152,14 @@ void BotThink( bot_t *pBot )
 			BotBustersPreUpdate(pBot);
 		}
 
+		// Horde: pick the highest-threat monster and pre-set v_goal so the
+		// movement block has a target on every tick — the bot streams toward
+		// the target even before BotFindEnemy resolves to it.
+		if (is_gameplay == GAME_HORDE)
+		{
+			BotHordePreUpdate(pBot);
+		}
+
 		if (b_botdontshoot == 0)
 		{
 			pBot->pBotEnemy = BotFindEnemy( pBot );
@@ -2324,6 +2341,10 @@ void BotThink( bot_t *pBot )
 			else if (is_gameplay == GAME_BUSTERS && BotBustersThink(pBot))
 			{
 				// BotBustersThink sets v_goal + f_move_speed based on Buster vs Ghost role.
+			}
+			else if (is_gameplay == GAME_HORDE && BotHordeThink(pBot))
+			{
+				// BotHordeThink sets v_goal + f_move_speed for hunting / resupply / retreat.
 			}
 			else if (pBot->pBotPickupItem)
 			{
@@ -2780,7 +2801,7 @@ void BotThink( bot_t *pBot )
 	// is refreshed every tick by the pre-scan and the mode's Think function
 	// — don't wipe it here or the movement block will never see the target
 	// and the bot follows waypoints instead.
-	if (is_gameplay != GAME_COLDSKULL && is_gameplay != GAME_KTS && is_gameplay != GAME_CTC && is_gameplay != GAME_CTF && is_gameplay != GAME_ARENA && is_gameplay != GAME_COLDSPOT && is_gameplay != GAME_BUSTERS)
+	if (is_gameplay != GAME_COLDSKULL && is_gameplay != GAME_KTS && is_gameplay != GAME_CTC && is_gameplay != GAME_CTF && is_gameplay != GAME_ARENA && is_gameplay != GAME_COLDSPOT && is_gameplay != GAME_BUSTERS && is_gameplay != GAME_HORDE)
 		pBot->v_goal = g_vecZero;
 	// is our goal ent still around?
 	if (pBot->pGoalEnt != NULL)
@@ -2998,7 +3019,19 @@ void BotThink( bot_t *pBot )
 				&& pBot->v_goal != g_vecZero
 				&& ((pBot->v_goal - pEdict->v.origin).Length() < 300.0f
 					|| FVisible(pBot->v_goal, pEdict)));
-			if (ktsDirectSteer || ktsBallChase || skullChase || ctcChase || ctfChase || arenaChase || coldspotChase || bustersChase)
+			// Horde: direct-steer toward picked monster on final approach so
+			// bots commit to the target instead of stalling at the last
+			// waypoint.  Mirrors CTF/ColdSpot two-tier gating.
+			bool hordeChase = false;
+			if (is_gameplay == GAME_HORDE && pBot->v_goal != g_vecZero)
+			{
+				float hDist = (pBot->v_goal - pEdict->v.origin).Length();
+				if (hDist < 128.0f)
+					hordeChase = true;
+				else if (hDist < 500.0f && FVisible(pBot->v_goal, pEdict))
+					hordeChase = true;
+			}
+			if (ktsDirectSteer || ktsBallChase || skullChase || ctcChase || ctfChase || arenaChase || coldspotChase || bustersChase || hordeChase)
 				bGoGoal = true;
 			else if (goalDist < 256 && FVisible(pBot->v_goal, pEdict))
 				bGoGoal = true;

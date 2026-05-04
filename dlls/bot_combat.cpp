@@ -2055,6 +2055,230 @@ bool BotColdSpotThink( bot_t *pBot )
 }
 
 
+//=========================================================
+// Horde — survivors-vs-monsters mode
+//
+// Gamerules: each wave spawns N monsters tagged with
+// pev->message == "horde" and pev->fuser4 == RADAR_HORDE.
+// All survivor players are on team "survivors"; FF is
+// blocked at gamerules.  Between waves there is a short
+// breather window (typically ~3-10s) during which surviving
+// players can run the map collecting health/armor/ammo
+// pickups; the gamerules also auto-replenish HP to 100 when
+// the next wave begins.
+//
+// Bot strategy:
+//   HUNTER   — wave active, pursue highest-threat-by-score
+//              monster (gargantua > assassin > grunt > ...).
+//              Sticky for 4s to avoid target thrashing.
+//   RESUPPLY — no monsters alive, fall back to default
+//              pickup/wander logic so the bot grabs items
+//              during the inter-wave breather.
+//   RETREAT  — HP <= 25, drop the chase and let default
+//              pickup logic find a healthkit.
+//=========================================================
+#define HORDE_STICKY_TIME       4.0f
+#define HORDE_RETREAT_HP        25.0f
+#define HORDE_TARGET_SWITCH_DIST 256.0f
+
+#define MAX_HORDE_CACHE 32
+static float    s_horde_cache_time = -1.0f;
+static int      s_horde_count = 0;
+static edict_t *s_horde_monsters[MAX_HORDE_CACHE];
+
+static int BotHordeMonsterScore( edict_t *pMonster )
+{
+	const char *cls = STRING(pMonster->v.classname);
+	if (FStrEq(cls, "monster_gargantua"))      return 100;
+	if (FStrEq(cls, "monster_human_assassin")) return  60;
+	if (FStrEq(cls, "monster_panther"))        return  50;
+	if (FStrEq(cls, "monster_human_grunt"))    return  40;
+	if (FStrEq(cls, "monster_houndeye"))       return  25;
+	if (FStrEq(cls, "monster_zombie"))         return  15;
+	if (FStrEq(cls, "monster_headcrab"))       return   8;
+	return 10;
+}
+
+static void BotHordeFindEntities( void )
+{
+	if (s_horde_cache_time == gpGlobals->time)
+		return;
+
+	s_horde_cache_time = gpGlobals->time;
+	s_horde_count = 0;
+
+	edict_t *pEnt = NULL;
+	while ((pEnt = UTIL_FindEntityByString(pEnt, "message", "horde")) != NULL
+		&& s_horde_count < MAX_HORDE_CACHE)
+	{
+		if (FNullEnt(pEnt) || pEnt->free)
+			continue;
+		if (!(pEnt->v.flags & FL_MONSTER))
+			continue;
+		if (!IsAlive(pEnt))
+			continue;
+		if (pEnt->v.effects & EF_NODRAW)
+			continue;
+		s_horde_monsters[s_horde_count++] = pEnt;
+	}
+}
+
+edict_t *BotHordePickTarget( bot_t *pBot )
+{
+	BotHordeFindEntities();
+	if (s_horde_count == 0)
+		return NULL;
+
+	edict_t *pEdict = pBot->pEdict;
+
+	// Sticky preference: keep current target while it lives and the
+	// 4-second lock is unexpired.  Prevents thrashing between two
+	// equally-weighted threats every 0.75s role tick.
+	if (!FNullEnt(pBot->p_horde_target) && IsAlive(pBot->p_horde_target)
+		&& (pBot->p_horde_target->v.flags & FL_MONSTER)
+		&& pBot->f_horde_target_time > gpGlobals->time)
+	{
+		return pBot->p_horde_target;
+	}
+
+	// Score = base_threat * 1000 / (distance + 200).  Closer + higher
+	// base_threat wins; constants tuned so a gargantua at 1500u still
+	// outweighs a headcrab at 200u, but a headcrab at 100u beats a
+	// gargantua at 4000u.
+	float bestScore = -1.0f;
+	edict_t *pBest = NULL;
+	for (int i = 0; i < s_horde_count; i++)
+	{
+		edict_t *pM = s_horde_monsters[i];
+		float dist = (pM->v.origin - pEdict->v.origin).Length();
+		float score = (float)BotHordeMonsterScore(pM) * (1000.0f / (dist + 200.0f));
+		if (score > bestScore)
+		{
+			bestScore = score;
+			pBest = pM;
+		}
+	}
+	return pBest;
+}
+
+//=========================================================
+// BotHordePreUpdate — called from BotThink BEFORE
+// BotFindEnemy every frame in Horde mode.
+//
+// Refreshes the monster cache, evaluates the bot's role at
+// ~0.75s intervals, picks the best monster target with a
+// 4-second sticky lock, and pre-sets v_goal so the movement
+// block has a destination on every tick (even ticks where
+// combat runs instead of BotHordeThink).
+//=========================================================
+void BotHordePreUpdate( bot_t *pBot )
+{
+	if (is_gameplay != GAME_HORDE)
+		return;
+
+	edict_t *pEdict = pBot->pEdict;
+	BotHordeFindEntities();
+
+	// Role evaluation throttled to 0.75s (matches Cold Spot cadence).
+	if (pBot->f_horde_role_eval_time < gpGlobals->time)
+	{
+		pBot->f_horde_role_eval_time = gpGlobals->time + 0.75f;
+
+		if (pEdict->v.health > 0 && pEdict->v.health <= HORDE_RETREAT_HP)
+			pBot->i_horde_role = HORDE_ROLE_RETREAT;
+		else if (s_horde_count == 0)
+			pBot->i_horde_role = HORDE_ROLE_RESUPPLY;
+		else
+			pBot->i_horde_role = HORDE_ROLE_HUNTER;
+	}
+
+	if (pBot->i_horde_role == HORDE_ROLE_HUNTER)
+	{
+		edict_t *pTarget = BotHordePickTarget(pBot);
+		if (!FNullEnt(pTarget))
+		{
+			// Refresh sticky lock when target changes.
+			if (pBot->p_horde_target != pTarget)
+			{
+				pBot->p_horde_target      = pTarget;
+				pBot->f_horde_target_time = gpGlobals->time + HORDE_STICKY_TIME;
+			}
+
+			Vector vecMonster = pTarget->v.origin;
+
+			// Detect a meaningful target relocation — wipe stale waypoint
+			// routing so the bot re-pathfinds on the next nav tick.
+			if (pBot->v_horde_last_target_org != g_vecZero
+				&& (pBot->v_horde_last_target_org - vecMonster).Length() > HORDE_TARGET_SWITCH_DIST)
+			{
+				pBot->waypoint_goal        = -1;
+				pBot->old_waypoint_goal    = -1;
+				pBot->f_waypoint_goal_time = 0.0f;
+			}
+			pBot->v_horde_last_target_org = vecMonster;
+
+			pBot->v_goal           = vecMonster;
+			pBot->f_goal_proximity = 64.0f;
+
+			// Suppress generic item detours while hunting.
+			pBot->pBotPickupItem = NULL;
+			pBot->item_waypoint  = -1;
+			return;
+		}
+		// Fall through if no target found this frame.
+	}
+
+	// RESUPPLY / RETREAT (or HUNTER with no target this frame): clear
+	// v_goal so the default pickup/wander logic runs and the bot grabs
+	// items during the inter-wave breather or retreat phase.
+	pBot->v_goal                  = g_vecZero;
+	pBot->f_goal_proximity        = 0.0f;
+	pBot->p_horde_target          = NULL;
+	pBot->f_horde_target_time     = 0.0f;
+	pBot->v_horde_last_target_org = g_vecZero;
+}
+
+//=========================================================
+// BotHordeThink — called from BotThink when no combat is
+// active.
+//
+// HUNTER   — drive toward picked monster origin (set by
+//            PreUpdate); face the target.
+// RESUPPLY — return false to let default nav/pickup run.
+// RETREAT  — return false; the default pickup logic
+//            naturally prioritizes health when low.
+//=========================================================
+bool BotHordeThink( bot_t *pBot )
+{
+	if (is_gameplay != GAME_HORDE)
+		return false;
+
+	edict_t *pEdict = pBot->pEdict;
+	pBot->f_pause_time = 0;
+
+	if (pBot->i_horde_role == HORDE_ROLE_HUNTER && pBot->v_goal != g_vecZero)
+	{
+		pBot->f_move_speed     = pBot->f_max_speed;
+		pBot->f_goal_proximity = 64.0f;
+
+		// Face the target so the bot can shoot the moment it acquires.
+		Vector vecDir = pBot->v_goal - pEdict->v.origin;
+		if (vecDir.Length() > 1.0f)
+		{
+			Vector angles = UTIL_VecToAngles(vecDir);
+			pEdict->v.ideal_yaw = angles.y;
+			BotFixIdealYaw(pEdict);
+		}
+		return true;
+	}
+
+	// RESUPPLY / RETREAT: fall back to default nav so BotFindItem and
+	// BotFindWaypointGoal route to pickups (the bot pickup heuristics
+	// already weight health/armor/ammo by current need).
+	return false;
+}
+
+
 edict_t *BotFindEnemy( bot_t *pBot )
 {
 //	ALERT(at_console, "BotFindEnemy\n");
@@ -2080,6 +2304,33 @@ edict_t *BotFindEnemy( bot_t *pBot )
 			// we're a prop, can't have an enemy
 			pBot->pBotEnemy = NULL;
 			return NULL;
+		}
+	}
+
+	// Horde: when the bot is in RETREAT, refuse to acquire any enemy so
+	// it commits to falling back / grabbing pickups instead of wading
+	// back into combat at low HP.  Sticky preference for the picked
+	// monster target is applied via pPrevEnemy below — if the picked
+	// target is alive and visible, prefer it over closer targets.
+	if (is_gameplay == GAME_HORDE)
+	{
+		if (pBot->i_horde_role == HORDE_ROLE_RETREAT)
+		{
+			pBot->pBotEnemy = NULL;
+			return NULL;
+		}
+		// Promote the sticky horde target into pPrevEnemy so the existing
+		// "remember enemy" branch keeps it as the preferred candidate.
+		if (!FNullEnt(pBot->p_horde_target) && IsAlive(pBot->p_horde_target)
+			&& pBot->f_horde_target_time > gpGlobals->time)
+		{
+			Vector vecTOrg = pBot->p_horde_target->v.origin + pBot->p_horde_target->v.view_ofs;
+			if (FInViewCone(&vecTOrg, pEdict) && FVisible(vecTOrg, pEdict))
+			{
+				pBot->pBotEnemy = pBot->p_horde_target;
+				pBot->f_bot_see_enemy_time = gpGlobals->time;
+				return pBot->p_horde_target;
+			}
 		}
 	}
 
@@ -2558,7 +2809,18 @@ bool BotShouldEngageEnemy( bot_t *pBot, edict_t *pEnemy )
 	// must have enemy and the enemy must be a client
 	if ((pSelect == NULL) || (pEnemy == NULL) || 
 		(strcmp(STRING(pEnemy->v.classname), "player") != 0))
+	{
+		// Horde: monsters are the *only* legitimate targets and they
+		// aren't class "player".  Treat any live FL_MONSTER as engage-
+		// worthy so the engagement state machine commits, the combat
+		// movement block runs (strafing, longjump, ignore-wpt), and
+		// the bot doesn't immediately fall into the "give up engaging"
+		// branch the next frame.
+		if (is_gameplay == GAME_HORDE && pEnemy != NULL
+			&& (pEnemy->v.flags & FL_MONSTER) && IsAlive(pEnemy))
+			return TRUE;
 		return FALSE;
+	}
 
 	// never engage the enemy if we have a sci/rsrc
 	if (mod_id == SI_DLL && pBot->i_carry_type)
@@ -3402,6 +3664,55 @@ void BotShootAtEnemy( bot_t *pBot )
 		pBot->f_combat_stuck_since      = 0.0f;
 	}
 
+	// -----------------------------------------------------------------
+	// Horde elevated-monster pursuit: if a monster is above the bot
+	// (e.g. headcrab on a platform/ledge), the bot would otherwise keep
+	// running its waypoint underneath while only aim-locking, never
+	// firing because FVisible to the body keeps clipping the platform
+	// edge and never closing because the monster's Z is unreachable
+	// from the current path.
+	//
+	// When we have a live monster enemy that is meaningfully above us
+	// (heightDiff > 32) and within engagement range (≤ 600u horiz),
+	// break off the waypoint, lock on, and hand off to the multi-jump
+	// helper with bForceTrigger=true.  The helper runs ground →
+	// double → triple-jump (flip) and re-asserts forward facing + max
+	// forward speed every frame — matching the CTF/Busters flag-pursuit
+	// behavior the user referenced.  No horizontal-distance "stall"
+	// gate here: bots running waypoints past a ledge mob never trip
+	// the stall detector, so they'd never engage without this branch.
+	// -----------------------------------------------------------------
+	if (is_gameplay == GAME_HORDE && pBot->pBotEnemy &&
+		(pBot->pBotEnemy->v.flags & FL_MONSTER) && IsAlive(pBot->pBotEnemy))
+	{
+		float heightDiff = pBot->pBotEnemy->v.origin.z - pEdict->v.origin.z;
+		Vector vecFlat = pBot->pBotEnemy->v.origin - pEdict->v.origin;
+		vecFlat.z = 0;
+		float horzDist = vecFlat.Length();
+
+		if (heightDiff > 32.0f && horzDist <= 600.0f)
+		{
+			// Suspend waypoint following so the multi-jump can re-aim
+			// the bot's yaw at the monster instead of the next node.
+			pBot->f_ignore_wpt_time = gpGlobals->time + 0.5f;
+			pBot->f_move_speed      = pBot->f_max_speed;
+
+			// Kick off (or continue) the ground → double → triple-jump
+			// sequence toward the monster.  bForceTrigger=true bypasses
+			// the helper's "wait 0.5s + close horizontally" gate so we
+			// commit immediately when the elevation is detected.
+			if (pBot->i_goal_jump_phase == 0
+				&& (pEdict->v.flags & FL_ONGROUND))
+			{
+				BotGoalElevatedJump(pBot, pBot->pBotEnemy->v.origin, true /*force*/);
+			}
+			else if (pBot->i_goal_jump_phase > 0)
+			{
+				BotGoalElevatedJump(pBot, pBot->pBotEnemy->v.origin, true /*force*/);
+			}
+		}
+	}
+
 	// allow 15 seconds for the mindray to regen it's ammo if it's low
 	if (mod_id == SI_DLL && pBot->current_weapon.iId == SI_WEAPON_MINDRAY &&
 		BotAssessPrimaryAmmo(pBot, SI_WEAPON_MINDRAY) == AMMO_CRITICAL)
@@ -3497,6 +3808,18 @@ void BotShootAtEnemy( bot_t *pBot )
 	// Arena: always engage immediately — the opponent IS the only objective.
 	// Skip the random aggressiveness gate.
 	if (is_gameplay == GAME_ARENA && !pBot->b_engaging_enemy && pBot->pBotEnemy != NULL)
+	{
+		if (pBot->waypoint_goal != -1)
+			pBot->old_waypoint_goal = pBot->waypoint_goal;
+		pBot->b_engaging_enemy = TRUE;
+	}
+
+	// Horde: same as Arena — monsters are the only objective.  Skip the
+	// random aggressiveness gate so bots commit to combat as soon as a
+	// monster is acquired, and so the engagement-driven movement block
+	// (strafing, ignore-wpt, longjump) actually runs.
+	if (is_gameplay == GAME_HORDE && !pBot->b_engaging_enemy && pBot->pBotEnemy != NULL
+		&& (pBot->pBotEnemy->v.flags & FL_MONSTER))
 	{
 		if (pBot->waypoint_goal != -1)
 			pBot->old_waypoint_goal = pBot->waypoint_goal;
