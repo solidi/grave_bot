@@ -180,6 +180,14 @@ enum
 	BUSTERS_ROLE_GHOST_HUNTER    // buster alive, pursue them
 };
 
+enum
+{
+	HORDE_ROLE_NONE = 0,
+	HORDE_ROLE_HUNTER,    // wave active, pursue picked monster
+	HORDE_ROLE_RESUPPLY,  // between waves, gather pickups
+	HORDE_ROLE_RETREAT    // low HP / out of ammo, fall back to teammate or pickup
+};
+
 extern double pi;
 
 typedef struct
@@ -437,6 +445,13 @@ typedef struct
 	float f_coldspot_role_eval_time; // timer for re-evaluating role
 	float f_coldspot_last_in_zone;   // last gpGlobals->time the bot was inside the 256u zone
 	Vector v_coldspot_last_origin;   // last known coldspot origin (for relocation detection)
+
+	// Horde — monster-hunt state
+	int     i_horde_role;            // current role (HORDE_ROLE_*)
+	float   f_horde_role_eval_time;  // timer for re-evaluating role
+	edict_t *p_horde_target;         // sticky monster target (focus-fire bias)
+	float   f_horde_target_time;     // expiry for sticky target preference
+	Vector  v_horde_last_target_org; // last picked monster origin (for waypoint-snap detection)
 
 	// Busters — role + anti-stalemate state
 	int    i_busters_role;             // current role (BUSTERS_ROLE_*)

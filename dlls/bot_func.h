@@ -79,6 +79,9 @@ bool BotColdSpotThink( bot_t *pBot );
 void BotColdSpotPreUpdate( bot_t *pBot );
 bool BotBustersThink( bot_t *pBot );
 void BotBustersPreUpdate( bot_t *pBot );
+bool BotHordeThink( bot_t *pBot );
+void BotHordePreUpdate( bot_t *pBot );
+edict_t *BotHordePickTarget( bot_t *pBot );
 edict_t *BotFindBestSkull( edict_t *pBotEdict, float *pflDist = NULL );
 
 #endif // BOT_FUNC_H
