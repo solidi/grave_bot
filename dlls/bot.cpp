@@ -269,6 +269,11 @@ void BotSpawnInit( bot_t *pBot )
 	pBot->f_aim_tracking_time = 0.0;
 	pBot->f_aim_x_angle_delta = 0.0;
 	pBot->f_aim_y_angle_delta = 0.0;
+	pBot->f_aim_jitter_refresh_time = 0.0;
+	pBot->f_aim_jitter_x = 0.0;
+	pBot->f_aim_jitter_y = 0.0;
+	pBot->f_combat_switch_cooldown = 0.0;
+	pBot->f_next_melee_time = 0.0;
 	pBot->f_last_enemy_los_time = 0.0;
 	pBot->i_burst_count = 0;
 	pBot->f_burst_pause_until = 0.0;
