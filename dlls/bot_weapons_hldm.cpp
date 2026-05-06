@@ -124,9 +124,9 @@ bot_weapon_select_t valve_weapon_select[] =
 		},
 		5,						// skill level
 		4,						// priority
-		250.0,					// min primary distance
+		300.0,					// min primary distance
 		9999.0,					// max primary distance
-		250.0,					// min secondary distance
+		300.0,					// min secondary distance
 		9999.0,					// max secondary distance
 		TRUE,					// can use underwater?
 		2.0,					// how long does this weapon take to reload?
@@ -558,7 +558,7 @@ bot_weapon_select_t valve_weapon_select[] =
 		},
 		5,						// skill level
 		4,						// priority
-		300.0,					// min primary distance
+		150.0,					// min primary distance
 		9999.0,					// max primary distance
 		300.0,					// min secondary distance
 		9999.0,					// max secondary distance

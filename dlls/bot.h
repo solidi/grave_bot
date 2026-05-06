@@ -344,6 +344,20 @@ typedef struct
 	float	f_aim_x_angle_delta;
 	float	f_aim_y_angle_delta;
 
+	// Persistent low-frequency aim jitter (refreshed every ~0.15-0.30s) to
+	// prevent visible per-frame "vibration" while locked onto a target.
+	float	f_aim_jitter_refresh_time;
+	float	f_aim_jitter_x;
+	float	f_aim_jitter_y;
+
+	// Combat weapon-switch hysteresis (avoid oscillating between weapons whose
+	// distance gates straddle the current enemy range).
+	float	f_combat_switch_cooldown;
+
+	// Independent close-range melee impulse cooldown (kick/punch when an
+	// enemy is < 96u away, even mid weapon-switch when no fire occurs).
+	float	f_next_melee_time;
+
 	// human-feel combat softening
 	float	f_last_enemy_los_time;  // last time this bot had LOS on pBotEnemy
 	int		i_burst_count;          // BotFireWeapon ticks with trigger held for an auto at range >350u (not 1:1 with rounds)

@@ -3215,6 +3215,41 @@ bool BotFireWeapon(Vector v_enemy, bot_t *pBot, int weapon_choice, bool nofire)
 
 		iId = pSelect[final_index].iId;
 
+		// Combat weapon-switch hysteresis: when the bot recently switched
+		// weapons in combat (cooldown active), and the current weapon is
+		// still usable at this distance for either fire mode, stick with
+		// it instead of switching again.  Without this, an enemy whose
+		// distance is straddling a weapon's primary_min/max boundary
+		// (e.g. cannon @ 300u min vs. a headcrab leaping in/out) causes
+		// constant switch-and-cancel-fire churn that prevents the bot
+		// from ever firing.
+		if (pBot->f_combat_switch_cooldown > gpGlobals->time &&
+			pBot->current_weapon.iId > 0 &&
+			pBot->current_weapon.iId != iId &&
+			UTIL_HasWeaponId(pEdict, pBot->current_weapon.iId))
+		{
+			int cur_idx = WeaponGetSelectIndex(pBot->current_weapon.iId);
+			if (cur_idx >= 0 && pSelect[cur_idx].iId == pBot->current_weapon.iId)
+			{
+				bool cur_prim_ok =
+					(distance >= pSelect[cur_idx].primary_min_distance) &&
+					(distance <= pSelect[cur_idx].primary_max_distance) &&
+					(BotAssessPrimaryAmmo(pBot, pBot->current_weapon.iId) != AMMO_CRITICAL);
+				bool cur_sec_ok =
+					(distance >= pSelect[cur_idx].secondary_min_distance) &&
+					(distance <= pSelect[cur_idx].secondary_max_distance) &&
+					(BotAssessSecondaryAmmo(pBot, pBot->current_weapon.iId) != AMMO_CRITICAL);
+
+				if (cur_prim_ok || cur_sec_ok)
+				{
+					final_index = cur_idx;
+					iId = pBot->current_weapon.iId;
+					use_primary[cur_idx] = cur_prim_ok;
+					use_secondary[cur_idx] = (!cur_prim_ok) && cur_sec_ok;
+				}
+			}
+		}
+
 		// select this weapon if it isn't already selected
 		if (is_gameplay != GAME_CTC && pBot->current_weapon.iId != iId/* && g_flWeaponSwitch <= gpGlobals->time*/)
 		{
@@ -3223,6 +3258,9 @@ bool BotFireWeapon(Vector v_enemy, bot_t *pBot, int weapon_choice, bool nofire)
 			//ALERT( at_console, "Switching to %s\n", pSelect[final_index].weapon_name);
 			UTIL_SelectItem(pEdict, pSelect[final_index].weapon_name);
 			pBot->f_shoot_time = gpGlobals->time + 0.5;
+			// Lock out further combat switches for ~1.5s so we don't
+			// oscillate when the enemy moves across a distance threshold.
+			pBot->f_combat_switch_cooldown = gpGlobals->time + 1.5;
 			pBot->f_reload_time = 0;
 			return FALSE;
 		}
@@ -3540,19 +3578,51 @@ void BotShootAtEnemy( bot_t *pBot )
 		// bots.  Enemy velocity still amplifies tracking error so fast strafing
 		// matters.  Continuous per-frame jitter is layered on top so aim is
 		// never pixel-perfect between step refreshes.
-		f_velocity = fmax(pBot->pBotEnemy->v.velocity.Length() * 0.01, 1);
-		d_x += pBot->f_aim_x_angle_delta * f_velocity;
-		d_y += pBot->f_aim_y_angle_delta * f_velocity;
+		//
+		// BUT: when LOS to the enemy was lost recently, the bot is aiming
+		// at a remembered position.  Adding velocity-scaled tracking error
+		// AND per-frame jitter on top of that produces visible pitch/yaw
+		// wobble (the gun bobs while the monster is occluded).  In that
+		// state, hold a smooth lock on the remembered point — the
+		// remembered position itself is already "error" enough.
+		bool has_recent_los = (pBot->f_bot_see_enemy_time > 0.0f) &&
+			((gpGlobals->time - pBot->f_bot_see_enemy_time) < 0.3f);
 
 		float difficulty = bot_aim_difficulty;
 		if (difficulty < 0.0f) difficulty = 0.0f;
 		if (difficulty > 2.0f) difficulty = 2.0f;
 
-		float jitter = aim_jitter_scale[pBot->bot_skill] * difficulty;
-		if (jitter > 0.0f)
+		if (has_recent_los)
 		{
-			d_x += RANDOM_FLOAT(-jitter, jitter);
-			d_y += RANDOM_FLOAT(-jitter, jitter);
+			f_velocity = fmax(pBot->pBotEnemy->v.velocity.Length() * 0.01, 1);
+			d_x += pBot->f_aim_x_angle_delta * f_velocity;
+			d_y += pBot->f_aim_y_angle_delta * f_velocity;
+
+			float jitter = aim_jitter_scale[pBot->bot_skill] * difficulty;
+			if (jitter > 0.0f)
+			{
+				// Smooth aim: use a persistent jitter offset refreshed at a low
+				// frequency (every 0.15-0.30s) instead of fresh per-frame
+				// randomization, which reads as visible "vibration" on the
+				// bot's view.
+				if (pBot->f_aim_jitter_refresh_time < gpGlobals->time)
+				{
+					pBot->f_aim_jitter_refresh_time = gpGlobals->time +
+						RANDOM_FLOAT(0.15f, 0.30f);
+					pBot->f_aim_jitter_x = RANDOM_FLOAT(-jitter, jitter);
+					pBot->f_aim_jitter_y = RANDOM_FLOAT(-jitter, jitter);
+				}
+				d_x += pBot->f_aim_jitter_x;
+				d_y += pBot->f_aim_jitter_y;
+			}
+		}
+		else
+		{
+			// Occluded: zero out persistent jitter so it doesn't snap back
+			// in when LOS is reacquired mid-refresh-window.
+			pBot->f_aim_jitter_x = 0.0f;
+			pBot->f_aim_jitter_y = 0.0f;
+			pBot->f_aim_jitter_refresh_time = 0.0f;
 		}
 	}
 
@@ -3984,6 +4054,30 @@ void BotShootAtEnemy( bot_t *pBot )
 		if (pBot->f_longjump_time > gpGlobals->time)
 			pBot->f_move_speed = pBot->f_strafe_speed = 0;
 	}
+	// Independent close-range melee: kick or punch when an enemy is within
+	// 96u, on a per-skill cooldown.  Runs regardless of weapon-fire state
+	// so the bot still throws hands during a weapon switch / shoot-time
+	// hold-off — without this, a bot oscillating between weapons (cannon
+	// out of min range, pistol in range) would stand passively while a
+	// headcrab clawed it.  Cooldown intervals (s):
+	//   skill 0 (best)   -> 0.6 + 0.3 jitter
+	//   skill 4 (worst)  -> 1.5 + 0.3 jitter
+	// not overpowered: still capped at one impulse per cooldown window.
+	if (sv_botsmelee.value > 0 && is_gameplay != GAME_GUNGAME &&
+		pBot->pBotEnemy && f_distance <= 96.0f &&
+		pBot->f_next_melee_time < gpGlobals->time &&
+		FInViewCone(&v_enemy_origin, pEdict) &&
+		FVisible(v_enemy_origin, pEdict))
+	{
+		static const float melee_cooldown[5] = { 0.6f, 0.8f, 1.0f, 1.25f, 1.5f };
+		int skill = pBot->bot_skill;
+		if (skill < 0) skill = 0;
+		if (skill > 4) skill = 4;
+		pBot->f_next_melee_time = gpGlobals->time +
+			melee_cooldown[skill] + RANDOM_FLOAT(0.0f, 0.3f);
+		pEdict->v.impulse = 206 + RANDOM_LONG(0, 1);  // 206 kick / 207 punch
+	}
+
 	// is it time to shoot yet?
 	if ((pBot->f_shoot_time <= gpGlobals->time) && !(pBot->pEdict->v.flags & FL_GODMODE) &&
 		!(pBot->pBotEnemy->v.flags & FL_GODMODE) && 
