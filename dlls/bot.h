@@ -188,6 +188,16 @@ enum
 	HORDE_ROLE_RETREAT    // low HP / out of ammo, fall back to teammate or pickup
 };
 
+enum
+{
+	LOOT_ROLE_NONE = 0,
+	LOOT_ROLE_CARRIER,   // self holds loot → run to loot_goal
+	LOOT_ROLE_RECOVERER, // enemy holds loot → force-engage carrier
+	LOOT_ROLE_ESCORT,    // teammate holds loot → trail and protect
+	LOOT_ROLE_GRABBER,   // loot_entity is loose → run to grab it
+	LOOT_ROLE_BREAKER    // default — seek and break loot_crates
+};
+
 extern double pi;
 
 typedef struct
@@ -443,6 +453,19 @@ typedef struct
 	bool  b_ctf_has_flag;          // TRUE when bot carries enemy flag
 	int   i_ctf_role;              // current CTF role (CTF_ROLE_*)
 	float f_ctf_role_eval_time;    // timer for re-evaluating CTF role
+
+	// Loot — round-based 4-team objective state
+	bool  b_loot_has_loot;             // TRUE while this bot carries the loot
+	int   i_loot_role;                 // current loot role (LOOT_ROLE_*)
+	float f_loot_role_eval_time;       // timer for re-evaluating loot role
+	float f_loot_crate_target_time;    // rate-limit crate-target re-selection
+	int   i_loot_crate_target_index;   // cached crate edict index, -1 if none
+	float f_loot_ontop_until;          // duck-attack window expiry while standing on crate
+	int   i_loot_crate_ignore_index;   // crate index temporarily off-limits after dismount
+	float f_loot_crate_ignore_until;   // time when ignore expires
+	float f_loot_carrier_stuck_since;  // carrier stall start time (0 = not stuck)
+	float f_loot_carrier_check_time;   // next progress sample time
+	float f_loot_carrier_last_dist;    // last sampled distance to loot_goal
 
 	// Arena (1v1) — active opponent and movement variation state
 	int   i_arena_opponent;        // entity index of the 1v1 opponent (cached per round)

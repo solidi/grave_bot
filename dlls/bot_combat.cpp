@@ -24,6 +24,8 @@
 #include "bot_weapons.h"
 #include "waypoint.h"
 
+extern bot_t bots[32];
+
 extern int mod_id;
 extern bot_weapon_t weapon_defs[MAX_WEAPONS];
 extern bool b_observer_mode;
@@ -771,6 +773,748 @@ bool BotCtfThink( bot_t *pBot )
 	}
 
 	return false;
+}
+
+//=========================================================
+// Loot mode — 4-team round-based objective AI
+//
+// Gamerules: many `loot_crate` entities spawn each round
+// (one randomly marked as containing the loot).  Breaking
+// the loot crate spawns a `loot_entity` (touchable) that a
+// player picks up; `CHalfLifeLoot::CaptureCharm` then sets
+// `pPlayer->m_bHoldingLoot = TRUE` and writes
+// `pev->fuser4 = RADAR_LOOT` (16) on the holder.  All other
+// players carry their team index (0–3) in fuser4.  When the
+// holder reaches `loot_goal`, their team scores.
+//
+// Bot strategy (priority order, evaluated every 0.75 s):
+//   CARRIER   — self has loot → run to loot_goal, suppress
+//                 engagement above 25 HP.
+//   RECOVERER — enemy holds loot → force-target the carrier.
+//   ESCORT    — teammate holds loot → trail and protect.
+//   GRABBER   — loot_entity loose → always run to grab it.
+//   BREAKER   — default — seek the nearest loot_crate and
+//                 shoot it open; switch crates after broken
+//                 or after a stuck timeout.
+//=========================================================
+#define RADAR_LOOT_VAL  16   // mirrors RADAR_LOOT in src/common/const.h
+
+#define LOOT_ROLE_EVAL_CADENCE   0.75f
+#define LOOT_CRATE_PICK_CADENCE  0.75f
+#define LOOT_CARRIER_PACIFY_HP   25.0f
+#define LOOT_ESCORT_PROXIMITY    128.0f
+#define LOOT_BREAKER_FIRE_DIST   1024.0f
+
+#define MAX_LOOT_CRATES 32
+
+static float    s_loot_cache_time = -1.0f;
+static edict_t *s_pLootEntity = NULL;
+static edict_t *s_pLootGoal   = NULL;
+static int      s_loot_crate_count = 0;
+static edict_t *s_loot_crates[MAX_LOOT_CRATES];
+
+//=========================================================
+// BotLootFindEntities — per-frame cached scan for the loot
+// entity, goal, and live crate list.
+//=========================================================
+static void BotLootFindEntities( void )
+{
+	if (s_loot_cache_time == gpGlobals->time)
+		return;
+
+	s_loot_cache_time = gpGlobals->time;
+	s_pLootEntity     = NULL;
+	s_pLootGoal       = NULL;
+	s_loot_crate_count = 0;
+
+	edict_t *pEnt = NULL;
+	while ((pEnt = UTIL_FindEntityByClassname(pEnt, "loot_entity")) != NULL)
+	{
+		if (FNullEnt(pEnt) || pEnt->free) continue;
+		if (pEnt->v.effects & EF_NODRAW)  continue; // held → invisible
+		s_pLootEntity = pEnt;
+		break;
+	}
+
+	pEnt = NULL;
+	while ((pEnt = UTIL_FindEntityByClassname(pEnt, "loot_goal")) != NULL)
+	{
+		if (FNullEnt(pEnt) || pEnt->free) continue;
+		s_pLootGoal = pEnt;
+		break;
+	}
+
+	pEnt = NULL;
+	while ((pEnt = UTIL_FindEntityByClassname(pEnt, "loot_crate")) != NULL
+		&& s_loot_crate_count < MAX_LOOT_CRATES)
+	{
+		if (FNullEnt(pEnt) || pEnt->free) continue;
+		if (pEnt->v.solid == SOLID_NOT)   continue; // mid-Break, ignore
+		if (pEnt->v.health <= 0)          continue;
+		s_loot_crates[s_loot_crate_count++] = pEnt;
+	}
+}
+
+// Return the player edict currently carrying the loot
+// (fuser4 == RADAR_LOOT) or NULL if no carrier.  We cannot
+// rely on `fuser4 > 0` here because all players in Loot
+// have a non-zero team-index fuser4 (0–3) outside of carry.
+static edict_t *BotLootGetHolder( void )
+{
+	for (int i = 1; i <= gpGlobals->maxClients; i++)
+	{
+		edict_t *pPlayer = INDEXENT(i);
+		if (FNullEnt(pPlayer) || pPlayer->free)
+			continue;
+		if (!(pPlayer->v.flags & FL_CLIENT))
+			continue;
+		if (!IsAlive(pPlayer))
+			continue;
+		if ((int)pPlayer->v.fuser4 == RADAR_LOOT_VAL)
+			return pPlayer;
+	}
+	return NULL;
+}
+
+// True when bot pSelf is currently standing on top of pCrate.
+// Use the crate's absolute bbox instead of a fixed radius —
+// loot_crate brushes commonly have horizontal half-widths
+// well over 48u, so a fixed-radius check missed bots planted
+// on the crate's corners.  Test:
+//   1. groundentity == crate (most reliable when it fires), OR
+//   2. on-ground AND bot origin is within the crate's XY
+//      bbox (with a small slop) AND the bot's feet are at or
+//      above the crate's top minus a tolerance.
+static bool BotLootIsOnTopOfCrate( edict_t *pBotEdict, edict_t *pCrate )
+{
+	if (FNullEnt(pBotEdict) || FNullEnt(pCrate)) return false;
+	if (!(pBotEdict->v.flags & FL_ONGROUND)) return false;
+
+	if (!FNullEnt(pBotEdict->v.groundentity)
+		&& pBotEdict->v.groundentity == ENT(pCrate))
+		return true;
+
+	Vector vMins = pCrate->v.absmin;
+	Vector vMaxs = pCrate->v.absmax;
+	const Vector &vOrg = pBotEdict->v.origin;
+
+	const float xySlop  = 16.0f;  // small over-hang allowance
+	const float topSlop = 12.0f;  // ~half a step
+
+	if (vOrg.x < vMins.x - xySlop || vOrg.x > vMaxs.x + xySlop) return false;
+	if (vOrg.y < vMins.y - xySlop || vOrg.y > vMaxs.y + xySlop) return false;
+
+	// Feet roughly at or above crate top (origin is mid-torso, so
+	// origin.z - 36 ≈ feet for a standing player).
+	float feetZ = vOrg.z - 36.0f;
+	return (feetZ >= vMaxs.z - topSlop);
+}
+
+// True when SOME OTHER live bot is currently on top of pCrate.
+// Lets BREAKER target-picking skip already-occupied crates so
+// two bots don't pile onto the same one and block each other.
+static bool BotLootCrateOccupiedByOtherBot( edict_t *pCrate, bot_t *pSelf )
+{
+	if (FNullEnt(pCrate)) return false;
+	for (int i = 0; i < 32; i++)
+	{
+		bot_t *pOther = &bots[i];
+		if (pOther == pSelf) continue;
+		if (FNullEnt(pOther->pEdict) || pOther->pEdict->free) continue;
+		if (!(pOther->pEdict->v.flags & FL_CLIENT)) continue;
+		if (!IsAlive(pOther->pEdict)) continue;
+		if (BotLootIsOnTopOfCrate(pOther->pEdict, pCrate))
+			return true;
+	}
+	return false;
+}
+
+// On-top-of-crate handler.  Called every frame from BotThink.
+//
+// Attacking from on top is unreliable: an eye-trace straight
+// down to the crate origin clips the crate brush itself and
+// reads as occluded — BotShootAtEnemy's FVisible gate then
+// blocks IN_ATTACK, the synthetic-enemy injection skips the
+// crate (same FVisible failure), and forcing the button
+// without aim resolution produces wild swings at empty air.
+//
+// So when we detect we're on top, we DISMOUNT immediately:
+// pick a horizontal away-from-crate direction, override v_goal
+// + suppress waypoint nav for ~1s so the bot actually walks
+// away (a bare strafe wasn't enough — the bot kept landing
+// back on top), and add this crate to a per-bot ignore list
+// so we don't immediately re-target it.  After ~2s the ignore
+// expires and BREAKER picking can re-select it from the side.
+//
+// Returns true when it took control this frame.
+bool BotLootHandleOnTopOfCrate( bot_t *pBot )
+{
+	if (is_gameplay != GAME_LOOT) return false;
+	if (pBot->b_loot_has_loot)    return false;
+	if (pBot->i_loot_role != LOOT_ROLE_BREAKER) return false;
+	if (pBot->i_loot_crate_target_index <= 0)   return false;
+
+	edict_t *pCrate = INDEXENT(pBot->i_loot_crate_target_index);
+	if (FNullEnt(pCrate) || pCrate->free) return false;
+	if (!FStrEq(STRING(pCrate->v.classname), "loot_crate")) return false;
+	if (pCrate->v.solid == SOLID_NOT) return false;
+	if (pCrate->v.health <= 0) return false;
+
+	edict_t *pEdict = pBot->pEdict;
+	if (!BotLootIsOnTopOfCrate(pEdict, pCrate)) return false;
+
+	// Pick a horizontal away-from-crate vector.  Use the bot's
+	// own offset from the crate origin (or fall back to a small
+	// nudge based on entindex parity if we're sitting exactly on
+	// top).  Project to XY and extend ~256u out so v_goal is well
+	// off the crate's bbox.
+	Vector vAway = pEdict->v.origin - pCrate->v.origin;
+	vAway.z = 0;
+	if (vAway.Length() < 4.0f)
+	{
+		vAway = Vector((ENTINDEX(pEdict) & 1) ? 1.0f : -1.0f, 0.0f, 0.0f);
+	}
+	else
+	{
+		vAway = vAway.Normalize();
+	}
+	Vector vAwayPoint = pEdict->v.origin + vAway * 256.0f;
+	vAwayPoint.z = pEdict->v.origin.z;
+
+	// Override navigation so the bot WALKS off the crate instead
+	// of just hopping in place.
+	pBot->v_goal           = vAwayPoint;
+	pBot->f_goal_proximity = 0.0f;
+	pBot->f_move_speed     = pBot->f_max_speed;
+	pBot->f_strafe_speed   = 0.0f;
+
+	// Face the away-direction so f_move_speed actually translates
+	// to motion in that direction.
+	Vector vAng = UTIL_VecToAngles(vAway);
+	pEdict->v.ideal_yaw = vAng.y;
+	BotFixIdealYaw(pEdict);
+
+	// Press IN_JUMP only on the first frame on top — the very
+	// next frames we want to RUN, not jump-spam (which produced
+	// the bunny-hop on top).  We detect first-frame via the
+	// ignore-list state: it's only updated below when we transition.
+	if (pBot->i_loot_crate_ignore_index != ENTINDEX(pCrate))
+	{
+		pEdict->v.button |= IN_JUMP;
+	}
+
+	// Suppress waypoint detours and pickup steering for 1.5s so
+	// the bot actually clears the crate's bbox before nav can
+	// re-route it back into a re-mount.
+	pBot->f_ignore_wpt_time = gpGlobals->time + 1.5f;
+	pBot->pBotPickupItem    = NULL;
+	pBot->item_waypoint     = -1;
+
+	// Add the crate to the per-bot ignore list for 2s and
+	// invalidate the cached pick so BREAKER chooses something else.
+	pBot->i_loot_crate_ignore_index = ENTINDEX(pCrate);
+	pBot->f_loot_crate_ignore_until = gpGlobals->time + 2.0f;
+	pBot->i_loot_crate_target_index = -1;
+	pBot->f_loot_crate_target_time  = gpGlobals->time + 1.0f;
+	pBot->f_loot_ontop_until        = 0;
+	return true;
+}
+
+// Scan all live crates and return the closest one that is
+// currently visible (FInViewCone + FVisible) to the bot,
+// within maxDist.  Used by the BREAKER engagement hook so
+// bots opportunistically shoot crates they walk past — the
+// cached "nearest" pick may be a different crate.
+edict_t *BotLootFindBestVisibleCrate( bot_t *pBot, float maxDist )
+{
+	BotLootFindEntities();
+	if (s_loot_crate_count == 0)
+		return NULL;
+
+	edict_t *pEdict = pBot->pEdict;
+	edict_t *pBest  = NULL;
+	float   bestD   = maxDist;
+
+	for (int i = 0; i < s_loot_crate_count; i++)
+	{
+		edict_t *pC = s_loot_crates[i];
+		if (FNullEnt(pC) || pC->free) continue;
+		if (pC->v.solid == SOLID_NOT) continue;
+		if (pC->v.health <= 0)        continue;
+
+		float d = (pC->v.origin - pEdict->v.origin).Length();
+		if (d >= bestD) continue;
+
+		// Skip per-bot ignore (recently dismounted from this one).
+		if (pBot->f_loot_crate_ignore_until > gpGlobals->time
+			&& pBot->i_loot_crate_ignore_index == ENTINDEX(pC))
+			continue;
+
+		// Skip crates another bot is already camping on top of —
+		// prevents the two-bots-stuck-on-same-crate deadlock.
+		// (Doesn't apply when *I* am the one on top.)
+		if (BotLootCrateOccupiedByOtherBot(pC, pBot)
+			&& !BotLootIsOnTopOfCrate(pEdict, pC))
+			continue;
+
+		// NOTE: no FInViewCone gate — when the bot reaches v_goal
+		// proximity (64u) it stops moving (f_move_speed = 0) and
+		// retains stale yaw.  If we required the cone here the bot
+		// would never assign the crate as enemy, never call
+		// BotShootAtEnemy, and never rotate to face it → permanent
+		// stall.  FVisible alone is enough; the shoot block will
+		// yaw the bot onto the crate and fire next frame.
+		if (!FVisible(pC->v.origin, pEdict)) continue;
+
+		bestD = d;
+		pBest = pC;
+	}
+	return pBest;
+}
+
+// Pick the nearest live crate.  Caches the choice on pBot
+// for LOOT_CRATE_PICK_CADENCE seconds to avoid thrashing.
+static edict_t *BotLootPickNearestCrate( bot_t *pBot )
+{
+	BotLootFindEntities();
+	if (s_loot_crate_count == 0)
+	{
+		pBot->i_loot_crate_target_index = -1;
+		return NULL;
+	}
+
+	edict_t *pEdict = pBot->pEdict;
+
+	// Honor cached pick while still valid + crate alive + not
+	// being camped by another bot (unless I'm the one camping it).
+	if (pBot->i_loot_crate_target_index > 0
+		&& pBot->f_loot_crate_target_time > gpGlobals->time)
+	{
+		edict_t *pCached = INDEXENT(pBot->i_loot_crate_target_index);
+		if (!FNullEnt(pCached) && !pCached->free
+			&& FStrEq(STRING(pCached->v.classname), "loot_crate")
+			&& pCached->v.solid != SOLID_NOT && pCached->v.health > 0
+			&& (!BotLootCrateOccupiedByOtherBot(pCached, pBot)
+				|| BotLootIsOnTopOfCrate(pEdict, pCached)))
+			return pCached;
+	}
+
+	pBot->f_loot_crate_target_time  = gpGlobals->time + LOOT_CRATE_PICK_CADENCE;
+	pBot->i_loot_crate_target_index = -1;
+
+	float bestDist = 1e9f;
+	edict_t *pBest = NULL;
+	for (int i = 0; i < s_loot_crate_count; i++)
+	{
+		edict_t *pC = s_loot_crates[i];
+		// Per-bot ignore: skip a crate we just dismounted from.
+		if (pBot->f_loot_crate_ignore_until > gpGlobals->time
+			&& pBot->i_loot_crate_ignore_index == ENTINDEX(pC))
+			continue;
+		// De-conflict: skip crates another bot is camping on top of.
+		if (BotLootCrateOccupiedByOtherBot(pC, pBot)
+			&& !BotLootIsOnTopOfCrate(pEdict, pC))
+			continue;
+		float d = (pC->v.origin - pEdict->v.origin).Length();
+		if (d < bestDist) { bestDist = d; pBest = pC; }
+	}
+
+	// Fallback: if every crate is camped by another bot, pick the
+	// nearest one anyway so the bot doesn't idle forever.
+	if (!pBest)
+	{
+		for (int i = 0; i < s_loot_crate_count; i++)
+		{
+			edict_t *pC = s_loot_crates[i];
+			float d = (pC->v.origin - pEdict->v.origin).Length();
+			if (d < bestDist) { bestDist = d; pBest = pC; }
+		}
+	}
+
+	if (pBest)
+		pBot->i_loot_crate_target_index = ENTINDEX(pBest);
+	return pBest;
+}
+
+//=========================================================
+// BotLootPreUpdate — called BEFORE BotFindEnemy every frame.
+// Sets b_loot_has_loot and pre-seeds v_goal so the movement
+// block always has a target on ticks where the enemy branch
+// runs instead of BotLootThink.
+//=========================================================
+void BotLootPreUpdate( bot_t *pBot )
+{
+	edict_t *pEdict = pBot->pEdict;
+
+	BotLootFindEntities();
+
+	pBot->b_loot_has_loot = ((int)pEdict->v.fuser4 == RADAR_LOOT_VAL);
+
+	if (pBot->b_loot_has_loot)
+	{
+		pBot->pBotPickupItem = NULL;
+		pBot->item_waypoint  = -1;
+		if (!FNullEnt(s_pLootGoal))
+		{
+			pBot->v_goal           = s_pLootGoal->v.origin;
+			pBot->f_goal_proximity = 0.0f;
+		}
+		return;
+	}
+
+	int botTeam = UTIL_GetTeam(pEdict);
+	edict_t *pHolder = BotLootGetHolder();
+
+	switch (pBot->i_loot_role)
+	{
+	case LOOT_ROLE_RECOVERER:
+		if (pHolder && UTIL_GetTeam(pHolder) != botTeam)
+		{
+			pBot->v_goal           = pHolder->v.origin;
+			pBot->f_goal_proximity = 0.0f;
+		}
+		break;
+	case LOOT_ROLE_ESCORT:
+		if (pHolder && UTIL_GetTeam(pHolder) == botTeam && pHolder != pEdict)
+		{
+			// Flank offset — match BotLootThink ESCORT.  Avoids escort
+			// stacking on the carrier and blocking forward motion.
+			Vector vForward;
+			if (!FNullEnt(s_pLootGoal))
+				vForward = s_pLootGoal->v.origin - pHolder->v.origin;
+			else
+			{
+				MAKE_VECTORS(pHolder->v.v_angle);
+				vForward = gpGlobals->v_forward;
+			}
+			vForward.z = 0;
+			if (vForward.Length() < 1.0f) vForward = Vector(1, 0, 0);
+			else vForward = vForward.Normalize();
+			Vector vSide((ENTINDEX(pEdict) & 1) ? -vForward.y :  vForward.y,
+			             (ENTINDEX(pEdict) & 1) ?  vForward.x : -vForward.x,
+			             0);
+			pBot->v_goal           = pHolder->v.origin + vSide * 96.0f - vForward * 32.0f;
+			pBot->f_goal_proximity = LOOT_ESCORT_PROXIMITY;
+		}
+		break;
+	case LOOT_ROLE_GRABBER:
+		if (!FNullEnt(s_pLootEntity))
+		{
+			pBot->v_goal           = s_pLootEntity->v.origin;
+			pBot->f_goal_proximity = 0.0f;
+		}
+		break;
+	case LOOT_ROLE_BREAKER:
+	default:
+	{
+		edict_t *pCrate = BotLootPickNearestCrate(pBot);
+		if (pCrate)
+		{
+			pBot->v_goal           = pCrate->v.origin;
+			pBot->f_goal_proximity = 64.0f;
+		}
+		break;
+	}
+	}
+}
+
+//=========================================================
+// BotLootThink — main loot AI dispatch.  Returns true when
+// movement intent has been set.
+//=========================================================
+bool BotLootThink( bot_t *pBot )
+{
+	if (is_gameplay != GAME_LOOT)
+		return false;
+
+	edict_t *pEdict = pBot->pEdict;
+	int botTeam = UTIL_GetTeam(pEdict);
+
+	BotLootFindEntities();
+
+	pBot->b_loot_has_loot = ((int)pEdict->v.fuser4 == RADAR_LOOT_VAL);
+	edict_t *pHolder = BotLootGetHolder();
+
+	// Role evaluation
+	if (pBot->b_loot_has_loot)
+	{
+		pBot->i_loot_role = LOOT_ROLE_CARRIER;
+	}
+	else if (pBot->f_loot_role_eval_time < gpGlobals->time
+	         || pBot->i_loot_role == LOOT_ROLE_CARRIER)
+	{
+		pBot->f_loot_role_eval_time = gpGlobals->time + LOOT_ROLE_EVAL_CADENCE;
+
+		// Count living teammates other than self.  When the bot is
+		// the sole survivor on its team, defensive roles (ESCORT)
+		// degenerate into back-and-forth pacing — there's nobody
+		// to defend or trail.  Force a forward role instead.
+		int aliveMates = 0;
+		for (int pi = 1; pi <= gpGlobals->maxClients; pi++)
+		{
+			edict_t *pPl = INDEXENT(pi);
+			if (FNullEnt(pPl) || pPl == pEdict) continue;
+			if (!IsAlive(pPl)) continue;
+			if (UTIL_GetTeam(pPl) != botTeam) continue;
+			aliveMates++;
+		}
+		bool bSoleSurvivor = (aliveMates == 0);
+
+		if (pHolder && UTIL_GetTeam(pHolder) != botTeam)
+			pBot->i_loot_role = LOOT_ROLE_RECOVERER;
+		else if (pHolder && UTIL_GetTeam(pHolder) == botTeam && pHolder != pEdict
+		         && !bSoleSurvivor)
+			pBot->i_loot_role = LOOT_ROLE_ESCORT;
+		else if (!FNullEnt(s_pLootEntity))
+			pBot->i_loot_role = LOOT_ROLE_GRABBER;
+		else
+			pBot->i_loot_role = LOOT_ROLE_BREAKER;
+	}
+
+	switch (pBot->i_loot_role)
+	{
+	// CARRIER — run to goal; pacified above 25 HP
+	case LOOT_ROLE_CARRIER:
+	{
+		if (FNullEnt(s_pLootGoal))
+			return false;
+
+		pBot->f_pause_time = 0;
+		pBot->f_move_speed = pBot->f_max_speed;
+		pBot->pBotPickupItem = NULL;
+		pBot->item_waypoint  = -1;
+
+		pBot->v_goal           = s_pLootGoal->v.origin;
+		pBot->f_goal_proximity = 0.0f;
+
+		// Goal-priority: when the loot_goal is visible within ~1500u
+		// (call it the carrier's "deposit radius"), drop ALL combat
+		// engagement and sprint for the score regardless of HP.
+		// Teammates handle escort.  Outside that radius we fall back
+		// to the standard pacify-above-25-HP rule so a low-HP carrier
+		// still defends itself when the goal is far / occluded.
+		float goalDist = (s_pLootGoal->v.origin - pEdict->v.origin).Length();
+		bool goalVisible = (goalDist < 1500.0f
+			&& FVisible(s_pLootGoal->v.origin, pEdict));
+
+		if (goalVisible)
+		{
+			pBot->pBotEnemy = NULL;
+		}
+		else if (pEdict->v.health > LOOT_CARRIER_PACIFY_HP && pBot->pBotEnemy)
+		{
+			pBot->pBotEnemy = NULL;
+		}
+
+		// Carrier anti-stuck: if a teammate (or any other live
+		// player) parks themselves between us and the goal we'd
+		// otherwise just stand still pushing into them.  Sample
+		// distance-to-goal every 0.4s; if it hasn't decreased by
+		// at least 8u we're stalled.  After 0.6s of stall, force
+		// IN_JUMP and alternate strafe direction so the carrier
+		// hops over or sidesteps the blocker.  After 1.2s of stall,
+		// hand off to BotGoalElevatedJump's multi-jump combo so we
+		// triple-jump clean over them.
+		if (pBot->f_loot_carrier_check_time < gpGlobals->time)
+		{
+			if (pBot->f_loot_carrier_check_time == 0.0f
+				|| pBot->f_loot_carrier_last_dist - goalDist >= 8.0f)
+			{
+				pBot->f_loot_carrier_stuck_since = 0.0f;
+			}
+			else if (pBot->f_loot_carrier_stuck_since == 0.0f)
+			{
+				pBot->f_loot_carrier_stuck_since = gpGlobals->time;
+			}
+			pBot->f_loot_carrier_last_dist  = goalDist;
+			pBot->f_loot_carrier_check_time = gpGlobals->time + 0.4f;
+		}
+
+		if (pBot->f_loot_carrier_stuck_since > 0.0f)
+		{
+			float stuckDur = gpGlobals->time - pBot->f_loot_carrier_stuck_since;
+
+			// Detect a player blocker within 80u in our forward arc.
+			edict_t *pBlocker = NULL;
+			for (int i = 1; i <= gpGlobals->maxClients; i++)
+			{
+				edict_t *pPl = INDEXENT(i);
+				if (FNullEnt(pPl) || pPl->free) continue;
+				if (pPl == pEdict) continue;
+				if (!(pPl->v.flags & FL_CLIENT)) continue;
+				if (!IsAlive(pPl)) continue;
+				Vector vDelta = pPl->v.origin - pEdict->v.origin;
+				if (vDelta.Length() > 80.0f) continue;
+				if (!FInViewCone(&pPl->v.origin, pEdict)) continue;
+				pBlocker = pPl;
+				break;
+			}
+
+			if (stuckDur >= 0.6f)
+			{
+				pEdict->v.button |= IN_JUMP;
+				// Alternate strafe direction by entindex parity so two
+				// adjacent stuck bots peel apart instead of mirroring.
+				pBot->f_strafe_speed = (ENTINDEX(pEdict) & 1)
+					? pBot->f_max_speed : -pBot->f_max_speed;
+				pBot->f_move_speed   = pBot->f_max_speed;
+			}
+
+			// Heavier escalation: if we've been stuck > 1.2s and a
+			// blocker is in front, force the multi-jump combo so we
+			// clear them via double/triple-jump.
+			if (stuckDur >= 1.2f && pBlocker && (pEdict->v.flags & FL_ONGROUND))
+			{
+				BotGoalElevatedJump(pBot, s_pLootGoal->v.origin, true /*force*/);
+				// Reset the stall timer so the combo gets a fair window
+				// to deliver progress before we re-trigger.
+				pBot->f_loot_carrier_stuck_since = 0.0f;
+				pBot->f_loot_carrier_check_time  = gpGlobals->time + 0.6f;
+			}
+		}
+
+		BotGoalElevatedJump(pBot, s_pLootGoal->v.origin);
+		return true;
+	}
+
+	// RECOVERER — force-target the enemy carrier
+	case LOOT_ROLE_RECOVERER:
+	{
+		if (!pHolder || UTIL_GetTeam(pHolder) == botTeam)
+		{
+			pBot->i_loot_role = LOOT_ROLE_NONE;
+			return false;
+		}
+
+		pBot->f_pause_time = 0;
+		pBot->f_move_speed = pBot->f_max_speed;
+
+		// Override default frag target with the carrier when in LoS
+		if (FInViewCone(&pHolder->v.origin, pEdict) && FVisible(pHolder->v.origin, pEdict))
+			pBot->pBotEnemy = pHolder;
+
+		pBot->v_goal           = pHolder->v.origin;
+		pBot->f_goal_proximity = 0.0f;
+
+		BotGoalElevatedJump(pBot, pHolder->v.origin);
+		return true;
+	}
+
+	// ESCORT — trail teammate carrier on a flank, NOT directly on top
+	// of them.  Walking straight to the carrier's origin causes pile-ups
+	// where the carrier ends up jumping in place against a teammate
+	// blocker.  Compute a flank offset perpendicular to the carrier's
+	// path toward the loot_goal (or the carrier's facing as fallback)
+	// and split escorts left/right by entindex parity.  Escort proximity
+	// stays loose so they don't crowd the carrier.
+	case LOOT_ROLE_ESCORT:
+	{
+		if (!pHolder || UTIL_GetTeam(pHolder) != botTeam || pHolder == pEdict)
+		{
+			pBot->i_loot_role = LOOT_ROLE_NONE;
+			return false;
+		}
+
+		Vector vForward;
+		if (!FNullEnt(s_pLootGoal))
+			vForward = s_pLootGoal->v.origin - pHolder->v.origin;
+		else
+		{
+			Vector vCarrierAngles = pHolder->v.v_angle;
+			if ((vCarrierAngles.x == 0) && (vCarrierAngles.y == 0) && (vCarrierAngles.z == 0))
+				vCarrierAngles = pHolder->v.angles;
+
+			MAKE_VECTORS(vCarrierAngles);
+			vForward = gpGlobals->v_forward;
+		}
+		vForward.z = 0;
+		if (vForward.Length() < 1.0f)
+			vForward = Vector(1, 0, 0);
+		else
+			vForward = vForward.Normalize();
+
+		// Perpendicular flank vector.  Parity flips left/right.
+		Vector vSide((ENTINDEX(pEdict) & 1) ? -vForward.y :  vForward.y,
+		             (ENTINDEX(pEdict) & 1) ?  vForward.x : -vForward.x,
+		             0);
+		Vector vEscortPos = pHolder->v.origin + vSide * 96.0f - vForward * 32.0f;
+
+		pBot->f_move_speed     = pBot->f_max_speed;
+		pBot->v_goal           = vEscortPos;
+		pBot->f_goal_proximity = LOOT_ESCORT_PROXIMITY;
+		return true;
+	}
+
+	// GRABBER — loose loot, override waypoints
+	case LOOT_ROLE_GRABBER:
+	{
+		if (FNullEnt(s_pLootEntity))
+		{
+			pBot->i_loot_role = LOOT_ROLE_NONE;
+			return false;
+		}
+
+		pBot->f_pause_time = 0;
+		pBot->f_move_speed = pBot->f_max_speed;
+
+		pBot->v_goal           = s_pLootEntity->v.origin;
+		pBot->f_goal_proximity = 0.0f;
+
+		// Bypass waypoint detours while we can see the loose loot
+		if (FInViewCone(&s_pLootEntity->v.origin, pEdict)
+			&& FVisible(s_pLootEntity->v.origin, pEdict))
+		{
+			pBot->f_ignore_wpt_time = gpGlobals->time + 0.5f;
+		}
+
+		BotGoalElevatedJump(pBot, s_pLootEntity->v.origin);
+		return true;
+	}
+
+	// BREAKER — seek and shoot the nearest crate
+	case LOOT_ROLE_BREAKER:
+	default:
+	{
+		edict_t *pCrate = BotLootPickNearestCrate(pBot);
+		if (FNullEnt(pCrate))
+			return false;
+
+		pBot->f_move_speed     = pBot->f_max_speed;
+		pBot->v_goal           = pCrate->v.origin;
+		pBot->f_goal_proximity = 64.0f;
+
+		float dist = (pCrate->v.origin - pEdict->v.origin).Length();
+		if (dist < LOOT_BREAKER_FIRE_DIST
+			&& FInViewCone(&pCrate->v.origin, pEdict)
+			&& FVisible(pCrate->v.origin, pEdict)
+			&& pBot->pBotEnemy == NULL)
+		{
+			pBot->pBotEnemy = pCrate;
+		}
+
+		// On top of the crate — the always-runs handler in
+		// BotLootHandleOnTopOfCrate (called from bot.cpp) is now
+		// authoritative.  Do nothing here; the handler will have
+		// already taken control before we reached this branch.
+
+		// Elevated crate: when the cached crate is significantly above
+		// the bot and we're horizontally close, hand off to the multi-
+		// jump helper so the bot double/triple-jumps up to it (mirrors
+		// CTF flag pursuit / loot goal).  Ground-level crates do NOT
+		// trigger this branch — the helper's 20u heightDiff gate plus
+		// our explicit 32u guard keep the bot from leaping onto floor
+		// crates and entering the weapon-thrash loop fixed earlier.
+		float heightDiff = pCrate->v.origin.z - pEdict->v.origin.z;
+		Vector vecFlat = pCrate->v.origin - pEdict->v.origin;
+		vecFlat.z = 0;
+		float horzDist = vecFlat.Length();
+		if (heightDiff > 32.0f && horzDist < 200.0f)
+		{
+			BotGoalElevatedJump(pBot, pCrate->v.origin);
+		}
+		return true;
+	}
+	}
 }
 
 //=========================================================
@@ -2404,6 +3148,17 @@ edict_t *BotFindEnemy( bot_t *pBot )
 				pBot->pBotEnemy = pRemember = NULL;
 			}
 		}
+		else if (is_gameplay == GAME_LOOT)
+		{
+			// Carrier pacifism — when this bot is the loot holder and
+			// healthy, drop the enemy so the bot keeps running to the
+			// goal instead of dueling on the way.  Mirrors CTC.
+			if (pBot->pEdict->v.health > LOOT_CARRIER_PACIFY_HP
+				&& (int)pBot->pEdict->v.fuser4 == RADAR_LOOT_VAL)
+			{
+				pBot->pBotEnemy = pRemember = NULL;
+			}
+		}
 		else if (is_gameplay == GAME_KTS)
 		{
 			// In KTS, only keep an enemy while they are actively dribbling.
@@ -3688,6 +4443,7 @@ void BotShootAtEnemy( bot_t *pBot )
 	// velocity.Length2D() stays > 100 and the flip on phase 3 lands.
 	// -----------------------------------------------------------------
 	if (pBot->pBotEnemy &&
+		(pBot->pBotEnemy->v.flags & (FL_CLIENT | FL_MONSTER)) &&
 		f_distance > 80.0f && f_distance < 512.0f &&
 		FVisible(v_enemy_origin, pEdict))
 	{
@@ -4121,7 +4877,8 @@ void BotAssessGrenades( bot_t *pBot )
 				(strcmp("grenade", STRING(pGrenade->v.classname)) != 0) &&
 				(strcmp("monster_chumtoad", STRING(pGrenade->v.classname)) != 0) &&
 				(strcmp("monster_propdecoy", STRING(pGrenade->v.classname)) != 0) &&
-				(strcmp("loot_crate", STRING(pGrenade->v.classname)) != 0) &&
+				// loot_crate is not allowlisted here, so it is excluded from
+				// grenade/entity scanning in this path unless re-added below.
 				(strcmp("kts_snowball", STRING(pGrenade->v.classname)) != 0))
 				continue;
 

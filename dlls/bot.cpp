@@ -339,6 +339,19 @@ void BotSpawnInit( bot_t *pBot )
 	pBot->i_ctf_role           = CTF_ROLE_NONE;
 	pBot->f_ctf_role_eval_time = 0.0f;
 
+	// Clear per-life Loot state.
+	pBot->b_loot_has_loot           = false;
+	pBot->i_loot_role               = LOOT_ROLE_NONE;
+	pBot->f_loot_role_eval_time     = 0.0f;
+	pBot->f_loot_crate_target_time  = 0.0f;
+	pBot->i_loot_crate_target_index = -1;
+	pBot->f_loot_ontop_until        = 0.0f;
+	pBot->i_loot_crate_ignore_index = -1;
+	pBot->f_loot_crate_ignore_until = 0.0f;
+	pBot->f_loot_carrier_stuck_since = 0.0f;
+	pBot->f_loot_carrier_check_time  = 0.0f;
+	pBot->f_loot_carrier_last_dist   = 0.0f;
+
 	// Clear per-life Arena (1v1) state.
 	pBot->i_arena_opponent             = 0;
 	pBot->f_arena_vary_time            = 0.0f;
@@ -1068,6 +1081,17 @@ void BotFindItem( bot_t *pBot )
 	// The chumtoad needs global scanning (holder or loose entity) and
 	// objective-aware routing that BotFindItem cannot provide.
 	if (is_gameplay == GAME_CTC)
+	{
+		pBot->pBotPickupItem = NULL;
+		pBot->item_waypoint  = -1;
+		return;
+	}
+
+	// Loot: navigation handled by BotLootThink + BotFindWaypointGoal.
+	// The loot/crate/goal entities need global scanning (holder, loose
+	// loot, crate list) and role-aware routing that BotFindItem cannot
+	// provide.  Same pattern as CtC.
+	if (is_gameplay == GAME_LOOT)
 	{
 		pBot->pBotPickupItem = NULL;
 		pBot->item_waypoint  = -1;
@@ -1920,6 +1944,8 @@ void BotThink( bot_t *pBot )
 		BotColdSpotPreUpdate(pBot);
 	else if (is_gameplay == GAME_HORDE)
 		BotHordePreUpdate(pBot);
+	else if (is_gameplay == GAME_LOOT)
+		BotLootPreUpdate(pBot);
 
 	// it is time to look for a waypoint AND
 	// there are waypoints in this level...
@@ -2165,19 +2191,74 @@ void BotThink( bot_t *pBot )
 			BotHordePreUpdate(pBot);
 		}
 
+		// Loot: detect carrier status (b_loot_has_loot) and pre-set v_goal
+		// based on current loot role so the movement block always has a
+		// target on ticks where the enemy branch runs instead of BotLootThink.
+		if (is_gameplay == GAME_LOOT)
+		{
+			BotLootPreUpdate(pBot);
+		}
+
 		if (b_botdontshoot == 0)
 		{
 			pBot->pBotEnemy = BotFindEnemy( pBot );
 		}
 		else
 			pBot->pBotEnemy = NULL;  // clear enemy pointer (no ememy for you!)
-		
+
+		// Loot BREAKER: when no real enemy was found, target the cached
+		// loot_crate as a synthetic enemy so the engagement block below
+		// fires the same frame.  Without this hook the bot walks up to
+		// the crate (v_goal-driven) and just stands there because
+		// BotLootThink — which would set pBotEnemy = pCrate — only runs
+		// in the no-enemy else-branch *after* the shoot block.  Re-setting
+		// every frame is fine; players still take priority because
+		// BotFindEnemy ran first and returned non-NULL when one is in LoS.
+		//
+		// LoS-priority swap: if BotFindEnemy DID return a player enemy,
+		// but that player isn't currently visible AND a cached crate IS
+		// visible within firing range, swap to the crate so the bot does
+		// useful work instead of pointlessly tracking an occluded enemy.
+		//
+		// Walk-by engagement: scan ALL live crates for the closest visible
+		// one within 1024u (covers elevated crates the cached "nearest"
+		// pick may not include).  This makes BREAKER bots fire on visible
+		// crates as they pass, including ones above them on platforms.
+		if (is_gameplay == GAME_LOOT
+			&& pBot->i_loot_role == LOOT_ROLE_BREAKER
+			&& !pBot->b_loot_has_loot)
+		{
+			edict_t *pVisCrate = BotLootFindBestVisibleCrate(pBot, 1024.0f);
+
+			if (pVisCrate && pBot->pBotEnemy == NULL)
+			{
+				pBot->pBotEnemy = pVisCrate;
+			}
+			else if (pVisCrate && pBot->pBotEnemy
+				&& (pBot->pBotEnemy->v.flags & FL_CLIENT)
+				&& !FVisible(pBot->pBotEnemy->v.origin, pEdict))
+			{
+				// Player enemy occluded — prefer the visible crate so the
+				// bot makes objective progress instead of aim-tracking a
+				// wall.  Player retakes priority next frame they're visible.
+				pBot->pBotEnemy = pVisCrate;
+			}
+		}
+
+		// Loot on-top-of-crate dismount: if standing on top of the
+		// cached BREAKER crate, immediately jump-strafe off and
+		// invalidate the pick.  Attacking from on top is unreliable
+		// because a downward eye-trace clips the crate brush itself
+		// and FVisible fails — so we re-approach from the side.
+		if (is_gameplay == GAME_LOOT)
+			BotLootHandleOnTopOfCrate(pBot);
+
 		// does an enemy exist and we're not on a ladder
 		if (pBot->pBotEnemy != NULL && pEdict->v.movetype != MOVETYPE_FLY &&
 			pBot->f_bot_spawn_time + 1.0 < gpGlobals->time)
 		{
 			BotShootAtEnemy( pBot );  // shoot at the enemy
-			
+
 			pBot->f_pause_time = 0;  // dont't pause if enemy exists
 		}
 
@@ -2239,6 +2320,15 @@ void BotThink( bot_t *pBot )
 				// Arena: same reset — after combat the bot should seek
 				// the opponent, not return to a stale waypoint.
 				else if (is_gameplay == GAME_ARENA)
+				{
+					pBot->waypoint_goal     = -1;
+					pBot->old_waypoint_goal = -1;
+					pBot->f_waypoint_goal_time = 0.0f;
+				}
+				// Loot: same reset — after combat the bot should pursue
+				// the loot/crate/goal objective, not return to a stale
+				// waypoint left over from a frag chase.
+				else if (is_gameplay == GAME_LOOT)
 				{
 					pBot->waypoint_goal     = -1;
 					pBot->old_waypoint_goal = -1;
@@ -2311,6 +2401,13 @@ void BotThink( bot_t *pBot )
 				pBot->item_waypoint  = -1;
 			}
 
+			// Loot: same clearing pattern — navigation handled by BotLootThink.
+			if (is_gameplay == GAME_LOOT && pBot->pBotPickupItem)
+			{
+				pBot->pBotPickupItem = NULL;
+				pBot->item_waypoint  = -1;
+			}
+
 			// Busters: only clear pickup when the bot is the Buster — ghosts
 			// still need to grab guns that BotFindItem surfaces.
 			if (is_gameplay == GAME_BUSTERS && pEdict->v.fuser4 > 0 && pBot->pBotPickupItem)
@@ -2350,6 +2447,10 @@ void BotThink( bot_t *pBot )
 			else if (is_gameplay == GAME_HORDE && BotHordeThink(pBot))
 			{
 				// BotHordeThink sets v_goal + f_move_speed for hunting / resupply / retreat.
+			}
+			else if (is_gameplay == GAME_LOOT && BotLootThink(pBot))
+			{
+				// BotLootThink sets v_goal + f_move_speed for all Loot roles.
 			}
 			else if (pBot->pBotPickupItem)
 			{
@@ -2802,11 +2903,11 @@ void BotThink( bot_t *pBot )
 	}
 
 	// always forget goal
-	// Cold Skulls / KTS / CtC / CTF / Arena / Cold Spot / Busters: v_goal
-	// is refreshed every tick by the pre-scan and the mode's Think function
-	// — don't wipe it here or the movement block will never see the target
-	// and the bot follows waypoints instead.
-	if (is_gameplay != GAME_COLDSKULL && is_gameplay != GAME_KTS && is_gameplay != GAME_CTC && is_gameplay != GAME_CTF && is_gameplay != GAME_ARENA && is_gameplay != GAME_COLDSPOT && is_gameplay != GAME_BUSTERS && is_gameplay != GAME_HORDE)
+	// Cold Skulls / KTS / CtC / CTF / Arena / Cold Spot / Busters / Horde / Loot:
+	// v_goal is refreshed every tick by the pre-scan and the mode's Think
+	// function — don't wipe it here or the movement block will never see the
+	// target and the bot follows waypoints instead.
+	if (is_gameplay != GAME_COLDSKULL && is_gameplay != GAME_KTS && is_gameplay != GAME_CTC && is_gameplay != GAME_CTF && is_gameplay != GAME_ARENA && is_gameplay != GAME_COLDSPOT && is_gameplay != GAME_BUSTERS && is_gameplay != GAME_HORDE && is_gameplay != GAME_LOOT)
 		pBot->v_goal = g_vecZero;
 	// is our goal ent still around?
 	if (pBot->pGoalEnt != NULL)
@@ -3036,7 +3137,20 @@ void BotThink( bot_t *pBot )
 				else if (hDist < 500.0f && FVisible(pBot->v_goal, pEdict))
 					hordeChase = true;
 			}
-			if (ktsDirectSteer || ktsBallChase || skullChase || ctcChase || ctfChase || arenaChase || coldspotChase || bustersChase || hordeChase)
+			// Loot: direct-steer toward the role-driven target (loot_goal,
+			// loot_entity, holder, or nearest loot_crate).  Two-tier gating
+			// matches CTF/ColdSpot — close-range commits regardless of LoS,
+			// mid-range needs FVisible to avoid wall-walking.
+			bool lootChase = false;
+			if (is_gameplay == GAME_LOOT && pBot->v_goal != g_vecZero)
+			{
+				float lDist = (pBot->v_goal - pEdict->v.origin).Length();
+				if (lDist < 128.0f)
+					lootChase = true;
+				else if (lDist < 500.0f && FVisible(pBot->v_goal, pEdict))
+					lootChase = true;
+			}
+			if (ktsDirectSteer || ktsBallChase || skullChase || ctcChase || ctfChase || arenaChase || coldspotChase || bustersChase || hordeChase || lootChase)
 				bGoGoal = true;
 			else if (goalDist < 256 && FVisible(pBot->v_goal, pEdict))
 				bGoGoal = true;
