@@ -1183,7 +1183,10 @@ void BotLootPreUpdate( bot_t *pBot )
 			if (!FNullEnt(s_pLootGoal))
 				vForward = s_pLootGoal->v.origin - pHolder->v.origin;
 			else
+			{
+				MAKE_VECTORS(pHolder->v.v_angle);
 				vForward = gpGlobals->v_forward;
+			}
 			vForward.z = 0;
 			if (vForward.Length() < 1.0f) vForward = Vector(1, 0, 0);
 			else vForward = vForward.Normalize();
@@ -1416,7 +1419,14 @@ bool BotLootThink( bot_t *pBot )
 		if (!FNullEnt(s_pLootGoal))
 			vForward = s_pLootGoal->v.origin - pHolder->v.origin;
 		else
+		{
+			Vector vCarrierAngles = pHolder->v.v_angle;
+			if ((vCarrierAngles.x == 0) && (vCarrierAngles.y == 0) && (vCarrierAngles.z == 0))
+				vCarrierAngles = pHolder->v.angles;
+
+			MAKE_VECTORS(vCarrierAngles);
 			vForward = gpGlobals->v_forward;
+		}
 		vForward.z = 0;
 		if (vForward.Length() < 1.0f)
 			vForward = Vector(1, 0, 0);
@@ -3143,7 +3153,7 @@ edict_t *BotFindEnemy( bot_t *pBot )
 			// Carrier pacifism — when this bot is the loot holder and
 			// healthy, drop the enemy so the bot keeps running to the
 			// goal instead of dueling on the way.  Mirrors CTC.
-			if (pBot->pEdict->v.health > 25
+			if (pBot->pEdict->v.health > LOOT_CARRIER_PACIFY_HP
 				&& (int)pBot->pEdict->v.fuser4 == RADAR_LOOT_VAL)
 			{
 				pBot->pBotEnemy = pRemember = NULL;
@@ -4867,9 +4877,8 @@ void BotAssessGrenades( bot_t *pBot )
 				(strcmp("grenade", STRING(pGrenade->v.classname)) != 0) &&
 				(strcmp("monster_chumtoad", STRING(pGrenade->v.classname)) != 0) &&
 				(strcmp("monster_propdecoy", STRING(pGrenade->v.classname)) != 0) &&
-				// loot_crate intentionally NOT excluded here — in Loot mode bots
-				// should opportunistically shoot crates that cross their LoS,
-				// even when not actively in BREAKER role (BotLootThink).
+				// loot_crate is not allowlisted here, so it is excluded from
+				// grenade/entity scanning in this path unless re-added below.
 				(strcmp("kts_snowball", STRING(pGrenade->v.classname)) != 0))
 				continue;
 
