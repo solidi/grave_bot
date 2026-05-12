@@ -5077,3 +5077,129 @@ float BotAssessSecondaryAmmo( bot_t *pBot, int weapon_id )
 		
 	return ammo_percent;
 }
+
+
+//=========================================================
+// Rune handling
+//
+// The bot DLL does not have access to CBasePlayer::m_fHasRune,
+// so it tracks its own rune type via the pickup callback. These
+// helpers let the bot decide whether a rune on the ground is
+// worth swapping for, and (if so) drop the held rune just before
+// touching the new one.
+//
+// See workspace/ai/gravebot.md "Rune handling" and
+// workspace/ai/runes.md for the design and rune effects.
+//=========================================================
+
+int BotRuneClassToType(const char *classname)
+{
+	if (classname == NULL)
+		return 0;
+	if      (strcmp(classname, "rune_frag")     == 0) return BOT_RUNE_FRAG;
+	else if (strcmp(classname, "rune_vampire")  == 0) return BOT_RUNE_VAMPIRE;
+	else if (strcmp(classname, "rune_protect")  == 0) return BOT_RUNE_PROTECT;
+	else if (strcmp(classname, "rune_regen")    == 0) return BOT_RUNE_REGEN;
+	else if (strcmp(classname, "rune_haste")    == 0) return BOT_RUNE_HASTE;
+	else if (strcmp(classname, "rune_gravity")  == 0) return BOT_RUNE_GRAVITY;
+	else if (strcmp(classname, "rune_strength") == 0) return BOT_RUNE_STRENGTH;
+	else if (strcmp(classname, "rune_cloak")    == 0) return BOT_RUNE_CLOAK;
+	else if (strcmp(classname, "rune_ammo")     == 0) return BOT_RUNE_AMMO;
+	return 0;
+}
+
+float BotEvaluateRuneScore(bot_t *pBot, int rune_type)
+{
+	if (rune_type <= 0 || pBot == NULL || pBot->pEdict == NULL)
+		return 0.0f;
+
+	// Base weights — direct combat power-ups score highest.
+	float score = 0.0f;
+	switch (rune_type)
+	{
+	case BOT_RUNE_STRENGTH: score = 90.0f; break;
+	case BOT_RUNE_HASTE:    score = 85.0f; break;
+	case BOT_RUNE_VAMPIRE:  score = 80.0f; break;
+	case BOT_RUNE_PROTECT:  score = 80.0f; break;
+	case BOT_RUNE_REGEN:    score = 70.0f; break;
+	case BOT_RUNE_FRAG:     score = 65.0f; break;
+	case BOT_RUNE_CLOAK:    score = 60.0f; break;
+	case BOT_RUNE_AMMO:     score = 55.0f; break;
+	case BOT_RUNE_GRAVITY:  score = 50.0f; break;
+	default:                score =  0.0f; break;
+	}
+
+	float health = pBot->pEdict->v.health;
+
+	// REGEN — strongly preferred when low HP.
+	if (rune_type == BOT_RUNE_REGEN)
+	{
+		if (health < 30.0f)      score += 50.0f;
+		else if (health < 60.0f) score += 25.0f;
+	}
+
+	// VAMPIRE — also a heal source when low.
+	if (rune_type == BOT_RUNE_VAMPIRE && health < 60.0f)
+		score += 20.0f;
+
+	// PROTECT — most valuable while taking fire.
+	if (rune_type == BOT_RUNE_PROTECT && pBot->b_engaging_enemy)
+		score += 15.0f;
+
+	// CLOAK — disengagement / escape rune.
+	if (rune_type == BOT_RUNE_CLOAK && health < 40.0f && !pBot->b_engaging_enemy)
+		score += 15.0f;
+
+	// AMMO — boost when current weapon's ammo is critical.
+	if (rune_type == BOT_RUNE_AMMO && pBot->current_weapon.iId > 0)
+	{
+		float prim_ammo = BotAssessPrimaryAmmo(pBot, pBot->current_weapon.iId);
+		float sec_ammo  = BotAssessSecondaryAmmo(pBot, pBot->current_weapon.iId);
+		if (prim_ammo == AMMO_CRITICAL || sec_ammo == AMMO_CRITICAL)
+			score += 30.0f;
+	}
+
+	// HASTE — flag carrier wants to move + shoot fast.
+	if (rune_type == BOT_RUNE_HASTE && pBot->bot_has_flag)
+		score += 20.0f;
+
+	// FRAG — only meaningful in DM (no team scoring uplift).
+	if (rune_type == BOT_RUNE_FRAG && is_team_play <= 0.0f)
+		score += 15.0f;
+
+	return score;
+}
+
+void BotMaybeDropRuneForSwap(bot_t *pBot)
+{
+	if (pBot == NULL || pBot->pEdict == NULL)
+		return;
+	if (!pBot->b_rune || pBot->i_rune_type == 0)
+		return;
+	if (gpGlobals->time < pBot->f_rune_drop_cooldown)
+		return;
+	if (pBot->pBotPickupItem == NULL || FNullEnt(pBot->pBotPickupItem) ||
+		pBot->pBotPickupItem->free)
+		return;
+
+	// Only drop when our queued pickup is itself a rune (BotFindItem only
+	// queues a rune over an existing rune when the new one scores better).
+	const char *pickup_class = STRING(pBot->pBotPickupItem->v.classname);
+	if (BotRuneClassToType(pickup_class) == 0)
+		return;
+
+	// Within touch range — drop now so the next step picks up the new rune.
+	float dist = (pBot->pBotPickupItem->v.origin - pBot->pEdict->v.origin).Length();
+	if (dist > 120.0f)
+		return;
+
+	// Issue the same client command a human would.
+	FakeClientCommand(pBot->pEdict, "drop_rune", NULL, NULL);
+
+	// Mirror the cleared state immediately and lock out rune pickups
+	// briefly so we don't re-grab the rune we just discarded
+	// (CWorldRunes::DropRune launches it ~400 u/s forward).
+	pBot->b_rune = FALSE;
+	pBot->i_rune_type = 0;
+	pBot->f_rune_drop_cooldown = gpGlobals->time + 1.5f;
+}

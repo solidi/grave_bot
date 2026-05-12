@@ -319,6 +319,8 @@ void BotSpawnInit( bot_t *pBot )
 
 	pBot->b_longjump = FALSE;
 	pBot->b_rune = FALSE;
+	pBot->i_rune_type = 0;
+	pBot->f_rune_drop_cooldown = 0.0f;
 	// Clear per-life KTS possession state before recomputing it so stale
 	// values cannot leak across spawn/life boundaries into this think step.
 	pBot->b_kts_has_ball = false;
@@ -1540,10 +1542,29 @@ void BotFindItem( bot_t *pBot )
 					if (pent->v.effects & EF_NODRAW)
 						continue;
 
-					// check if the bot can use this item...
+					// just dropped a rune — don't immediately re-acquire any rune
+					if (gpGlobals->time < pBot->f_rune_drop_cooldown)
+						continue;
+
 					if (!pBot->b_rune)
 					{
+						// no rune held — grab anything
 						can_pickup = TRUE;
+					}
+					else
+					{
+						// already have a rune — only swap when the candidate
+						// scores strictly better than the held rune by a margin.
+						// Margin keeps near-equal runes from causing thrash.
+						const float RUNE_SWAP_MARGIN = 8.0f;
+						int new_type = BotRuneClassToType(item_name);
+						if (new_type != 0)
+						{
+							float new_score  = BotEvaluateRuneScore(pBot, new_type);
+							float held_score = BotEvaluateRuneScore(pBot, pBot->i_rune_type);
+							if (new_score > held_score + RUNE_SWAP_MARGIN)
+								can_pickup = TRUE;
+						}
 					}
 				}
 
@@ -2792,6 +2813,10 @@ void BotThink( bot_t *pBot )
 		if (pBot->f_find_item < gpGlobals->time)
 			pBot->f_find_item = gpGlobals->time + 1.0;  // wait at least 1 second before looking again
 	}
+
+	// If BotFindItem queued a strictly-better rune as our pickup target,
+	// drop our current rune just before contact so we can swap on touch.
+	BotMaybeDropRuneForSwap( pBot );
 
 	if ((pBot->f_role_check < gpGlobals->time) && (!pBot->b_role_locked))
 	{	// redo our role every 5 seconds

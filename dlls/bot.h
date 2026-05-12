@@ -78,6 +78,20 @@ typedef int BOOL;
 void FakeClientCommand(edict_t *pBot, char *arg1, char *arg2, char *arg3);
 
 
+// Rune type IDs — must match src/dlls/items.h (RUNE_FRAG..RUNE_AMMO).
+// The bot DLL does not include the server's items.h, so we mirror the
+// nine spawnable rune IDs here. Keep these values in lock-step.
+#define BOT_RUNE_FRAG     1
+#define BOT_RUNE_VAMPIRE  2
+#define BOT_RUNE_PROTECT  3
+#define BOT_RUNE_REGEN    4
+#define BOT_RUNE_HASTE    5
+#define BOT_RUNE_GRAVITY  6
+#define BOT_RUNE_STRENGTH 7
+#define BOT_RUNE_CLOAK    8
+#define BOT_RUNE_AMMO     9
+
+
 const char *Cmd_Args();
 const char *Cmd_Argv( int argc );
 int Cmd_Argc();
@@ -405,6 +419,8 @@ typedef struct
 	
 	bool	b_longjump;
 	bool	b_rune;
+	int		i_rune_type;            // BOT_RUNE_* enum value, 0 if no rune
+	float	f_rune_drop_cooldown;   // ignore rune entities until this time
 
 	bot_current_weapon_t current_weapon;  // one current weapon for each bot
 	int m_rgAmmo[MAX_AMMO_SLOTS];  // total ammo amounts (1 array for each bot)
@@ -510,6 +526,12 @@ typedef struct
 	float  f_combat_stuck_last_dist;
 	float  f_combat_stuck_since;
 } bot_t;
+
+// Rune helpers (defined in bot_combat.cpp). Declared after bot_t typedef
+// so bot_t is in scope.
+int   BotRuneClassToType(const char *classname);
+float BotEvaluateRuneScore(bot_t *pBot, int rune_type);
+void  BotMaybeDropRuneForSwap(bot_t *pBot);
 
 
 #define MAX_TEAMS 32
