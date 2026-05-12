@@ -418,6 +418,7 @@ void BotClient_Valve_ItemPickup(void *p, edict_t *pEdict)
 	else if (strncmp(itemname, "rune_", 5) == 0)
 	{
 		pBot->b_rune = true;
+		pBot->i_rune_type = BotRuneClassToType(itemname);
 	}
 }
 
