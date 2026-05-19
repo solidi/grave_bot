@@ -3,13 +3,13 @@
 //
 // Roles
 // -----
-// Props  (pev->fuser4 >= 1, value 1..30 doubles as decoy body index)
+// Props  (pev->fuser4 >= 1, value 1..n doubles as decoy body index)
 //   FREEZE      — game start; walk to chosen hide spot, do not attack
 //   HIDE        — at hide spot; stand still, morph to match a neighbouring
 //                 world-item, optionally drop a decoy
 //   PANIC       — hunter within ~512u with LOS; flee to a fresh hide spot,
 //                 may drop a decoy (IN_RELOAD), may attack with fists
-//   DESPERATE   — last prop standing buff active (glow shell + extra HP +
+//   DESPERATE   — last prop standing buff active (extra HP +
 //                 grenade resupply); plays aggressively with grenades
 //
 // Hunters (pev->fuser4 == 0)
@@ -19,9 +19,11 @@
 //   HUNT_HELP   — teammate engaged → flank toward the same suspect
 //
 // Cross-DLL signals consumed
-//   pev->fuser4   prop body slot (1..30) / 0 for hunter
-//   pev->fuser3   freeze-timer signal (>1 = frozen until time, 1 = unstick)
-//   pev->renderfx kRenderFxGlowShell on the last-prop-standing buff
+//   pev->fuser4   prop body slot (1..n) / 0 for hunter
+//   pev->fuser3   prop multi-signal:
+//                   > 1   = freeze deadline (frozen until that gpGlobals->time)
+//                   == 1  = unstick request after freeze
+//                   < 0   = last-prop-standing buff active (DESPERATE)
 //
 // Implementation mirrors the BotLoot* / BotHorde* pre-update + think pattern.
 //
@@ -90,7 +92,11 @@ static inline bool PP_IsHunter(edict_t *p)
 
 static inline bool PP_IsDesperate(edict_t *p)
 {
-	return p && p->v.renderfx == kRenderFxGlowShell;
+	// Last-prop-standing buff: server stamps pev->fuser3 = -1 on the surviving
+	// prop.  Avoid keying off renderfx — that field is also driven by other
+	// gameplay systems (e.g. the freeze rune in player.cpp) and would either
+	// false-positive (a frozen non-last prop) or clobber/race with them.
+	return p && p->v.fuser3 < 0.0f;
 }
 
 static inline bool PP_HunterIsFrozen(edict_t *p)

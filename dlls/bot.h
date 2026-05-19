@@ -544,7 +544,7 @@ typedef struct
 	int    i_pp_role;                 // current Prop Hunt role (PROP_ROLE_*)
 	float  f_pp_role_eval_time;       // cadence for role re-evaluation (~0.75s)
 	Vector v_pp_hide_spot;            // chosen world-item / cluster origin to hide near
-	int    i_pp_target_body;          // desired pev->fuser4 body (1..30)
+	int    i_pp_target_body;          // desired pev->fuser4 body (1..n)
 	float  f_pp_next_morph;           // soonest time bot may press IN_ATTACK to morph
 	float  f_pp_panic_until;          // gpGlobals->time the bot stays in panic mode
 	edict_t *p_pp_target_item;        // nearest world-item reference for hiding
