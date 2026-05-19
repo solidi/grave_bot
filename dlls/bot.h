@@ -541,18 +541,18 @@ typedef struct
 	float  f_combat_stuck_since;
 
 	// Prop Hunt — role + hide-spot state
-	int    i_pp_role;                 // current Prop Hunt role (PROP_ROLE_*)
-	float  f_pp_role_eval_time;       // cadence for role re-evaluation (~0.75s)
-	Vector v_pp_hide_spot;            // chosen world-item / cluster origin to hide near
-	int    i_pp_target_body;          // desired pev->fuser4 body (1..30)
-	float  f_pp_next_morph;           // soonest time bot may press IN_ATTACK to morph
-	float  f_pp_panic_until;          // gpGlobals->time the bot stays in panic mode
-	edict_t *p_pp_target_item;        // nearest world-item reference for hiding
-	float  f_pp_hide_arrived_time;    // gpGlobals->time of last hide-spot arrival/pick
-	float  f_pp_search_pick_time;     // hunter: next time to (re)pick a search cluster
-	Vector v_pp_search_target;        // hunter: cluster centroid to sweep
-	float  f_pp_lookaround_until;     // hunter: micro-search yaw-sweep window
-	float  f_pp_decoy_drop_time;      // prop: next time IN_RELOAD may drop a decoy
+	int    i_pp_role = 0;                 // current Prop Hunt role (PROP_ROLE_*)
+	float  f_pp_role_eval_time = 0.0f;    // cadence for role re-evaluation (~0.75s)
+	Vector v_pp_hide_spot = g_vecZero;    // chosen world-item / cluster origin to hide near
+	int    i_pp_target_body = 0;          // desired pev->fuser4 body (1..30)
+	float  f_pp_next_morph = 0.0f;        // soonest time bot may press IN_ATTACK to morph
+	float  f_pp_panic_until = 0.0f;       // gpGlobals->time the bot stays in panic mode
+	edict_t *p_pp_target_item = NULL;     // nearest world-item reference for hiding
+	float  f_pp_hide_arrived_time = 0.0f; // gpGlobals->time of last hide-spot arrival/pick
+	float  f_pp_search_pick_time = 0.0f;  // hunter: next time to (re)pick a search cluster
+	Vector v_pp_search_target = g_vecZero; // hunter: cluster centroid to sweep
+	float  f_pp_lookaround_until = 0.0f;  // hunter: micro-search yaw-sweep window
+	float  f_pp_decoy_drop_time = 0.0f;   // prop: next time IN_RELOAD may drop a decoy
 } bot_t;
 
 // Rune helpers (defined in bot_combat.cpp). Declared after bot_t typedef

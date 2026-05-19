@@ -50,13 +50,11 @@ extern bot_t bots[32];
 
 // Tunables
 static const float PP_HIDE_ARRIVE_DIST    = 96.0f;
-static const float PP_PANIC_HUNTER_DIST   = 512.0f;
 static const float PP_HUNTER_SEARCH_DIST  = 1024.0f;
 static const float PP_MORPH_COOLDOWN      = 0.6f;
 static const float PP_ROLE_EVAL_PERIOD    = 0.75f;
 static const float PP_DECOY_COOLDOWN      = 6.0f;
 static const float PP_HIDE_REPICK_DELAY   = 8.0f;
-static const int   PP_MAX_MORPH_PRESSES   = 4;   // per role-eval tick
 static const float PP_HUNTER_LOOKAROUND   = 1.2f;
 static const float PP_HUNTER_SEARCH_PERIOD= 3.0f;
 // Minimum distance any hide-spot anchor (and any chosen hide spot) must

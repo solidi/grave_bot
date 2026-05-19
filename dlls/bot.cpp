@@ -2023,8 +2023,11 @@ void BotThink( bot_t *pBot )
 		{
 			// Forget defeated-prop targets immediately — fuser4 is cleared by the
 			// server when a prop is converted, so the bot must not keep aiming at
-			// the now-hunter teammate.
-			if (pBot->pBotEnemy && pBot->pBotEnemy->v.fuser4 == 0
+			// the now-hunter teammate.  Only interpret fuser4 this way for
+			// player entities; BotFindEnemy can also return non-player targets.
+			if (pBot->pBotEnemy
+				&& (pBot->pBotEnemy->v.flags & (FL_CLIENT | FL_FAKECLIENT))
+				&& pBot->pBotEnemy->v.fuser4 == 0
 				&& pEdict->v.fuser4 == 0) // I'm a hunter
 				pBot->pBotEnemy = NULL;
 
