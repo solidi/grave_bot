@@ -9,6 +9,7 @@ OBJ = 	bot.o \
 	bot_client.o \
 	bot_combat.o \
 	bot_navigate.o \
+	bot_prophunt.o \
 	bot_start.o \
 	bot_weapons.o \
 	bot_weapons_hldm.o \

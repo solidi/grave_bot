@@ -212,6 +212,20 @@ enum
 	LOOT_ROLE_BREAKER    // default — seek and break loot_crates
 };
 
+enum
+{
+	PROP_ROLE_NONE = 0,
+	// Prop side
+	PROP_ROLE_FREEZE,      // round just started → walk to hide spot
+	PROP_ROLE_HIDE,        // at hide spot → still + morph to match neighbour
+	PROP_ROLE_PANIC,       // hunter close + LOS → grenade or flee + decoy
+	PROP_ROLE_DESPERATE,   // last prop standing buff active
+	// Hunter side
+	PROP_ROLE_HUNT_SEARCH, // sweep search clusters cooperatively
+	PROP_ROLE_HUNT_PURSUE, // chasing a suspect target (player or decoy)
+	PROP_ROLE_HUNT_HELP    // teammate already pursuing → flank
+};
+
 extern double pi;
 
 typedef struct
@@ -525,6 +539,20 @@ typedef struct
 	float  f_combat_stuck_check_time;
 	float  f_combat_stuck_last_dist;
 	float  f_combat_stuck_since;
+
+	// Prop Hunt — role + hide-spot state
+	int    i_pp_role;                 // current Prop Hunt role (PROP_ROLE_*)
+	float  f_pp_role_eval_time;       // cadence for role re-evaluation (~0.75s)
+	Vector v_pp_hide_spot;            // chosen world-item / cluster origin to hide near
+	int    i_pp_target_body;          // desired pev->fuser4 body (1..30)
+	float  f_pp_next_morph;           // soonest time bot may press IN_ATTACK to morph
+	float  f_pp_panic_until;          // gpGlobals->time the bot stays in panic mode
+	edict_t *p_pp_target_item;        // nearest world-item reference for hiding
+	float  f_pp_hide_arrived_time;    // gpGlobals->time of last hide-spot arrival/pick
+	float  f_pp_search_pick_time;     // hunter: next time to (re)pick a search cluster
+	Vector v_pp_search_target;        // hunter: cluster centroid to sweep
+	float  f_pp_lookaround_until;     // hunter: micro-search yaw-sweep window
+	float  f_pp_decoy_drop_time;      // prop: next time IN_RELOAD may drop a decoy
 } bot_t;
 
 // Rune helpers (defined in bot_combat.cpp). Declared after bot_t typedef

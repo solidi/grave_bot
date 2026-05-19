@@ -1967,6 +1967,8 @@ void BotThink( bot_t *pBot )
 		BotHordePreUpdate(pBot);
 	else if (is_gameplay == GAME_LOOT)
 		BotLootPreUpdate(pBot);
+	else if (is_gameplay == GAME_PROPHUNT)
+		BotProphuntPreUpdate(pBot);
 
 	// it is time to look for a waypoint AND
 	// there are waypoints in this level...
@@ -2019,35 +2021,22 @@ void BotThink( bot_t *pBot )
 
 		if (is_gameplay == GAME_PROPHUNT)
 		{
-			// Run around until game starts
-			if (pEdict->v.fuser4 > 0) // if I'm a prop
-			{
-				if (pEdict->v.fuser3 > gpGlobals->time)
-				{
-					pBot->f_pause_time = 0;
-					if (pBot->f_shoot_time < gpGlobals->time)
-						pEdict->v.button |= IN_ATTACK;
-					pBot->f_shoot_time = gpGlobals->time + 1.0;
-				}
-				// Bot stop in place
-				else if (pEdict->v.fuser3 > 1)
-				{
-					pBot->f_pause_time = gpGlobals->time + 1000;
-					pEdict->v.fuser3 = 0;
-				}
-			}
+			// Forget defeated-prop targets immediately — fuser4 is cleared by the
+			// server when a prop is converted, so the bot must not keep aiming at
+			// the now-hunter teammate.
+			if (pBot->pBotEnemy && pBot->pBotEnemy->v.fuser4 == 0
+				&& pEdict->v.fuser4 == 0) // I'm a hunter
+				pBot->pBotEnemy = NULL;
 
-			// Unstick signal
+			// Prop side: handled in full by BotProphuntPreUpdate/Think which
+			// already ran above (sets pause/morph buttons + v_goal).  Just honour
+			// the legacy unstick signal (server pokes fuser3 = 1).
 			if (pEdict->v.fuser3 == 1)
 			{
 				pBot->f_pause_time = 0;
 				pEdict->v.fuser3 = 0;
 				pBot->pBotEnemy = NULL;
 			}
-
-			// Remove enemy if was a defeated prop
-			if (pBot->pBotEnemy && pBot->pBotEnemy->v.fuser4 == 0)
-				pBot->pBotEnemy = NULL;
 		}
 
 		// KTS: update b_kts_has_ball BEFORE BotFindEnemy so the early-return
@@ -2220,12 +2209,62 @@ void BotThink( bot_t *pBot )
 			BotLootPreUpdate(pBot);
 		}
 
+		// Prop Hunt: refresh role, hide-spot, and morph state BEFORE BotFindEnemy
+		// so the enemy filter sees the correct prop/hunter context and v_goal is
+		// pre-set toward the chosen hide spot or search cluster.
+		if (is_gameplay == GAME_PROPHUNT)
+		{
+			BotProphuntPreUpdate(pBot);
+		}
+
 		if (b_botdontshoot == 0)
 		{
 			pBot->pBotEnemy = BotFindEnemy( pBot );
 		}
 		else
 			pBot->pBotEnemy = NULL;  // clear enemy pointer (no ememy for you!)
+
+		// Prop Hunt POST-filter: BotFindEnemy can re-acquire a hunter that
+		// PP_PreUpdate just cleared (PreUpdate runs BEFORE BotFindEnemy).
+		// Re-apply the frozen-hunter and self-frozen guards HERE so props
+		// never throw grenades / swing / shoot at hunters during the round
+		// freeze window or while a hunter is individually frozen
+		// (FL_FROZEN, set by EnableControl(FALSE) in prophunt_gamerules).
+		if (is_gameplay == GAME_PROPHUNT && pEdict->v.fuser4 >= 1)
+		{
+			const bool bSelfFrozen = (pEdict->v.fuser3 > 1.0f
+				&& pEdict->v.fuser3 > gpGlobals->time);
+			edict_t *pE = pBot->pBotEnemy;
+			const bool bEnemyFrozenHunter = pE && !FNullEnt(pE)
+				&& pE->v.fuser4 == 0
+				&& (pE->v.flags & FL_FROZEN) != 0;
+
+			if (bSelfFrozen || bEnemyFrozenHunter)
+			{
+				pBot->pBotEnemy        = NULL;
+				pBot->f_pp_panic_until = 0;
+				pEdict->v.button      &= ~(IN_ATTACK | IN_ATTACK2 | IN_RELOAD);
+			}
+		}
+
+		// Prop Hunt POST-filter (hunter side): hunters are frozen via
+		// EnableControl(FALSE) -> FL_FROZEN.  BotFindEnemy can still
+		// acquire a nearby prop and BotShootAtEnemy will then fire / jump
+		// / strafe the FROZEN hunter (the engine pain-pushes a frozen
+		// player when it presses IN_JUMP through the move code).  Drop the
+		// enemy and strip ALL action buttons whenever this hunter holds
+		// FL_FROZEN, regardless of round timing.
+		if (is_gameplay == GAME_PROPHUNT && pEdict->v.fuser4 == 0
+			&& (pEdict->v.flags & FL_FROZEN) != 0)
+		{
+			pBot->pBotEnemy   = NULL;
+			pBot->f_move_speed = 0.0f;
+			pBot->v_goal       = g_vecZero;
+			pBot->f_pause_time = gpGlobals->time + 0.25f;
+			pEdict->v.button  &= ~(IN_ATTACK | IN_ATTACK2 | IN_RELOAD
+			                       | IN_JUMP | IN_DUCK | IN_FORWARD | IN_BACK
+			                       | IN_MOVELEFT | IN_MOVERIGHT);
+		}
 
 		// Loot BREAKER: when no real enemy was found, target the cached
 		// loot_crate as a synthetic enemy so the engagement block below
@@ -2472,6 +2511,10 @@ void BotThink( bot_t *pBot )
 			else if (is_gameplay == GAME_LOOT && BotLootThink(pBot))
 			{
 				// BotLootThink sets v_goal + f_move_speed for all Loot roles.
+			}
+			else if (is_gameplay == GAME_PROPHUNT && BotProphuntThink(pBot))
+			{
+				// BotProphuntThink sets v_goal + f_move_speed for both prop and hunter roles.
 			}
 			else if (pBot->pBotPickupItem)
 			{
@@ -2932,7 +2975,7 @@ void BotThink( bot_t *pBot )
 	// v_goal is refreshed every tick by the pre-scan and the mode's Think
 	// function — don't wipe it here or the movement block will never see the
 	// target and the bot follows waypoints instead.
-	if (is_gameplay != GAME_COLDSKULL && is_gameplay != GAME_KTS && is_gameplay != GAME_CTC && is_gameplay != GAME_CTF && is_gameplay != GAME_ARENA && is_gameplay != GAME_COLDSPOT && is_gameplay != GAME_BUSTERS && is_gameplay != GAME_HORDE && is_gameplay != GAME_LOOT)
+	if (is_gameplay != GAME_COLDSKULL && is_gameplay != GAME_KTS && is_gameplay != GAME_CTC && is_gameplay != GAME_CTF && is_gameplay != GAME_ARENA && is_gameplay != GAME_COLDSPOT && is_gameplay != GAME_BUSTERS && is_gameplay != GAME_HORDE && is_gameplay != GAME_LOOT && is_gameplay != GAME_PROPHUNT)
 		pBot->v_goal = g_vecZero;
 	// is our goal ent still around?
 	if (pBot->pGoalEnt != NULL)
