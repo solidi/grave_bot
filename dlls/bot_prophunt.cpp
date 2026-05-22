@@ -553,11 +553,11 @@ void BotProphuntPreUpdate( bot_t *pBot )
 						pBot->f_pp_morph_attempt_time     = gpGlobals->time;
 					}
 					else if (pBot->f_pp_morph_attempt_time > 0
-						&& (gpGlobals->time - pBot->f_pp_morph_attempt_time) > 0.6f)
+						&& (gpGlobals->time - pBot->f_pp_morph_attempt_time) > PP_MORPH_COOLDOWN)
 					{
 						// Server rejected (gap slot, hunter on top, etc.).
-						// Drop this anchor and force the next pick to skip it.
-						pBot->p_pp_target_item            = NULL;
+						// Keep this failed anchor as the current item long enough
+						// for the next hide-anchor pick to pass it as pAvoid.
 						pBot->v_pp_hide_spot              = g_vecZero;
 						pBot->f_pp_hide_arrived_time      = 0.0f;
 						pBot->i_pp_morph_attempt_entindex = 0;

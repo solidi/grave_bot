@@ -556,8 +556,9 @@ typedef struct
 
 	// Prop: +use morph attempt tracking.  When the bot presses IN_USE on a
 	// candidate item (w_weapons.mdl / w_ammo.mdl) we record the attempt so
-	// we can detect failure (fuser4 didn't change within a tick window) and
-	// move to the next candidate instead of pressing forever.
+	// later logic can wait about 0.6s and treat the morph as failed if the
+	// recorded anchor/item is still visible (i.e. not EF_NODRAW), then move
+	// to the next candidate instead of pressing forever.
 	float  f_pp_morph_attempt_time = 0.0f;
 	int    i_pp_morph_attempt_entindex = 0;
 } bot_t;
