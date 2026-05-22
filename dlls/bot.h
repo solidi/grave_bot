@@ -553,6 +553,14 @@ typedef struct
 	Vector v_pp_search_target = g_vecZero; // hunter: cluster centroid to sweep
 	float  f_pp_lookaround_until = 0.0f;  // hunter: micro-search yaw-sweep window
 	float  f_pp_decoy_drop_time = 0.0f;   // prop: next time IN_RELOAD may drop a decoy
+
+	// Prop: +use morph attempt tracking.  When the bot presses IN_USE on a
+	// candidate item (w_weapons.mdl / w_ammo.mdl) we record the attempt so
+	// later logic can wait about 0.6s and treat the morph as failed if the
+	// recorded anchor/item is still visible (i.e. not EF_NODRAW), then move
+	// to the next candidate instead of pressing forever.
+	float  f_pp_morph_attempt_time = 0.0f;
+	int    i_pp_morph_attempt_entindex = 0;
 } bot_t;
 
 // Rune helpers (defined in bot_combat.cpp). Declared after bot_t typedef

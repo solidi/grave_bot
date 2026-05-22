@@ -164,6 +164,26 @@ static int PP_BodyForClassname(const char *cls)
 	return 52 + (int)(h % (unsigned)span);
 }
 
+// True if the entity is a w_weapons.mdl / w_ammo.mdl pickup that the
+// server's TryPropMorphToItem will accept (out-range gap slots 32 / 34
+// are filtered out).  Returns the target body slot (1..70) or 0.  We
+// mirror the server formula here so the bot can decide whether to press
+// +use vs. fall back to the IN_ATTACK stepping morph.
+static int PP_AnchorMorphBody(edict_t *pAnchor)
+{
+	if (FNullEnt(pAnchor) || pAnchor->v.model == 0) return 0;
+	const char *mdl = STRING(pAnchor->v.model);
+	if (!mdl || !*mdl) return 0;
+	int body = pAnchor->v.body;
+	int target = 0;
+	if (strstr(mdl, "w_weapons.mdl"))      target = body + 1;
+	else if (strstr(mdl, "w_ammo.mdl"))    target = body + 52;
+	else                                    return 0;
+	if (target < 1 || target > PROP_BODY_MAX) return 0;
+	if (target == 32 || target == 34)          return 0;
+	return target;
+}
+
 // Find the closest world-item the prop can use as a hide-spot anchor.
 // Prefers `weapon_*` / `ammo_*` / `item_*` pickups; never returns a
 // hazardous entity (grenade, monster_*, tripmine, projectile).
@@ -183,6 +203,11 @@ static edict_t *PP_FindHideAnchor(edict_t *pEdict, float maxDist, edict_t *pAvoi
 		if ((pEnt->v.flags & FL_CLIENT) || (pEnt->v.flags & FL_FAKECLIENT))
 			continue;
 		if (pEnt->v.solid == SOLID_NOT && pEnt->v.movetype == MOVETYPE_NONE)
+			continue;
+		// Skip items currently anchored to another prop (+use morph hides
+		// them with EF_NODRAW + SOLID_NOT).  Picking one would just have us
+		// march onto an invisible target the server would reject.
+		if (pEnt->v.effects & EF_NODRAW)
 			continue;
 		if (pEnt->v.modelindex == 0)
 			continue;
@@ -487,10 +512,69 @@ void BotProphuntPreUpdate( bot_t *pBot )
 			}
 		}
 
-		// Morph driver — step pev->fuser4 toward i_pp_target_body using
-		// the shorter wrap-around direction.  IN_ATTACK steps +1, IN_ATTACK2
-		// steps -1 (server enforces the 0.3 s morph cooldown via fuser2).
-		if (pBot->i_pp_target_body >= 1 && pBot->i_pp_target_body <= PROP_BODY_MAX
+		// +use morph driver (preferred): if the chosen anchor is a
+		// w_weapons.mdl / w_ammo.mdl entity, the server's TryPropMorphToItem
+		// will hide the item and snap fuser4 to the exact matching body in
+		// one tap of IN_USE.  We only press once per attempt and watch for
+		// EF_NODRAW on the anchor (server-set on success) to confirm.  On
+		// failure (~0.6 s with no EF_NODRAW) we blacklist this anchor and
+		// fall back to the legacy IN_ATTACK / IN_ATTACK2 step morph.
+		edict_t *pAnchor = pBot->p_pp_target_item;
+		bool bMorphDone = false;
+		if (!FNullEnt(pAnchor) && !bFrozen)
+		{
+			int anchorBody = PP_AnchorMorphBody(pAnchor);
+			if (anchorBody != 0)
+			{
+				float dA = (pAnchor->v.origin - pEdict->v.origin).Length();
+				bool bAlreadyHidden = (pAnchor->v.effects & EF_NODRAW) != 0;
+
+				if (bAlreadyHidden && (int)pEdict->v.fuser4 == anchorBody)
+				{
+					// Success — keep the stepper quiet by syncing the target
+					// body to what we now display.
+					pBot->i_pp_target_body              = anchorBody;
+					pBot->f_pp_morph_attempt_time       = 0.0f;
+					pBot->i_pp_morph_attempt_entindex   = 0;
+					bMorphDone                          = true;
+				}
+				else if (dA <= PROP_ANCHOR_USE_RADIUS)
+				{
+					// In range — face the anchor (server uses a narrow LOS
+					// cone) and press +use one tick.
+					Vector dir = pAnchor->v.origin - pEdict->v.origin;
+					pEdict->v.ideal_yaw = (dir.x == 0.0f && dir.y == 0.0f)
+						? pEdict->v.v_angle.y
+						: (float)(atan2((double)dir.y, (double)dir.x) * (180.0 / 3.14159265358979323846));
+					pEdict->v.button |= IN_USE;
+					if (pBot->i_pp_morph_attempt_entindex != ENTINDEX(pAnchor))
+					{
+						pBot->i_pp_morph_attempt_entindex = ENTINDEX(pAnchor);
+						pBot->f_pp_morph_attempt_time     = gpGlobals->time;
+					}
+					else if (pBot->f_pp_morph_attempt_time > 0
+						&& (gpGlobals->time - pBot->f_pp_morph_attempt_time) > PP_MORPH_COOLDOWN)
+					{
+						// Server rejected (gap slot, hunter on top, etc.).
+						// Keep this failed anchor as the current item long enough
+						// for the next hide-anchor pick to pass it as pAvoid.
+						pBot->v_pp_hide_spot              = g_vecZero;
+						pBot->f_pp_hide_arrived_time      = 0.0f;
+						pBot->i_pp_morph_attempt_entindex = 0;
+						pBot->f_pp_morph_attempt_time     = 0.0f;
+					}
+					bMorphDone = true;   // suppress legacy stepper this frame
+				}
+			}
+		}
+
+		// Morph driver (legacy fallback) — step pev->fuser4 toward
+		// i_pp_target_body using the shorter wrap-around direction.
+		// IN_ATTACK steps +1, IN_ATTACK2 steps -1 (server enforces the
+		// 0.3 s morph cooldown via fuser2).  Skipped when the +use path
+		// has already done the work above.
+		if (!bMorphDone
+			&& pBot->i_pp_target_body >= 1 && pBot->i_pp_target_body <= PROP_BODY_MAX
 			&& (int)pEdict->v.fuser4 != pBot->i_pp_target_body
 			&& pBot->f_pp_next_morph < gpGlobals->time
 			&& !bFrozen)
@@ -522,7 +606,16 @@ void BotProphuntPreUpdate( bot_t *pBot )
 		if (pBot->v_pp_hide_spot != g_vecZero)
 		{
 			pBot->v_goal           = pBot->v_pp_hide_spot;
-			pBot->f_goal_proximity = PP_HIDE_ARRIVE_DIST;
+			// If the anchor is +use-morphable we must actually step inside
+			// the server's PROP_ANCHOR_USE_RADIUS (80u).  PP_HIDE_ARRIVE_DIST
+			// (96u) would park us just outside and the morph would never
+			// fire.  Use a tighter proximity for morphable anchors so the
+			// bot walks right onto the item.
+			edict_t *pProx = pBot->p_pp_target_item;
+			if (!FNullEnt(pProx) && PP_AnchorMorphBody(pProx) != 0)
+				pBot->f_goal_proximity = PROP_ANCHOR_USE_RADIUS * 0.5f;  // 40u
+			else
+				pBot->f_goal_proximity = PP_HIDE_ARRIVE_DIST;
 		}
 
 		// Hunter-in-path dodge: if a hunter (frozen or not) is close and
