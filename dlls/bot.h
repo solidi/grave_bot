@@ -497,6 +497,11 @@ typedef struct
 	float f_loot_carrier_check_time;   // next progress sample time
 	float f_loot_carrier_last_dist;    // last sampled distance to loot_goal
 
+	// Loot — weapon drop/swap state (mirrors rune-drop pattern)
+	int   i_loot_weapon_target_index;  // entindex of weapon entity to grab, 0=none
+	float f_loot_weapon_eval_time;     // next time to rescan for upgrade weapons
+	float f_loot_weapon_drop_cooldown; // anti-spam timer after a drop command
+
 	// Arena (1v1) — active opponent and movement variation state
 	int   i_arena_opponent;        // entity index of the 1v1 opponent (cached per round)
 	float f_arena_vary_time;       // timer for next speed/movement variation event
