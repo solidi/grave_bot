@@ -1427,6 +1427,20 @@ static void BotLootMaybeDropForSwap(bot_t *pBot, edict_t *pTarget)
 	if (FNullEnt(pTarget) || pTarget->free) return;
 	if (gpGlobals->time < pBot->f_loot_weapon_drop_cooldown) return;
 
+	// Re-validate the target.  Critical for weaponbox (dropped weapons):
+	// BotLootFindUpgradeWeapon allows caching a weaponbox while under
+	// the cap, but if the bot reaches the cap (or loses loot-advantage)
+	// before touching it, we MUST NOT drop a known weapon to "swap"
+	// into a weaponbox of unknown contents -- the box could hold a
+	// weaker weapon than what we're dropping.  Skip and clear the cache
+	// so BotLootFindUpgradeWeapon can pick a real upgrade next eval.
+	int tgtId = -1, tgtPrio = 0;
+	if (!BotLootIsPickupableWeapon(pTarget, &tgtId, &tgtPrio) || tgtId == 0)
+	{
+		pBot->i_loot_weapon_target_index = 0;
+		return;
+	}
+
 	edict_t *pEdict = pBot->pEdict;
 	int held_count = BotLootCountNonFistsHeld(pBot);
 	int max_held   = BotLootHasTeamAdvantage(pBot) ? 3 : 1;
