@@ -591,6 +591,44 @@ bool BotHeadTowardWaypoint( bot_t *pBot )
 
 		if (index != -1)
 		{
+			// Ladder/transit safety gate.  Every gameplay-specific snap
+			// below resets curr_waypoint_index to the bot's nearest
+			// reachable waypoint whenever the new goal differs from the
+			// previous one.  When v_goal tracks a moving target (Loot
+			// RECOVERER chasing the holder, KTS bots tracking the ball,
+			// CTF defenders tracking a roaming carrier, etc.) the
+			// nearest waypoint to v_goal can flip between two candidates
+			// every frame, causing the snap to fire continuously.  If
+			// the bot is mid-climb on a ladder waypoint, "nearest
+			// reachable" is the ladder-foot waypoint right under the
+			// bot, so the snap UNDOES the routing promotion to the
+			// next ladder/top-of-ladder waypoint — the bot freezes at
+			// the foot of the ladder with no movement.  Also skip when
+			// routing from the current waypoint to the new goal already
+			// returns a valid next hop: WaypointRouteFromTo uses the
+			// precomputed shortest path, so a snap is unnecessary and
+			// merely thrashes navigation state.  Only snap when the
+			// current waypoint genuinely can't reach the new goal.
+			bool bSafeToSnap = true;
+			if (pBot->curr_waypoint_index != -1)
+			{
+				int currFlags = waypoints[pBot->curr_waypoint_index].flags;
+				if (pEdict->v.movetype == MOVETYPE_FLY ||
+					(currFlags & (W_FL_LADDER | W_FL_LIFT | W_FL_JUMP |
+								  W_FL_DUCKJUMP | W_FL_DOUBLEJUMP)))
+				{
+					bSafeToSnap = false;
+				}
+				else
+				{
+					int nextHop = WaypointRouteFromTo(
+						pBot->curr_waypoint_index, index, team);
+					if (nextHop != WAYPOINT_UNREACHABLE &&
+						nextHop >= 0 && nextHop < num_waypoints)
+						bSafeToSnap = false;
+				}
+			}
+
 			// KTS (ball-chasing only): Reset curr_waypoint_index to the nearest
 			// reachable waypoint when the goal actually CHANGES.  Without this,
 			// the bot must walk all the way to its old curr_waypoint_index
@@ -603,7 +641,7 @@ bool BotHeadTowardWaypoint( bot_t *pBot )
 			// Skip when dribbling: the bot has a stable goal (enemy goal) and
 			// should follow the waypoint graph normally.
 			if (is_gameplay == GAME_KTS && !pBot->b_kts_has_ball
-				&& index != pBot->waypoint_goal)
+				&& index != pBot->waypoint_goal && bSafeToSnap)
 			{
 				int fresh = WaypointFindReachable(pEdict, REACHABLE_RANGE, team);
 				if (fresh != -1)
@@ -618,7 +656,7 @@ bool BotHeadTowardWaypoint( bot_t *pBot )
 			// changes (new skull target), snap curr_waypoint_index to
 			// nearest reachable so the bot doesn't walk to a stale
 			// weapon/ammo waypoint before re-routing.
-			if (is_gameplay == GAME_COLDSKULL && index != pBot->waypoint_goal)
+			if (is_gameplay == GAME_COLDSKULL && index != pBot->waypoint_goal && bSafeToSnap)
 			{
 				int fresh = WaypointFindReachable(pEdict, REACHABLE_RANGE, team);
 				if (fresh != -1)
@@ -633,7 +671,7 @@ bool BotHeadTowardWaypoint( bot_t *pBot )
 			// or holder changed position), snap curr_waypoint_index to
 			// nearest reachable so the bot doesn't walk to a stale
 			// weapon/ammo waypoint before re-routing.
-			if (is_gameplay == GAME_CTC && index != pBot->waypoint_goal)
+			if (is_gameplay == GAME_CTC && index != pBot->waypoint_goal && bSafeToSnap)
 			{
 				int fresh = WaypointFindReachable(pEdict, REACHABLE_RANGE, team);
 				if (fresh != -1)
@@ -647,7 +685,7 @@ bool BotHeadTowardWaypoint( bot_t *pBot )
 			// CTF: same waypoint reset — when the goal changes (flag moved
 			// or role changed), snap curr_waypoint_index to nearest
 			// reachable so the bot doesn't walk to a stale waypoint.
-			if (is_gameplay == GAME_CTF && index != pBot->waypoint_goal)
+			if (is_gameplay == GAME_CTF && index != pBot->waypoint_goal && bSafeToSnap)
 			{
 				int fresh = WaypointFindReachable(pEdict, REACHABLE_RANGE, team);
 				if (fresh != -1)
@@ -661,7 +699,7 @@ bool BotHeadTowardWaypoint( bot_t *pBot )
 			// Arena: same waypoint reset — when the goal changes (opponent
 			// moved), snap curr_waypoint_index to nearest reachable so
 			// the bot doesn't walk to a stale waypoint.
-			if (is_gameplay == GAME_ARENA && index != pBot->waypoint_goal)
+			if (is_gameplay == GAME_ARENA && index != pBot->waypoint_goal && bSafeToSnap)
 			{
 				int fresh = WaypointFindReachable(pEdict, REACHABLE_RANGE, team);
 				if (fresh != -1)
@@ -676,7 +714,7 @@ bool BotHeadTowardWaypoint( bot_t *pBot )
 			// (spot relocated or role changed target), snap
 			// curr_waypoint_index to nearest reachable so the bot
 			// doesn't walk to a stale waypoint.
-			if (is_gameplay == GAME_COLDSPOT && index != pBot->waypoint_goal)
+			if (is_gameplay == GAME_COLDSPOT && index != pBot->waypoint_goal && bSafeToSnap)
 			{
 				int fresh = WaypointFindReachable(pEdict, REACHABLE_RANGE, team);
 				if (fresh != -1)
@@ -691,7 +729,7 @@ bool BotHeadTowardWaypoint( bot_t *pBot )
 			// (Buster moved, egon dropped elsewhere, or role flipped),
 			// snap curr_waypoint_index to nearest reachable so the bot
 			// doesn't walk to a stale weapon/ammo waypoint.
-			if (is_gameplay == GAME_BUSTERS && index != pBot->waypoint_goal)
+			if (is_gameplay == GAME_BUSTERS && index != pBot->waypoint_goal && bSafeToSnap)
 			{
 				int fresh = WaypointFindReachable(pEdict, REACHABLE_RANGE, team);
 				if (fresh != -1)
@@ -706,7 +744,7 @@ bool BotHeadTowardWaypoint( bot_t *pBot )
 			// (last one died or threat priority shifted), snap
 			// curr_waypoint_index to nearest reachable so the bot doesn't
 			// walk to a stale waypoint before re-routing.
-			if (is_gameplay == GAME_HORDE && index != pBot->waypoint_goal)
+			if (is_gameplay == GAME_HORDE && index != pBot->waypoint_goal && bSafeToSnap)
 			{
 				int fresh = WaypointFindReachable(pEdict, REACHABLE_RANGE, team);
 				if (fresh != -1)
@@ -722,7 +760,7 @@ bool BotHeadTowardWaypoint( bot_t *pBot )
 			// loose loot_entity, holder player, or loot_goal.  Snap
 			// curr_waypoint_index to nearest reachable so the bot doesn't
 			// walk to a stale waypoint before re-routing.
-			if (is_gameplay == GAME_LOOT && index != pBot->waypoint_goal)
+			if (is_gameplay == GAME_LOOT && index != pBot->waypoint_goal && bSafeToSnap)
 			{
 				int fresh = WaypointFindReachable(pEdict, REACHABLE_RANGE, team);
 				if (fresh != -1)

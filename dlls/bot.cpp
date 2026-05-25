@@ -353,6 +353,9 @@ void BotSpawnInit( bot_t *pBot )
 	pBot->f_loot_carrier_stuck_since = 0.0f;
 	pBot->f_loot_carrier_check_time  = 0.0f;
 	pBot->f_loot_carrier_last_dist   = 0.0f;
+	pBot->i_loot_weapon_target_index = 0;
+	pBot->f_loot_weapon_eval_time    = 0.0f;
+	pBot->f_loot_weapon_drop_cooldown = 0.0f;
 
 	// Clear per-life Arena (1v1) state.
 	pBot->i_arena_opponent             = 0;
@@ -2287,9 +2290,16 @@ void BotThink( bot_t *pBot )
 		// one within 1024u (covers elevated crates the cached "nearest"
 		// pick may not include).  This makes BREAKER bots fire on visible
 		// crates as they pass, including ones above them on platforms.
-		if (is_gameplay == GAME_LOOT
-			&& pBot->i_loot_role == LOOT_ROLE_BREAKER
-			&& !pBot->b_loot_has_loot)
+		//
+		// All-role opportunistic crate fire: non-BREAKER roles
+		// (RECOVERER chasing a hidden carrier, ESCORT trailing,
+		// GRABBER en route to loose loot) should also shoot at
+		// crates they pass when they have no other enemy — the user
+		// expects bots without a current target to actively destroy
+		// crates.  Only the BREAKER branch's player-occluded swap is
+		// gated to BREAKER (other roles have stronger reasons to
+		// keep the player target).
+		if (is_gameplay == GAME_LOOT && !pBot->b_loot_has_loot)
 		{
 			edict_t *pVisCrate = BotLootFindBestVisibleCrate(pBot, 1024.0f);
 
@@ -2297,22 +2307,52 @@ void BotThink( bot_t *pBot )
 			{
 				pBot->pBotEnemy = pVisCrate;
 			}
-			else if (pVisCrate && pBot->pBotEnemy
+			else if (pBot->i_loot_role == LOOT_ROLE_BREAKER
+				&& pVisCrate && pBot->pBotEnemy
 				&& (pBot->pBotEnemy->v.flags & FL_CLIENT)
 				&& !FVisible(pBot->pBotEnemy->v.origin, pEdict))
 			{
-				// Player enemy occluded — prefer the visible crate so the
+				// Player enemy occluded -- prefer the visible crate so the
 				// bot makes objective progress instead of aim-tracking a
 				// wall.  Player retakes priority next frame they're visible.
 				pBot->pBotEnemy = pVisCrate;
 			}
+
+			// Crate engagement detour: if we just bound a crate as our
+			// enemy (no live player target), commit to breaking it.
+			// Override waypoint travel so the bot actually stops and
+			// shoots instead of sprinting past with a token shot.
+			// Applies to every loot role except CARRIER (early-outed
+			// by !b_loot_has_loot above).  Released the moment the
+			// crate dies / becomes invisible -- next frame BotFindEnemy
+			// falls through and waypointing resumes naturally.
+			if (pVisCrate && pBot->pBotEnemy == pVisCrate)
+			{
+				float crateDist = (pVisCrate->v.origin - pEdict->v.origin).Length();
+
+				pBot->pBotPickupItem    = NULL;
+				pBot->item_waypoint     = -1;
+				pBot->v_goal            = pVisCrate->v.origin;
+				pBot->f_goal_proximity  = 80.0f;
+				pBot->f_ignore_wpt_time = gpGlobals->time + 0.5f;
+
+				// Inside fire range and we can see it: plant and shoot.
+				// Outside fire range: close the gap at full sprint.
+				if (crateDist < 600.0f)
+					pBot->f_move_speed = 0.0f;
+				else
+					pBot->f_move_speed = pBot->f_max_speed;
+			}
 		}
 
-		// Loot on-top-of-crate dismount: if standing on top of the
-		// cached BREAKER crate, immediately jump-strafe off and
-		// invalidate the pick.  Attacking from on top is unreliable
-		// because a downward eye-trace clips the crate brush itself
-		// and FVisible fails — so we re-approach from the side.
+		// Loot on-top-of-crate dismount: if standing on top of ANY
+		// crate, immediately jump-strafe off and invalidate the pick.
+		// Runs for ALL loot roles — non-BREAKER bots (RECOVERER /
+		// ESCORT / GRABBER) traveling waypoints frequently bump onto
+		// crates parked in chokepoints and would otherwise idle on
+		// top.  Attacking from on top is unreliable because a
+		// downward eye-trace clips the crate brush itself and
+		// FVisible fails — so we re-approach from the side.
 		if (is_gameplay == GAME_LOOT)
 			BotLootHandleOnTopOfCrate(pBot);
 

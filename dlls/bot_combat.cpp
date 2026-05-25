@@ -951,17 +951,36 @@ bool BotLootHandleOnTopOfCrate( bot_t *pBot )
 {
 	if (is_gameplay != GAME_LOOT) return false;
 	if (pBot->b_loot_has_loot)    return false;
-	if (pBot->i_loot_role != LOOT_ROLE_BREAKER) return false;
-	if (pBot->i_loot_crate_target_index <= 0)   return false;
-
-	edict_t *pCrate = INDEXENT(pBot->i_loot_crate_target_index);
-	if (FNullEnt(pCrate) || pCrate->free) return false;
-	if (!FStrEq(STRING(pCrate->v.classname), "loot_crate")) return false;
-	if (pCrate->v.solid == SOLID_NOT) return false;
-	if (pCrate->v.health <= 0) return false;
 
 	edict_t *pEdict = pBot->pEdict;
-	if (!BotLootIsOnTopOfCrate(pEdict, pCrate)) return false;
+
+	// Locate the crate we're standing on.  Prefer the cached BREAKER
+	// pick (cheap check), but fall back to scanning ALL live crates
+	// so non-BREAKER roles (RECOVERER / ESCORT / GRABBER) that bump
+	// onto a crate while waypoint-traveling also get dismounted.
+	edict_t *pCrate = NULL;
+	if (pBot->i_loot_crate_target_index > 0)
+	{
+		edict_t *pCached = INDEXENT(pBot->i_loot_crate_target_index);
+		if (!FNullEnt(pCached) && !pCached->free
+			&& FStrEq(STRING(pCached->v.classname), "loot_crate")
+			&& pCached->v.solid != SOLID_NOT && pCached->v.health > 0
+			&& BotLootIsOnTopOfCrate(pEdict, pCached))
+			pCrate = pCached;
+	}
+	if (FNullEnt(pCrate))
+	{
+		BotLootFindEntities();
+		for (int i = 0; i < s_loot_crate_count; i++)
+		{
+			edict_t *pC = s_loot_crates[i];
+			if (FNullEnt(pC) || pC->free) continue;
+			if (pC->v.solid == SOLID_NOT) continue;
+			if (pC->v.health <= 0) continue;
+			if (BotLootIsOnTopOfCrate(pEdict, pC)) { pCrate = pC; break; }
+		}
+	}
+	if (FNullEnt(pCrate)) return false;
 
 	// Pick a horizontal away-from-crate vector.  Use the bot's
 	// own offset from the crate origin (or fall back to a small
@@ -1137,6 +1156,385 @@ static edict_t *BotLootPickNearestCrate( bot_t *pBot )
 }
 
 //=========================================================
+// LOOT — weapon drop/swap (mirrors rune-drop bot pattern)
+//
+// In Loot, players are capped at 1 non-fists weapon (or 3
+// while their team controls the loot via "loot advantage").
+// The server enforces the cap via CHalfLifeLoot::
+// CanHavePlayerItem; the player.cpp +use handler drops the
+// active weapon when the player presses +use near a weapon
+// they can't carry.  Humans also have the "drop" client cmd.
+//
+// Bot equivalent: scan a radius for pickupable weapon ents,
+// compare priority vs what we already hold, and either walk
+// over the upgrade (under the cap) or drop our worst-held
+// weapon when within touch range (at the cap) so the next
+// touch frame picks the upgrade up via standard Touch().
+//=========================================================
+#define LOOT_WEAPON_SCAN_RADIUS    768.0f
+#define LOOT_WEAPON_EVAL_CADENCE   1.0f
+#define LOOT_WEAPON_SWAP_RANGE     80.0f
+#define LOOT_WEAPON_DROP_COOLDOWN  1.5f
+
+static int BotLootWeaponClassToId(const char *classname)
+{
+	bot_weapon_select_t *pSel = WeaponGetSelectPointer();
+	if (pSel == NULL || classname == NULL) return 0;
+	int i = 0;
+	while (pSel[i].iId)
+	{
+		if (strcmp(pSel[i].weapon_name, classname) == 0)
+			return pSel[i].iId;
+		i++;
+	}
+	return 0;
+}
+
+static int BotLootWeaponPriority(int iId)
+{
+	if (iId <= 0) return 999;
+	int idx = WeaponGetSelectIndex(iId);
+	if (idx < 0) return 999;
+	return WeaponGetSelectPointer()[idx].priority;
+}
+
+// True when the held weapon has a primary-ammo type and the bot's
+// reserves are empty (and the clip is too, if it happens to be the
+// active weapon).  Melee / exhaustible weapons with no ammo index
+// (iAmmo1 == -1) are never considered out.
+static bool BotLootIsHeldOutOfAmmo(bot_t *pBot, int iId)
+{
+	if (iId <= 0 || iId >= MAX_WEAPONS) return false;
+	int ammoIdx = weapon_defs[iId].iAmmo1;
+	if (ammoIdx < 0) return false;
+	if (pBot->m_rgAmmo[ammoIdx] > 0) return false;
+	if (pBot->current_weapon.iId == iId && pBot->current_weapon.iClip > 0)
+		return false;
+	return true;
+}
+
+// Worst (highest priority value) non-fists weapon currently held —
+// this is the slot we'd be giving up to swap.
+static int BotLootWorstHeldPriority(bot_t *pBot)
+{
+	bot_weapon_select_t *pSel = WeaponGetSelectPointer();
+	int worst = -1;
+	int i = 0;
+	while (pSel[i].iId)
+	{
+		if (pSel[i].iId != VALVE_WEAPON_FISTS
+			&& UTIL_HasWeaponId(pBot->pEdict, pSel[i].iId))
+		{
+			// Out-of-ammo weapons rank as worst-possible so any
+			// candidate beats them in the at-cap swap gate.
+			int p = BotLootIsHeldOutOfAmmo(pBot, pSel[i].iId)
+				? 999 : pSel[i].priority;
+			if (p > worst) worst = p;
+		}
+		i++;
+	}
+	return worst;
+}
+
+// Classname of the worst-priority non-fists weapon currently held.
+// Used to drop a specific weapon by name so the drop succeeds even
+// when the bot's active item is fists (fists has ITEM_FLAG_NODROP).
+// Out-of-ammo weapons are preferred targets regardless of priority:
+// a dry shotgun is more disposable than a loaded MAC-10 even if the
+// shotgun has the better table priority.
+static const char *BotLootGetWorstHeldName(bot_t *pBot)
+{
+	bot_weapon_select_t *pSel = WeaponGetSelectPointer();
+
+	// First pass: any out-of-ammo non-fists weapon wins outright.
+	int i = 0;
+	while (pSel[i].iId)
+	{
+		if (pSel[i].iId != VALVE_WEAPON_FISTS
+			&& UTIL_HasWeaponId(pBot->pEdict, pSel[i].iId)
+			&& BotLootIsHeldOutOfAmmo(pBot, pSel[i].iId))
+			return pSel[i].weapon_name;
+		i++;
+	}
+
+	// Fallback: highest-priority-value (worst by table priority).
+	const char *name = NULL;
+	int worst = -1;
+	i = 0;
+	while (pSel[i].iId)
+	{
+		if (pSel[i].iId != VALVE_WEAPON_FISTS
+			&& UTIL_HasWeaponId(pBot->pEdict, pSel[i].iId))
+		{
+			if (pSel[i].priority > worst)
+			{
+				worst = pSel[i].priority;
+				name  = pSel[i].weapon_name;
+			}
+		}
+		i++;
+	}
+	return name;
+}
+
+// Best (lowest priority value) non-fists weapon currently held.
+// Returns classname or NULL when bot only has fists.
+static const char *BotLootGetBestHeldName(bot_t *pBot)
+{
+	bot_weapon_select_t *pSel = WeaponGetSelectPointer();
+	const char *name = NULL;
+	int best = 999;
+	int i = 0;
+	while (pSel[i].iId)
+	{
+		if (pSel[i].iId != VALVE_WEAPON_FISTS
+			&& UTIL_HasWeaponId(pBot->pEdict, pSel[i].iId))
+		{
+			if (pSel[i].priority < best)
+			{
+				best = pSel[i].priority;
+				name = pSel[i].weapon_name;
+			}
+		}
+		i++;
+	}
+	return name;
+}
+
+static int BotLootCountNonFistsHeld(bot_t *pBot)
+{
+	bot_weapon_select_t *pSel = WeaponGetSelectPointer();
+	int count = 0;
+	int i = 0;
+	while (pSel[i].iId)
+	{
+		if (pSel[i].iId != VALVE_WEAPON_FISTS
+			&& UTIL_HasWeaponId(pBot->pEdict, pSel[i].iId))
+			count++;
+		i++;
+	}
+	return count;
+}
+
+// Mirrors CHalfLifeLoot::CanHavePlayerItem's loot-advantage check.
+static bool BotLootHasTeamAdvantage(bot_t *pBot)
+{
+	edict_t *pEdict = pBot->pEdict;
+	if (pBot->b_loot_has_loot) return true;
+	int botTeam = UTIL_GetTeam(pEdict);
+	for (int i = 1; i <= gpGlobals->maxClients; i++)
+	{
+		edict_t *pPl = INDEXENT(i);
+		if (FNullEnt(pPl) || pPl == pEdict) continue;
+		if (!IsAlive(pPl)) continue;
+		if (UTIL_GetTeam(pPl) != botTeam) continue;
+		if ((int)pPl->v.fuser4 == RADAR_LOOT_VAL) return true;
+	}
+	return false;
+}
+
+// Sentinel priority used for weaponbox entities (dropped weapons whose
+// contents the bot DLL can't introspect from server private state).
+// Pegged to 50 so weapon_* entries (priorities ~1-10) always rank
+// better when both are in range; weaponboxes only get picked when no
+// real weapon is around.
+#define LOOT_WEAPONBOX_PRIORITY 50
+
+// True when the entity is a weapon on the ground (no owner) we could
+// pick up.  Outputs the bot-recognized iId and the weapon's priority.
+// For weaponbox (dropped guns), iId is 0 (unknown contents).
+static bool BotLootIsPickupableWeapon(edict_t *pWeapon, int *outId, int *outPriority)
+{
+	if (FNullEnt(pWeapon) || pWeapon->free) return false;
+	const char *cn = STRING(pWeapon->v.classname);
+
+	// Dropped weapons become weaponbox entities (CWeaponBox).  Bot DLL
+	// can't see the packed weapon's iId without server-private types,
+	// so treat as unknown contents — still worth detouring when we
+	// have a free slot.
+	if (strcmp(cn, "weaponbox") == 0)
+	{
+		if (pWeapon->v.effects & EF_NODRAW) return false;
+		if (outId)       *outId = 0;
+		if (outPriority) *outPriority = LOOT_WEAPONBOX_PRIORITY;
+		return true;
+	}
+
+	if (strncmp(cn, "weapon_", 7) != 0) return false;
+	if (strcmp(cn, "weapon_fists") == 0) return false;
+	// Currently-held weapons have a non-null owner.
+	if (!FNullEnt(pWeapon->v.owner)) return false;
+	if (pWeapon->v.effects & EF_NODRAW) return false;
+	int iId = BotLootWeaponClassToId(cn);
+	if (iId <= 0) return false;
+	int prio = BotLootWeaponPriority(iId);
+	if (prio >= 999) return false;
+	if (outId)       *outId = iId;
+	if (outPriority) *outPriority = prio;
+	return true;
+}
+
+// Find the best (lowest-priority value) nearby weapon worth detouring
+// for.  Worthwhile means: (a) the bot has no weapon, (b) under the cap,
+// or (c) at the cap but the candidate's priority strictly beats the
+// worst weapon already held (strict to avoid swap thrashing on ties).
+static edict_t *BotLootFindUpgradeWeapon(bot_t *pBot)
+{
+	edict_t *pEdict = pBot->pEdict;
+	int held_count = BotLootCountNonFistsHeld(pBot);
+	int held_worst = BotLootWorstHeldPriority(pBot);
+	int max_held   = BotLootHasTeamAdvantage(pBot) ? 3 : 1;
+
+	int      best_prio = 999;
+	edict_t *pBest     = NULL;
+
+	edict_t *pE = NULL;
+	while ((pE = UTIL_FindEntityInSphere(pE, pEdict->v.origin,
+	                                     LOOT_WEAPON_SCAN_RADIUS)) != NULL)
+	{
+		int iId, prio;
+		if (!BotLootIsPickupableWeapon(pE, &iId, &prio)) continue;
+		// Skip duplicates we already hold (iId==0 means weaponbox of
+		// unknown contents — can't dedupe, just try it).
+		if (iId != 0 && UTIL_HasWeaponId(pEdict, iId)) continue;
+
+		bool worthwhile;
+		if (iId == 0)
+		{
+			// Weaponbox contents unknown — only chase when we have a
+			// free slot.  Never swap (could be worse than what we hold).
+			worthwhile = (held_count < max_held);
+		}
+		else if (held_count == 0)              worthwhile = true;
+		else if (held_count < max_held)   worthwhile = true;
+		else                              worthwhile = (prio < held_worst);
+		if (!worthwhile) continue;
+
+		if (prio < best_prio)
+		{
+			best_prio = prio;
+			pBest     = pE;
+		}
+	}
+	return pBest;
+}
+
+// At-cap swap: when within touch range of the upgrade target, issue
+// the "drop" client command — server drops the active weapon and the
+// upgrade picks up on the next Touch frame via standard pickup logic.
+static void BotLootMaybeDropForSwap(bot_t *pBot, edict_t *pTarget)
+{
+	if (FNullEnt(pTarget) || pTarget->free) return;
+	if (gpGlobals->time < pBot->f_loot_weapon_drop_cooldown) return;
+
+	// Re-validate the target.  Critical for weaponbox (dropped weapons):
+	// BotLootFindUpgradeWeapon allows caching a weaponbox while under
+	// the cap, but if the bot reaches the cap (or loses loot-advantage)
+	// before touching it, we MUST NOT drop a known weapon to "swap"
+	// into a weaponbox of unknown contents -- the box could hold a
+	// weaker weapon than what we're dropping.  Skip and clear the cache
+	// so BotLootFindUpgradeWeapon can pick a real upgrade next eval.
+	int tgtId = -1, tgtPrio = 0;
+	if (!BotLootIsPickupableWeapon(pTarget, &tgtId, &tgtPrio) || tgtId == 0)
+	{
+		pBot->i_loot_weapon_target_index = 0;
+		return;
+	}
+
+	edict_t *pEdict = pBot->pEdict;
+	int held_count = BotLootCountNonFistsHeld(pBot);
+	int max_held   = BotLootHasTeamAdvantage(pBot) ? 3 : 1;
+	if (held_count < max_held) return;  // touch-pickup handles under-cap
+
+	float dist = (pTarget->v.origin - pEdict->v.origin).Length();
+	if (dist > LOOT_WEAPON_SWAP_RANGE) return;
+
+	// Drop by name — DropPlayerItem matches the arg against weapon
+	// classnames.  We pass the WORST-priority non-fists weapon so the
+	// drop succeeds even when the bot's active item is fists (fists
+	// has ITEM_FLAG_NODROP and would silently fail an empty-arg drop).
+	const char *pszDrop = BotLootGetWorstHeldName(pBot);
+	if (pszDrop == NULL) return;
+	FakeClientCommand(pEdict, "drop", (char *)pszDrop, NULL);
+	pBot->f_loot_weapon_drop_cooldown = gpGlobals->time + LOOT_WEAPON_DROP_COOLDOWN;
+}
+
+// When the bot holds a non-fists weapon but is wielding fists, force
+// a switch to the best non-fists weapon.  HL's auto-switch on pickup
+// doesn't always engage for bots, leaving them punching enemies past
+// a perfectly good MAC-10 in their inventory.
+static void BotLootMaybeWieldNonFists(bot_t *pBot)
+{
+	edict_t *pEdict = pBot->pEdict;
+	if (FNullEnt(pEdict)) return;
+	if (pBot->current_weapon.iId != VALVE_WEAPON_FISTS) return;
+	const char *pszBest = BotLootGetBestHeldName(pBot);
+	if (pszBest == NULL) return;
+	UTIL_SelectItem(pEdict, (char *)pszBest);
+}
+
+// Proactively drop any held non-fists weapon whose reserves are
+// exhausted.  Frees the inventory slot so the next weapon pickup
+// succeeds even at the cap, and lets the bot fall back to fists
+// (better than carrying dead weight).  Cooldowned to avoid spam.
+static void BotLootDropEmptyWeapons(bot_t *pBot)
+{
+	if (gpGlobals->time < pBot->f_loot_weapon_drop_cooldown) return;
+
+	edict_t *pEdict = pBot->pEdict;
+	bot_weapon_select_t *pSel = WeaponGetSelectPointer();
+	int i = 0;
+	while (pSel[i].iId)
+	{
+		if (pSel[i].iId != VALVE_WEAPON_FISTS
+			&& UTIL_HasWeaponId(pEdict, pSel[i].iId)
+			&& BotLootIsHeldOutOfAmmo(pBot, pSel[i].iId))
+		{
+			FakeClientCommand(pEdict, "drop",
+			                  (char *)pSel[i].weapon_name, NULL);
+			pBot->f_loot_weapon_drop_cooldown =
+				gpGlobals->time + LOOT_WEAPON_DROP_COOLDOWN;
+			return;
+		}
+		i++;
+	}
+}
+
+// Public entry: returns true and fills outGoal when the bot should
+// detour to grab a weapon.  Never deviates while carrying the loot.
+static bool BotLootHandleWeaponSwap(bot_t *pBot, Vector *outGoal)
+{
+	if (pBot == NULL || pBot->pEdict == NULL) return false;
+	if (pBot->b_loot_has_loot) return false;
+
+	// Validate cached target first; rescan on cadence if invalid.
+	edict_t *pTarget = NULL;
+	if (pBot->i_loot_weapon_target_index > 0)
+	{
+		edict_t *pC = INDEXENT(pBot->i_loot_weapon_target_index);
+		int id, pr;
+		if (!FNullEnt(pC) && !pC->free
+			&& BotLootIsPickupableWeapon(pC, &id, &pr)
+			&& (id == 0 || !UTIL_HasWeaponId(pBot->pEdict, id)))
+			pTarget = pC;
+		else
+			pBot->i_loot_weapon_target_index = 0;
+	}
+	if (pTarget == NULL && pBot->f_loot_weapon_eval_time < gpGlobals->time)
+	{
+		pBot->f_loot_weapon_eval_time = gpGlobals->time + LOOT_WEAPON_EVAL_CADENCE;
+		pTarget = BotLootFindUpgradeWeapon(pBot);
+		pBot->i_loot_weapon_target_index = pTarget ? ENTINDEX(pTarget) : 0;
+	}
+	if (pTarget == NULL) return false;
+
+	BotLootMaybeDropForSwap(pBot, pTarget);
+
+	if (outGoal) *outGoal = pTarget->v.origin;
+	return true;
+}
+
+//=========================================================
 // BotLootPreUpdate — called BEFORE BotFindEnemy every frame.
 // Sets b_loot_has_loot and pre-seeds v_goal so the movement
 // block always has a target on ticks where the enemy branch
@@ -1150,6 +1548,14 @@ void BotLootPreUpdate( bot_t *pBot )
 
 	pBot->b_loot_has_loot = ((int)pEdict->v.fuser4 == RADAR_LOOT_VAL);
 
+	// Get off fists whenever we hold a real weapon -- prevents bots
+	// from running around punching when they're carrying an MP5.
+	BotLootMaybeWieldNonFists(pBot);
+
+	// Dump any empty non-fists weapons so we're not holding dead
+	// weight that blocks future pickups.
+	BotLootDropEmptyWeapons(pBot);
+
 	if (pBot->b_loot_has_loot)
 	{
 		pBot->pBotPickupItem = NULL;
@@ -1159,6 +1565,33 @@ void BotLootPreUpdate( bot_t *pBot )
 			pBot->v_goal           = s_pLootGoal->v.origin;
 			pBot->f_goal_proximity = 0.0f;
 		}
+		return;
+	}
+
+	// Loose loot_entity always wins — a freshly-broken crate's loot
+	// is the single most valuable pickup on the map.  Forcing role +
+	// goal here (instead of waiting for the 0.75s role-eval cadence)
+	// stops bots from running past exposed loot while still cached as
+	// BREAKER/RECOVERER/ESCORT from the previous tick.
+	if (!FNullEnt(s_pLootEntity))
+	{
+		pBot->i_loot_role      = LOOT_ROLE_GRABBER;
+		pBot->pBotPickupItem   = NULL;
+		pBot->item_waypoint    = -1;
+		pBot->v_goal           = s_pLootEntity->v.origin;
+		pBot->f_goal_proximity = 0.0f;
+		return;
+	}
+
+	// Weapon-swap detour overrides any role-driven goal: a clearly
+	// better gun on the floor is worth a brief pivot even mid-escort.
+	Vector vWeaponGoal;
+	if (BotLootHandleWeaponSwap(pBot, &vWeaponGoal))
+	{
+		pBot->pBotPickupItem   = NULL;
+		pBot->item_waypoint    = -1;
+		pBot->v_goal           = vWeaponGoal;
+		pBot->f_goal_proximity = 32.0f;
 		return;
 	}
 
@@ -1235,10 +1668,33 @@ bool BotLootThink( bot_t *pBot )
 	pBot->b_loot_has_loot = ((int)pEdict->v.fuser4 == RADAR_LOOT_VAL);
 	edict_t *pHolder = BotLootGetHolder();
 
+	// Weapon-swap detour: short-circuit the role switch when an
+	// upgrade weapon is nearby.  Suppressed while carrying loot
+	// (handled by BotLootHandleWeaponSwap itself).
+	{
+		Vector vWeaponGoal;
+		if (BotLootHandleWeaponSwap(pBot, &vWeaponGoal))
+		{
+			pBot->pBotPickupItem   = NULL;
+			pBot->item_waypoint    = -1;
+			pBot->v_goal           = vWeaponGoal;
+			pBot->f_goal_proximity = 32.0f;
+			pBot->f_move_speed     = pBot->f_max_speed;
+			return true;
+		}
+	}
+
 	// Role evaluation
 	if (pBot->b_loot_has_loot)
 	{
 		pBot->i_loot_role = LOOT_ROLE_CARRIER;
+	}
+	else if (!FNullEnt(s_pLootEntity))
+	{
+		// Loose loot ALWAYS forces GRABBER — don't wait for the
+		// 0.75s eval cadence (bot would run past exposed loot in
+		// the meantime while still cached as BREAKER/ESCORT/etc).
+		pBot->i_loot_role = LOOT_ROLE_GRABBER;
 	}
 	else if (pBot->f_loot_role_eval_time < gpGlobals->time
 	         || pBot->i_loot_role == LOOT_ROLE_CARRIER)
