@@ -188,8 +188,14 @@ void BotCheckTeamplay()
 		is_gameplay = GAME_BUSTERS;
 	}
 
-	if ((strstr(gameMode, "lms") || atoi(gameMode) == GAME_LMS) && CVAR_GET_FLOAT("mp_royaleteam"))
-		is_team_play = TRUE;
+	if (strstr(gameMode, "lms") || atoi(gameMode) == GAME_LMS)
+	{
+		// FFA-LMS (mp_royaleteam 0) still runs the zone-survival role evaluator —
+		// only the HOLDER / HUNTER team roles are gated by is_team_play.
+		if (CVAR_GET_FLOAT("mp_royaleteam"))
+			is_team_play = TRUE;
+		is_gameplay = GAME_LMS;
+	}
 
 	if (strstr(gameMode, "gungame") || atoi(gameMode) == GAME_GUNGAME)
 	{
@@ -3256,6 +3262,397 @@ bool BotColdSpotThink( bot_t *pBot )
 
 
 //=========================================================
+// LMS / Battle Royale — shrinking-zone survival mode
+//
+// Gamerules: a single `safespot` entity spawns per round
+// (classname "safespot", pev->fuser4 == RADAR_COLD_SPOT,
+// shared model with Cold Spot).  Its radius is
+// `256 * pev->body` where body starts at 8 and shrinks to
+// 1 over the round.  Players outside the radius take
+// 2 DMG_SHOCK every 2s (gated by mp_royaledamage); players
+// inside heal +2 HP per tick.  Each player has
+// `pev->frags` lives; at 0 they are eliminated for the
+// round.  Win condition: last alive (FFA) or last team
+// standing (when mp_royaleteam=1).
+//=========================================================
+#define LMS_ZONE_SLACK         96.0f    // hysteresis inside the radius
+#define LMS_NEARBY_RADIUS      768.0f   // enemy-priority band outside zone
+#define LMS_DIRECT_STEER       400.0f   // direct-steer (with visibility) range
+#define LMS_RETREAT_HP         25.0f    // health threshold for RETREATER
+#define LMS_RETREAT_HOLD_TIME  4.0f     // (reserved) min RETREATER dwell
+
+static float   s_lms_cache_time = -1.0f;
+static edict_t *s_pSafeSpot = NULL;
+
+static void BotLmsFindEntity()
+{
+	if (s_lms_cache_time == gpGlobals->time)
+		return;
+
+	s_lms_cache_time = gpGlobals->time;
+	s_pSafeSpot = NULL;
+
+	edict_t *pEnt = NULL;
+	while ((pEnt = UTIL_FindEntityByClassname(pEnt, "safespot")) != NULL)
+	{
+		if ((int)pEnt->v.fuser4 == RADAR_COLD_SPOT)
+		{
+			s_pSafeSpot = pEnt;
+			break;
+		}
+	}
+}
+
+static edict_t *BotLmsGetEntity()
+{
+	BotLmsFindEntity();
+	return s_pSafeSpot;
+}
+
+// Current zone radius in units.  pev->body is the size index (1..8); the
+// max(1, body) guard mirrors what the gamerules clamp guarantees but keeps
+// the bot side safe if a tick observes the entity mid-shrink.
+static float BotLmsCurrentRadius( edict_t *pSpot )
+{
+	int body = (int)pSpot->v.body;
+	if (body < 1) body = 1;
+	return 256.0f * (float)body;
+}
+
+// True when the player is "in the round" — alive, not in observer, and not
+// eliminated.  This is the cross-DLL proxy for `IsInArena && lives > 0` that
+// the bot DLL can't read directly.
+static bool BotLmsPlayerInRound( edict_t *pPlayer )
+{
+	if (!pPlayer || pPlayer->free || !(pPlayer->v.flags & FL_CLIENT))
+		return false;
+	if (!IsAlive(pPlayer))
+		return false;
+	if (pPlayer->v.iuser1)
+		return false;
+	if (pPlayer->v.frags <= 0)
+		return false;
+	return true;
+}
+
+// Find the nearest in-round enemy player currently inside the safe zone so
+// HUNTER / HOLDER bots can target the most immediate intruder.  Returns NULL
+// when the zone is clear.  In FFA the team check short-circuits and every
+// living opponent counts as an intruder.
+static edict_t *BotLmsFindZoneIntruder( edict_t *pSpot, int botTeam )
+{
+	if (FNullEnt(pSpot))
+		return NULL;
+
+	const float radius = BotLmsCurrentRadius(pSpot);
+	edict_t *pBest = NULL;
+	float flBestDist = radius + 1.0f;
+
+	for (int i = 1; i <= gpGlobals->maxClients; i++)
+	{
+		edict_t *pPlayer = INDEXENT(i);
+		if (!BotLmsPlayerInRound(pPlayer))
+			continue;
+		if (is_team_play && UTIL_GetTeam(pPlayer) == botTeam)
+			continue;
+		float d = (pPlayer->v.origin - pSpot->v.origin).Length();
+		if (d < flBestDist)
+		{
+			flBestDist = d;
+			pBest = pPlayer;
+		}
+	}
+	return pBest;
+}
+
+// Deterministic per-bot center offset to keep multiple bots from piling on
+// a single pixel.  entindex() is stable across the round so the target
+// doesn't oscillate.  Bias scales with the current radius so it never
+// pushes the bot out of zone.
+static Vector BotLmsCenterTarget( edict_t *pBot, edict_t *pSpot )
+{
+	int idx = ENTINDEX(pBot);
+	float ang = (float)idx * 0.7853981633f; // ~pi/4 per index
+	float r = BotLmsCurrentRadius(pSpot) * 0.3f;
+	Vector offset(cosf(ang) * r, sinf(ang) * r, 0.0f);
+	return pSpot->v.origin + offset;
+}
+
+//=========================================================
+// BotLmsPreUpdate — called from bot.cpp BEFORE BotFindEnemy
+// every frame in LMS mode.
+//
+// Refreshes the entity cache, detects relocation between
+// rounds AND mid-round shrinks (both wipe stale waypoint
+// routing), evaluates the bot's role at ~0.75s intervals,
+// and pre-sets v_goal so the movement block always has a
+// current destination even on ticks where the enemy branch
+// runs instead of BotLmsThink.
+//=========================================================
+void BotLmsPreUpdate( bot_t *pBot )
+{
+	if (is_gameplay != GAME_LMS)
+		return;
+
+	edict_t *pEdict = pBot->pEdict;
+	edict_t *pSpot  = BotLmsGetEntity();
+
+	// Pre-round / between-rounds / eliminated: idle cleanly.  The
+	// fake-client auto-promotion path handles re-entry on the next round.
+	if (FNullEnt(pSpot) || pEdict->v.iuser1 || pEdict->v.frags <= 0)
+	{
+		pBot->v_goal           = g_vecZero;
+		pBot->f_goal_proximity = 0.0f;
+		pBot->i_lms_role       = LMS_ROLE_NONE;
+		// Reset health baseline so the first PreUpdate after re-entry
+		// doesn't trip a spurious bZoneHurt.
+		pBot->f_lms_last_health = pEdict->v.health;
+		return;
+	}
+
+	int botTeam = UTIL_GetTeam(pEdict);
+
+	// Seed health baseline on first contact each life so the zone-damage
+	// probe has a sane starting point.
+	if (pBot->f_lms_last_health == 0.0f)
+		pBot->f_lms_last_health = pEdict->v.health;
+
+	// Relocation invalidation (between-round zone moves only — origin is
+	// stable within a single round).  Wipe every field that could pin the
+	// bot to a stale waypoint, matching the Cold Spot reset block.
+	Vector vecSpot = pSpot->v.origin;
+	if (pBot->v_lms_last_origin != g_vecZero &&
+		(pBot->v_lms_last_origin - vecSpot).Length() > 32.0f)
+	{
+		pBot->waypoint_goal        = -1;
+		pBot->old_waypoint_goal    = -1;
+		pBot->f_waypoint_goal_time = 0.0f;
+		pBot->curr_waypoint_index  = -1;
+		pBot->f_waypoint_time      = 0.0f;
+		pBot->prev_waypoint_distance = 0.0f;
+		for (int p = 0; p < 5; p++)
+			pBot->prev_waypoint_index[p] = -1;
+		pBot->f_pause_time         = 0.0f;
+		pBot->wpt_goal_type        = WPT_GOAL_NONE;
+	}
+	pBot->v_lms_last_origin = vecSpot;
+
+	// Shrink invalidation — when pev->body drops, the previously-safe path
+	// may now lead into the red zone.  Force a recalc.
+	int body = (int)pSpot->v.body;
+	if (pBot->i_lms_last_body > 0 && body < pBot->i_lms_last_body)
+	{
+		pBot->waypoint_goal        = -1;
+		pBot->f_waypoint_goal_time = 0.0f;
+	}
+	pBot->i_lms_last_body = body;
+
+	const float radius   = BotLmsCurrentRadius(pSpot);
+	float botDist        = (pEdict->v.origin - vecSpot).Length();
+	bool  bInZone        = (botDist <= radius - LMS_ZONE_SLACK);
+	if (bInZone)
+		pBot->f_lms_last_in_zone = gpGlobals->time;
+
+	// Zone-damage probe.  Combat damage inside the zone won't trip this
+	// because bInZone is true and the !bInZone gate fails.
+	bool bZoneHurt = (!bInZone) && (pEdict->v.health < pBot->f_lms_last_health);
+	pBot->f_lms_last_health = pEdict->v.health;
+
+	// Role evaluation — throttled to ~0.75s.
+	if (pBot->f_lms_role_eval_time < gpGlobals->time)
+	{
+		pBot->f_lms_role_eval_time = gpGlobals->time + 0.75f;
+
+		int enemiesInZone = 0;
+		int alliesInZone  = 0;
+
+		for (int i = 1; i <= gpGlobals->maxClients; i++)
+		{
+			edict_t *pPlayer = INDEXENT(i);
+			if (pPlayer == pEdict)
+				continue;
+			if (!BotLmsPlayerInRound(pPlayer))
+				continue;
+			if ((pPlayer->v.origin - vecSpot).Length() > radius)
+				continue;
+			if (is_team_play && UTIL_GetTeam(pPlayer) == botTeam)
+				alliesInZone++;
+			else
+				enemiesInZone++;
+		}
+
+		// Priority 1 — RETREATER: low HP, zone is hurting us, or simply
+		// outside the safe radius.
+		if (pEdict->v.health <= LMS_RETREAT_HP || bZoneHurt || !bInZone)
+		{
+			pBot->i_lms_role = LMS_ROLE_RETREATER;
+		}
+		// Priority 2 — team HOLDER: inside zone alongside allies.
+		else if (is_team_play && bInZone && alliesInZone > 0)
+		{
+			pBot->i_lms_role = LMS_ROLE_HOLDER;
+		}
+		// Priority 3 — team HUNTER: enemy inside zone, push them out.
+		else if (is_team_play && enemiesInZone > 0)
+		{
+			pBot->i_lms_role = LMS_ROLE_HUNTER;
+		}
+		// Default — SURVIVOR: in zone, no special pressure.
+		else
+		{
+			pBot->i_lms_role = LMS_ROLE_SURVIVOR;
+		}
+	}
+
+	// HOLDER overshoot guard — if chase momentum pulled the holder across
+	// the perimeter, demote to RETREATER for one tick so they bail back in
+	// rather than wandering into the red zone.
+	if (pBot->i_lms_role == LMS_ROLE_HOLDER && !bInZone &&
+		pBot->f_lms_last_in_zone > 0.0f &&
+		(gpGlobals->time - pBot->f_lms_last_in_zone) > 0.75f)
+	{
+		pBot->i_lms_role = LMS_ROLE_RETREATER;
+	}
+
+	// Pre-set v_goal so the movement block has a current target on every
+	// tick, even when the combat branch runs instead of BotLmsThink.  Role
+	// targets must match BotLmsThink so combat-tick routing agrees with
+	// non-combat-tick routing.
+	switch (pBot->i_lms_role)
+	{
+	case LMS_ROLE_HOLDER:
+		pBot->v_goal           = vecSpot;
+		pBot->f_goal_proximity = LMS_ZONE_SLACK;
+		break;
+
+	case LMS_ROLE_HUNTER:
+	{
+		edict_t *pIntruder = BotLmsFindZoneIntruder(pSpot, botTeam);
+		pBot->v_goal           = pIntruder ? pIntruder->v.origin : vecSpot;
+		pBot->f_goal_proximity = 0.0f;
+		break;
+	}
+
+	case LMS_ROLE_RETREATER:
+	case LMS_ROLE_SURVIVOR:
+	default:
+		pBot->v_goal           = BotLmsCenterTarget(pEdict, pSpot);
+		pBot->f_goal_proximity = 32.0f;
+		break;
+	}
+
+	// Advance the multi-jump sequence toward the spot for movement roles.
+	// HOLDER intentionally skips it — the goal is to stay put inside the
+	// zone, not to climb onto an elevated marker.
+	if (pBot->i_lms_role != LMS_ROLE_HOLDER)
+		BotGoalElevatedJump(pBot, vecSpot);
+
+	// Suppress random item detours — survival trumps loot.
+	pBot->pBotPickupItem = NULL;
+	pBot->item_waypoint  = -1;
+}
+
+//=========================================================
+// BotLmsThink — called from BotThink when in LMS mode and
+// no combat is active.
+//
+// Role-based movement:
+//  SURVIVOR / RETREATER — full-speed run toward zone center
+//                         (RETREATER differs only in combat
+//                         priority — disengages aggressively)
+//  HOLDER   — anchor inside zone, face nearest intruder
+//  HUNTER   — rush nearest intruder inside the zone
+//
+// Returns true when movement intent has been set; false to
+// fall back to normal nav (e.g. between rounds).
+//=========================================================
+bool BotLmsThink( bot_t *pBot )
+{
+	if (is_gameplay != GAME_LMS)
+		return false;
+
+	edict_t *pSpot = BotLmsGetEntity();
+	if (FNullEnt(pSpot))
+		return false;
+
+	edict_t *pEdict = pBot->pEdict;
+	if (pEdict->v.iuser1 || pEdict->v.frags <= 0)
+		return false;
+
+	int botTeam = UTIL_GetTeam(pEdict);
+
+	Vector vecSpot = pSpot->v.origin;
+	const float radius = BotLmsCurrentRadius(pSpot);
+	float botDist = (pEdict->v.origin - vecSpot).Length();
+
+	pBot->f_pause_time = 0;
+
+	switch (pBot->i_lms_role)
+	{
+	// =================================================================
+	// HOLDER — anchor inside the zone, face nearest threat
+	// =================================================================
+	case LMS_ROLE_HOLDER:
+	{
+		if (botDist > radius - LMS_ZONE_SLACK)
+		{
+			pBot->f_move_speed     = pBot->f_max_speed;
+			pBot->v_goal           = vecSpot;
+			pBot->f_goal_proximity = LMS_ZONE_SLACK;
+		}
+		else
+		{
+			pBot->f_move_speed     = pBot->f_max_speed * 0.35f;
+			pBot->v_goal           = vecSpot;
+			pBot->f_goal_proximity = LMS_ZONE_SLACK;
+		}
+
+		edict_t *pIntruder = BotLmsFindZoneIntruder(pSpot, botTeam);
+		Vector   vecFace   = pIntruder ? pIntruder->v.origin : vecSpot;
+		Vector   vecDir    = vecFace - pEdict->v.origin;
+		if (vecDir.Length() > 1.0f)
+		{
+			Vector angles = UTIL_VecToAngles(vecDir);
+			pEdict->v.ideal_yaw = angles.y;
+			BotFixIdealYaw(pEdict);
+		}
+
+		return true;
+	}
+
+	// =================================================================
+	// HUNTER — rush an in-zone intruder
+	// =================================================================
+	case LMS_ROLE_HUNTER:
+	{
+		edict_t *pIntruder = BotLmsFindZoneIntruder(pSpot, botTeam);
+		pBot->f_move_speed     = pBot->f_max_speed;
+		pBot->v_goal           = pIntruder ? pIntruder->v.origin : vecSpot;
+		pBot->f_goal_proximity = 0.0f;
+
+		BotGoalElevatedJump(pBot, pBot->v_goal);
+		return true;
+	}
+
+	// =================================================================
+	// SURVIVOR / RETREATER — sprint toward zone center
+	// =================================================================
+	case LMS_ROLE_SURVIVOR:
+	case LMS_ROLE_RETREATER:
+	default:
+	{
+		pBot->f_move_speed     = pBot->f_max_speed;
+		pBot->v_goal           = BotLmsCenterTarget(pEdict, pSpot);
+		pBot->f_goal_proximity = 32.0f;
+
+		BotGoalElevatedJump(pBot, vecSpot);
+		return true;
+	}
+	}
+}
+
+
+//=========================================================
 // Horde — survivors-vs-monsters mode
 //
 // Gamerules: each wave spawns N monsters tagged with
@@ -3864,6 +4261,27 @@ edict_t *BotFindEnemy( bot_t *pBot )
 						}
 					}
 
+					// LMS: prefer enemies inside / near the safe zone so the
+					// bot fights for the high-value ground rather than
+					// chasing frags into the red zone.  Low-HP self
+					// flips the sign — RETREATER actively disengages by
+					// inflating every candidate's effective distance.
+					if (is_gameplay == GAME_LMS)
+					{
+						edict_t *pSpot = BotLmsGetEntity();
+						if (!FNullEnt(pSpot))
+						{
+							float radius   = BotLmsCurrentRadius(pSpot);
+							float spotDist = (pPlayer->v.origin - pSpot->v.origin).Length();
+							if (spotDist < radius)
+								distance -= 1500.0f;
+							else if (spotDist < LMS_NEARBY_RADIUS)
+								distance -= 500.0f;
+						}
+						if (pEdict->v.health <= LMS_RETREAT_HP)
+							distance += 2000.0f;
+					}
+
 					if (distance < nearestdistance)
 					{
 						nearestdistance = distance;
@@ -3879,9 +4297,9 @@ edict_t *BotFindEnemy( bot_t *pBot )
 	if (pNewEnemy == NULL && pRemember != NULL)
 		pNewEnemy = pRemember;
 	// are we engaging an enemy?  Don't forget about them
-	// In CTF / Arena / Cold Spot, let the enemy go so the bot returns to objective play.
+	// In CTF / Arena / Cold Spot / LMS, let the enemy go so the bot returns to objective play.
 	if (pNewEnemy == NULL && pBot->b_engaging_enemy && pBot->pBotEnemy != NULL
-		&& is_gameplay != GAME_CTF && is_gameplay != GAME_ARENA && is_gameplay != GAME_COLDSPOT)
+		&& is_gameplay != GAME_CTF && is_gameplay != GAME_ARENA && is_gameplay != GAME_COLDSPOT && is_gameplay != GAME_LMS)
 		pNewEnemy = pBot->pBotEnemy;
 
 	if (pNewEnemy)

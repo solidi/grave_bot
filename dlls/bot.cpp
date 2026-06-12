@@ -373,6 +373,14 @@ void BotSpawnInit( bot_t *pBot )
 	pBot->f_coldspot_last_in_zone   = 0.0f;
 	pBot->v_coldspot_last_origin    = g_vecZero;
 
+	// Clear per-life LMS / Battle Royale state.
+	pBot->i_lms_role             = LMS_ROLE_NONE;
+	pBot->f_lms_role_eval_time   = 0.0f;
+	pBot->f_lms_last_in_zone     = 0.0f;
+	pBot->v_lms_last_origin      = g_vecZero;
+	pBot->i_lms_last_body        = 0;
+	pBot->f_lms_last_health      = 0.0f;
+
 	// Clear per-life Horde state.
 	pBot->i_horde_role            = HORDE_ROLE_NONE;
 	pBot->f_horde_role_eval_time  = 0.0f;
@@ -1966,6 +1974,8 @@ void BotThink( bot_t *pBot )
 		BotArenaPreUpdate(pBot);
 	else if (is_gameplay == GAME_COLDSPOT)
 		BotColdSpotPreUpdate(pBot);
+	else if (is_gameplay == GAME_LMS)
+		BotLmsPreUpdate(pBot);
 	else if (is_gameplay == GAME_HORDE)
 		BotHordePreUpdate(pBot);
 	else if (is_gameplay == GAME_LOOT)
@@ -2188,6 +2198,14 @@ void BotThink( bot_t *pBot )
 		if (is_gameplay == GAME_COLDSPOT)
 		{
 			BotColdSpotPreUpdate(pBot);
+		}
+
+		// LMS / Battle Royale: same pattern — evaluate survival role
+		// (SURVIVOR / HOLDER / HUNTER / RETREATER), invalidate routing on
+		// shrink or relocation, and pre-set v_goal toward the safe zone.
+		if (is_gameplay == GAME_LMS)
+		{
+			BotLmsPreUpdate(pBot);
 		}
 
 		// Busters: evaluate role (Buster / Ghost Grabber / Ghost Hunter) and
@@ -2504,6 +2522,14 @@ void BotThink( bot_t *pBot )
 				pBot->item_waypoint  = -1;
 			}
 
+			// LMS: same clearing pattern — leaving the safe zone for a pickup
+			// is usually fatal.  Navigation handled by BotLmsThink.
+			if (is_gameplay == GAME_LMS && pBot->pBotPickupItem)
+			{
+				pBot->pBotPickupItem = NULL;
+				pBot->item_waypoint  = -1;
+			}
+
 			// Loot: same clearing pattern — navigation handled by BotLootThink.
 			if (is_gameplay == GAME_LOOT && pBot->pBotPickupItem)
 			{
@@ -2542,6 +2568,10 @@ void BotThink( bot_t *pBot )
 			else if (is_gameplay == GAME_COLDSPOT && BotColdSpotThink(pBot))
 			{
 				// BotColdSpotThink sets v_goal + f_move_speed for all Cold Spot cases.
+			}
+			else if (is_gameplay == GAME_LMS && BotLmsThink(pBot))
+			{
+				// BotLmsThink sets v_goal + f_move_speed for all LMS cases.
 			}
 			else if (is_gameplay == GAME_BUSTERS && BotBustersThink(pBot))
 			{
@@ -3018,7 +3048,7 @@ void BotThink( bot_t *pBot )
 	// v_goal is refreshed every tick by the pre-scan and the mode's Think
 	// function — don't wipe it here or the movement block will never see the
 	// target and the bot follows waypoints instead.
-	if (is_gameplay != GAME_COLDSKULL && is_gameplay != GAME_KTS && is_gameplay != GAME_CTC && is_gameplay != GAME_CTF && is_gameplay != GAME_ARENA && is_gameplay != GAME_COLDSPOT && is_gameplay != GAME_BUSTERS && is_gameplay != GAME_HORDE && is_gameplay != GAME_LOOT && is_gameplay != GAME_PROPHUNT)
+	if (is_gameplay != GAME_COLDSKULL && is_gameplay != GAME_KTS && is_gameplay != GAME_CTC && is_gameplay != GAME_CTF && is_gameplay != GAME_ARENA && is_gameplay != GAME_COLDSPOT && is_gameplay != GAME_BUSTERS && is_gameplay != GAME_HORDE && is_gameplay != GAME_LOOT && is_gameplay != GAME_PROPHUNT && is_gameplay != GAME_LMS)
 		pBot->v_goal = g_vecZero;
 	// is our goal ent still around?
 	if (pBot->pGoalEnt != NULL)
@@ -3231,6 +3261,19 @@ void BotThink( bot_t *pBot )
 				else if (csDist < 500.0f && FVisible(pBot->v_goal, pEdict))
 					coldspotChase = true;
 			}
+			// LMS: direct-steer toward the per-role safe-zone target on final
+			// approach.  Same two-tier gating as Cold Spot, slightly larger
+			// visible-range tier (LMS_DIRECT_STEER = 400u) for the open
+			// shrinking-zone geometry.
+			bool lmsChase = false;
+			if (is_gameplay == GAME_LMS && pBot->v_goal != g_vecZero)
+			{
+				float lmsDist = (pBot->v_goal - pEdict->v.origin).Length();
+				if (lmsDist < 128.0f)
+					lmsChase = true;
+				else if (lmsDist < 400.0f && FVisible(pBot->v_goal, pEdict))
+					lmsChase = true;
+			}
 			// Busters: direct-steer toward egon weaponbox or Buster at close range.
 			bool bustersChase = (is_gameplay == GAME_BUSTERS
 				&& pBot->v_goal != g_vecZero
@@ -3261,7 +3304,7 @@ void BotThink( bot_t *pBot )
 				else if (lDist < 500.0f && FVisible(pBot->v_goal, pEdict))
 					lootChase = true;
 			}
-			if (ktsDirectSteer || ktsBallChase || skullChase || ctcChase || ctfChase || arenaChase || coldspotChase || bustersChase || hordeChase || lootChase)
+			if (ktsDirectSteer || ktsBallChase || skullChase || ctcChase || ctfChase || arenaChase || coldspotChase || lmsChase || bustersChase || hordeChase || lootChase)
 				bGoGoal = true;
 			else if (goalDist < 256 && FVisible(pBot->v_goal, pEdict))
 				bGoGoal = true;

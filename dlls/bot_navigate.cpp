@@ -570,7 +570,7 @@ bool BotHeadTowardWaypoint( bot_t *pBot )
 	if ((pBot->waypoint_goal == -1 || pBot->b_engaging_enemy || is_gameplay == GAME_KTS ||
 		is_gameplay == GAME_COLDSKULL || is_gameplay == GAME_CTC || is_gameplay == GAME_CTF ||
 		is_gameplay == GAME_ARENA || is_gameplay == GAME_COLDSPOT || is_gameplay == GAME_BUSTERS ||
-		is_gameplay == GAME_HORDE || is_gameplay == GAME_LOOT ||
+		is_gameplay == GAME_HORDE || is_gameplay == GAME_LOOT || is_gameplay == GAME_LMS ||
 		(pBot->role == ROLE_ATTACK &&
 		pBot->subrole == ROLE_SUB_DEF_ALLY) || (pBot->role == ROLE_DEFEND &&
 		(pBot->subrole == ROLE_SUB_DEF_SCIS || pBot->subrole == ROLE_SUB_DEF_RSRC) && pBot->pGoalEnt &&
@@ -582,7 +582,7 @@ bool BotHeadTowardWaypoint( bot_t *pBot )
 			pBot->defend_wpt != -1 || is_gameplay == GAME_KTS || is_gameplay == GAME_COLDSKULL ||
 			is_gameplay == GAME_CTC || is_gameplay == GAME_CTF || is_gameplay == GAME_ARENA ||
 			is_gameplay == GAME_COLDSPOT || is_gameplay == GAME_BUSTERS || is_gameplay == GAME_HORDE ||
-			is_gameplay == GAME_LOOT)
+			is_gameplay == GAME_LOOT || is_gameplay == GAME_LMS)
 			pBot->f_waypoint_goal_time = gpGlobals->time + 0.5;
 		else // don't pick a goal more often than every 120 seconds...
 			pBot->f_waypoint_goal_time = gpGlobals->time + 120.0;
@@ -715,6 +715,22 @@ bool BotHeadTowardWaypoint( bot_t *pBot )
 			// curr_waypoint_index to nearest reachable so the bot
 			// doesn't walk to a stale waypoint.
 			if (is_gameplay == GAME_COLDSPOT && index != pBot->waypoint_goal && bSafeToSnap)
+			{
+				int fresh = WaypointFindReachable(pEdict, REACHABLE_RANGE, team);
+				if (fresh != -1)
+				{
+					pBot->curr_waypoint_index = fresh;
+					pBot->waypoint_origin = waypoints[fresh].origin;
+					pBot->f_waypoint_time = gpGlobals->time;
+				}
+			}
+
+			// LMS: same waypoint reset — when the goal changes (zone
+			// shrank, role flipped to RETREATER, or a new round
+			// relocated the spot), snap curr_waypoint_index to nearest
+			// reachable so the bot doesn't follow a path that's now in
+			// the red zone.
+			if (is_gameplay == GAME_LMS && index != pBot->waypoint_goal && bSafeToSnap)
 			{
 				int fresh = WaypointFindReachable(pEdict, REACHABLE_RANGE, team);
 				if (fresh != -1)
@@ -2168,6 +2184,38 @@ int BotFindWaypointGoal( bot_t *pBot )
 				// curr_waypoint_index to the nearest reachable waypoint.  If we
 				// mutate waypoint_goal first, that compare is always false and
 				// stale routing is never cleared after a spot relocation.
+				return index;
+			}
+		}
+
+		pBot->waypoint_goal = -1;
+		return -1;
+	}
+
+	// LMS: route toward the safe spot using the per-role target stored in
+	// v_goal by BotLmsPreUpdate (origin, perimeter, or intruder).  Pure
+	// distance pick — the zone may sit on the far side of obstacles, so a
+	// LOS filter would reject the only valid path.  Same change-detection
+	// contract as Cold Spot: do NOT assign pBot->waypoint_goal here.
+	if (is_gameplay == GAME_LMS)
+	{
+		Vector vecTarget = pBot->v_goal;
+		if (vecTarget != g_vecZero)
+		{
+			float nearDist = 9e9f;
+			for (int w = 0; w < num_waypoints; w++)
+			{
+				if (waypoints[w].flags & W_FL_DELETED) continue;
+				if (waypoints[w].flags & W_FL_AIMING)  continue;
+				if ((team != -1) && (waypoints[w].flags & W_FL_TEAM_SPECIFIC) &&
+					((waypoints[w].flags & W_FL_TEAM) != team)) continue;
+				float d = (waypoints[w].origin - vecTarget).Length();
+				if (d < nearDist) { nearDist = d; index = w; }
+			}
+
+			if (index != -1)
+			{
+				pBot->wpt_goal_type = WPT_GOAL_LOCATION;
 				return index;
 			}
 		}
