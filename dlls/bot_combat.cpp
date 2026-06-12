@@ -3279,7 +3279,6 @@ bool BotColdSpotThink( bot_t *pBot )
 #define LMS_NEARBY_RADIUS      768.0f   // enemy-priority band outside zone
 #define LMS_DIRECT_STEER       400.0f   // direct-steer (with visibility) range
 #define LMS_RETREAT_HP         25.0f    // health threshold for RETREATER
-#define LMS_RETREAT_HOLD_TIME  4.0f     // (reserved) min RETREATER dwell
 
 static float   s_lms_cache_time = -1.0f;
 static edict_t *s_pSafeSpot = NULL;
@@ -3365,6 +3364,7 @@ static edict_t *BotLmsFindZoneIntruder( edict_t *pSpot, int botTeam )
 		}
 	}
 	return pBest;
+}
 
 // Deterministic per-bot center offset to keep multiple bots from piling on
 // a single pixel.  entindex() is stable across the round so the target
