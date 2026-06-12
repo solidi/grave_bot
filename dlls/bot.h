@@ -190,7 +190,7 @@ enum
 {
 	LMS_ROLE_NONE = 0,
 	LMS_ROLE_SURVIVOR,     // default — drift toward zone center
-	LMS_ROLE_HOLDER,       // (team mode) in zone with allies, hold perimeter
+	LMS_ROLE_HOLDER,       // (team mode) in zone with allies, anchor inside zone
 	LMS_ROLE_HUNTER,       // (team mode) enemy in zone, rush in to clear
 	LMS_ROLE_RETREATER     // low HP / outside zone / ring damage — bail inward
 };

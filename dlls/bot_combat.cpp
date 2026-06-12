@@ -3346,7 +3346,7 @@ static edict_t *BotLmsFindZoneIntruder( edict_t *pSpot, int botTeam )
 
 	const float radius = BotLmsCurrentRadius(pSpot);
 	edict_t *pBest = NULL;
-	float flBestDist = radius + 1.0f;
+	float flBestDist = radius;
 
 	for (int i = 1; i <= gpGlobals->maxClients; i++)
 	{
@@ -3356,6 +3356,8 @@ static edict_t *BotLmsFindZoneIntruder( edict_t *pSpot, int botTeam )
 		if (is_team_play && UTIL_GetTeam(pPlayer) == botTeam)
 			continue;
 		float d = (pPlayer->v.origin - pSpot->v.origin).Length();
+		if (d > radius)
+			continue;
 		if (d < flBestDist)
 		{
 			flBestDist = d;
@@ -3363,7 +3365,6 @@ static edict_t *BotLmsFindZoneIntruder( edict_t *pSpot, int botTeam )
 		}
 	}
 	return pBest;
-}
 
 // Deterministic per-bot center offset to keep multiple bots from piling on
 // a single pixel.  entindex() is stable across the round so the target
