@@ -5739,6 +5739,7 @@ void BotAssessGrenades( bot_t *pBot )
 		{	// crabbed lets players shoot anything
 			if ((strcmp("monster_satchel", STRING(pGrenade->v.classname)) != 0) && 
 				(strcmp("monster_tripmine", STRING(pGrenade->v.classname)) != 0) && 
+				(strcmp("monster_proxmine", STRING(pGrenade->v.classname)) != 0) && 
 				(strcmp("grenade", STRING(pGrenade->v.classname)) != 0) && 
 				(strcmp("rpg_rocket", STRING(pGrenade->v.classname)) != 0) && 
 				(strcmp("monster_snark", STRING(pGrenade->v.classname)) != 0))
@@ -5747,6 +5748,7 @@ void BotAssessGrenades( bot_t *pBot )
 		else
 		{
 			if ((strcmp("monster_tripmine", STRING(pGrenade->v.classname)) != 0) && 
+				(strcmp("monster_proxmine", STRING(pGrenade->v.classname)) != 0) &&
 				(strcmp("monster_snark", STRING(pGrenade->v.classname)) != 0) &&
 				(strcmp("grenade", STRING(pGrenade->v.classname)) != 0) &&
 				(strcmp("monster_chumtoad", STRING(pGrenade->v.classname)) != 0) &&
