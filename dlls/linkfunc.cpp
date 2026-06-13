@@ -229,6 +229,7 @@
    LINK_ENTITY_TO_FUNC(monster_tentacle);
    LINK_ENTITY_TO_FUNC(monster_tentaclemaw);
    LINK_ENTITY_TO_FUNC(monster_tripmine);
+   LINK_ENTITY_TO_FUNC(monster_proxmine);
    LINK_ENTITY_TO_FUNC(monster_turret);
    LINK_ENTITY_TO_FUNC(monster_vortigaunt);
    LINK_ENTITY_TO_FUNC(monster_zombie);

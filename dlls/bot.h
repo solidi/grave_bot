@@ -188,6 +188,15 @@ enum
 
 enum
 {
+	LMS_ROLE_NONE = 0,
+	LMS_ROLE_SURVIVOR,     // default — drift toward zone center
+	LMS_ROLE_HOLDER,       // (team mode) in zone with allies, anchor inside zone
+	LMS_ROLE_HUNTER,       // (team mode) enemy in zone, rush in to clear
+	LMS_ROLE_RETREATER     // low HP / outside zone / ring damage — bail inward
+};
+
+enum
+{
 	BUSTERS_ROLE_NONE = 0,
 	BUSTERS_ROLE_BUSTER,         // bot holds the egon, hunt ghosts
 	BUSTERS_ROLE_GHOST_GRABBER,  // egon is loose, sprint to grab it
@@ -517,6 +526,14 @@ typedef struct
 	float f_coldspot_role_eval_time; // timer for re-evaluating role
 	float f_coldspot_last_in_zone;   // last gpGlobals->time the bot was inside the 256u zone
 	Vector v_coldspot_last_origin;   // last known coldspot origin (for relocation detection)
+
+	// LMS / Battle Royale — shrinking-zone survival state
+	int    i_lms_role;               // current role (LMS_ROLE_*)
+	float  f_lms_role_eval_time;     // timer for re-evaluating role (~0.75s)
+	float  f_lms_last_in_zone;       // last gpGlobals->time the bot was inside the safe zone
+	Vector v_lms_last_origin;        // last cached safespot origin (relocation detection)
+	int    i_lms_last_body;          // last observed pev->body (shrink detection)
+	float  f_lms_last_health;        // last health sample (zone-damage delta probe)
 
 	// Horde — monster-hunt state
 	int     i_horde_role;            // current role (HORDE_ROLE_*)

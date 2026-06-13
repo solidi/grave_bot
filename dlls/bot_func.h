@@ -77,6 +77,8 @@ bool BotArenaThink( bot_t *pBot );
 void BotArenaPreUpdate( bot_t *pBot );
 bool BotColdSpotThink( bot_t *pBot );
 void BotColdSpotPreUpdate( bot_t *pBot );
+bool BotLmsThink( bot_t *pBot );
+void BotLmsPreUpdate( bot_t *pBot );
 bool BotBustersThink( bot_t *pBot );
 void BotBustersPreUpdate( bot_t *pBot );
 bool BotHordeThink( bot_t *pBot );
