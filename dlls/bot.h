@@ -223,6 +223,18 @@ enum
 
 enum
 {
+	SHIDDEN_ROLE_NONE = 0,
+	// Dealter-only roles
+	SHIDDEN_ROLE_HUNTER,     // approach smelter with fists, fire fart on close range
+	SHIDDEN_ROLE_FINISHER,   // smelter frozen → switch to knife and one-shot
+	// Smelter-only roles
+	SHIDDEN_ROLE_FLOCK,      // default — converge on team centroid
+	SHIDDEN_ROLE_DEFENDER,   // teammate under attack / frozen → cover them
+	SHIDDEN_ROLE_SCOUT       // last survivor / no team — solo waypoint nav
+};
+
+enum
+{
 	PROP_ROLE_NONE = 0,
 	// Prop side
 	PROP_ROLE_FREEZE,      // round just started → walk to hide spot
@@ -583,6 +595,15 @@ typedef struct
 	// to the next candidate instead of pressing forever.
 	float  f_pp_morph_attempt_time = 0.0f;
 	int    i_pp_morph_attempt_entindex = 0;
+
+	// Shidden — dealter/smelter asymmetric role state
+	int    i_shidden_role;             // current Shidden role (SHIDDEN_ROLE_*)
+	float  f_shidden_role_eval_time;   // cadence for role re-evaluation
+	edict_t *p_shidden_target;         // pursued smelter / frozen victim / threatened teammate
+	float  f_shidden_target_time;      // when target was set (for staleness clear)
+	float  f_shidden_fart_cooldown;    // local IN_ATTACK pacing (server cooldown is 0.75s)
+	bool   b_shidden_pending_finish;   // dealter: target just frozen, keep knife out + chase
+	float  f_shidden_unseen_until;     // smelter: damage-reaction sensitivity boost expiry
 } bot_t;
 
 // Rune helpers (defined in bot_combat.cpp). Declared after bot_t typedef

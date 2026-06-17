@@ -4563,6 +4563,52 @@ bool BotFireWeapon(Vector v_enemy, bot_t *pBot, int weapon_choice, bool nofire)
 		return FALSE;
 	}
 
+	// Shidden dealters: own weapon selection here so the priority loop
+	// (knife priority 9 outranks fists priority 10) can't override the
+	// role weapon.  Also press IN_ATTACK ourselves — fart range 240u
+	// exceeds fists primary_max_distance=100u, so the default picker
+	// would never fire fists at fart range either.
+	if (is_gameplay == GAME_SHIDDEN && pEdict->v.fuser4 == 1 /* SHIDDEN_DEALTER */)
+	{
+		// FINISHER trigger is derived from the live enemy state — NOT from
+		// pBot->i_shidden_role.  i_shidden_role is only refreshed inside
+		// BotShiddenThink, which runs only in the no-enemy branch; once
+		// pBotEnemy is set (i.e. the moment we acquire a smelter to fart),
+		// BotShiddenThink never runs again until the enemy is cleared, so
+		// i_shidden_role would stay HUNTER even after the fart freezes the
+		// target.  Checking the enemy's freeze mirror (iuser4) here makes
+		// the fart → freeze → knife → frag → fart loop self-correcting on
+		// the same target.
+		const bool enemyFrozen = pBot->pBotEnemy
+			&& !FNullEnt(pBot->pBotEnemy)
+			&& pBot->pBotEnemy->v.iuser4 > 0;
+		const bool isFinisher = enemyFrozen
+			|| (pBot->i_shidden_role == SHIDDEN_ROLE_FINISHER);
+		const int  wantId     = isFinisher ? VALVE_WEAPON_KNIFE : VALVE_WEAPON_FISTS;
+		const char *wantName  = isFinisher ? "weapon_knife" : "weapon_fists";
+		const float fireRange = isFinisher ? 64.0f : 240.0f;
+
+		if (pBot->current_weapon.iId != wantId
+			&& UTIL_HasWeaponId(pEdict, wantId)
+			&& pBot->f_switch_weapon_time <= gpGlobals->time)
+		{
+			UTIL_SelectItem(pEdict, (char *)wantName);
+			pBot->f_switch_weapon_time = gpGlobals->time + 0.25f;
+			pBot->f_shoot_time = gpGlobals->time + 0.4f;
+			return FALSE;
+		}
+
+		if (!nofire
+			&& pBot->current_weapon.iId == wantId
+			&& distance <= fireRange
+			&& pBot->f_shoot_time <= gpGlobals->time)
+		{
+			pEdict->v.button |= IN_ATTACK;
+			pBot->f_shoot_time = gpGlobals->time + (isFinisher ? 0.6f : 0.85f);
+		}
+		return TRUE;
+	}
+
 	if (is_gameplay == GAME_CTC)
 	{
 		// Don't fire if I have good health and the chumtoad

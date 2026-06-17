@@ -64,6 +64,7 @@ extern void RoleDetermine();
 extern WAYPOINT waypoints[MAX_WAYPOINTS];
 extern int num_waypoints;  // number of waypoints currently in use
 extern int num_def_waypoints;
+extern int is_gameplay;
 
 // This message is sent when a client joins the game.  All of the weapons
 // are sent with the weapon ID and information about what ammo is used.
@@ -336,7 +337,20 @@ void BotClient_Valve_Damage(void *p, edict_t *pEdict)
 			{
 				pBot->dmg_origin = damage_origin;
 				pBot->f_dmg_time = gpGlobals->time + 1.0;
-				
+
+				// Shidden smelters: extend the alert window so we stay
+				// facing the (invisible) attacker long enough to spot
+				// the dealter as they close for the knife finish.  Also
+				// arm the "unseen attacker" flag so BotShiddenThink
+				// widens its dealter spot logic for a few seconds.
+				if (is_gameplay == GAME_SHIDDEN
+				    && pEdict->v.fuser4 == 0
+				    && pEdict->v.iuser4 == 0)
+				{
+					pBot->f_dmg_time            = gpGlobals->time + 3.0f;
+					pBot->f_shidden_unseen_until = gpGlobals->time + 3.0f;
+				}
+
 				// stop using health or HEV stations...
 				pBot->b_use_health_station = FALSE;
 				pBot->b_use_HEV_station = FALSE;

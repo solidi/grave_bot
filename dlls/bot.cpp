@@ -403,6 +403,15 @@ void BotSpawnInit( bot_t *pBot )
 	pBot->f_combat_stuck_last_dist   = 0.0f;
 	pBot->f_combat_stuck_since       = 0.0f;
 
+	// Clear per-life Shidden state.
+	pBot->i_shidden_role           = SHIDDEN_ROLE_NONE;
+	pBot->f_shidden_role_eval_time = 0.0f;
+	pBot->p_shidden_target         = NULL;
+	pBot->f_shidden_target_time    = 0.0f;
+	pBot->f_shidden_fart_cooldown  = 0.0f;
+	pBot->b_shidden_pending_finish = false;
+	pBot->f_shidden_unseen_until   = 0.0f;
+
 	pBot->respawn_time = 0;
 	pBot->respawn_set = FALSE;
 	pBot->b_hasgrenade = FALSE;
@@ -1124,6 +1133,17 @@ void BotFindItem( bot_t *pBot )
 	// pickup keeps BotBustersThink's hunt goal from being overridden.
 	// Ghosts fall through to normal item scanning — they still need guns.
 	if (is_gameplay == GAME_BUSTERS && pEdict->v.fuser4 > 0)
+	{
+		pBot->pBotPickupItem = NULL;
+		pBot->item_waypoint  = -1;
+		return;
+	}
+
+	// Shidden dealters spawn with fists + knife only and cannot use other
+	// weapons (gamerules clears inventory each spawn).  Clearing pickup
+	// keeps BotShiddenThink's hunt goal from being overridden by stray
+	// world weapon scans.  Smelters fall through — they fight normally.
+	if (is_gameplay == GAME_SHIDDEN && pEdict->v.fuser4 == 1)
 	{
 		pBot->pBotPickupItem = NULL;
 		pBot->item_waypoint  = -1;
@@ -1982,6 +2002,8 @@ void BotThink( bot_t *pBot )
 		BotLootPreUpdate(pBot);
 	else if (is_gameplay == GAME_PROPHUNT)
 		BotProphuntPreUpdate(pBot);
+	else if (is_gameplay == GAME_SHIDDEN)
+		BotShiddenPreUpdate(pBot);
 
 	// it is time to look for a waypoint AND
 	// there are waypoints in this level...
@@ -2239,6 +2261,14 @@ void BotThink( bot_t *pBot )
 		if (is_gameplay == GAME_PROPHUNT)
 		{
 			BotProphuntPreUpdate(pBot);
+		}
+
+		// Shidden: refresh dealter/smelter caches, evaluate role, and pre-set
+		// v_goal toward prey / flock centroid / frozen teammate so the movement
+		// block always has a target on ticks where the enemy branch runs.
+		if (is_gameplay == GAME_SHIDDEN)
+		{
+			BotShiddenPreUpdate(pBot);
 		}
 
 		if (b_botdontshoot == 0)
@@ -2588,6 +2618,10 @@ void BotThink( bot_t *pBot )
 			else if (is_gameplay == GAME_PROPHUNT && BotProphuntThink(pBot))
 			{
 				// BotProphuntThink sets v_goal + f_move_speed for both prop and hunter roles.
+			}
+			else if (is_gameplay == GAME_SHIDDEN && BotShiddenThink(pBot))
+			{
+				// BotShiddenThink sets v_goal + f_move_speed for dealter HUNTER/FINISHER and smelter FLOCK/DEFENDER/SCOUT roles.
 			}
 			else if (pBot->pBotPickupItem)
 			{
@@ -3429,6 +3463,15 @@ void BotThink( bot_t *pBot )
 
 	if (UTIL_MutatorEnabled(MUTATOR_TOPSYTURVY))
 		pEdict->v.v_angle[2] = 180;
+
+	// Shidden dealters must never throw their knife (IN_ATTACK2 on the
+	// knife = throw, which destroys the weapon and breaks the
+	// fart-then-finish loop).  Also strip IN_RELOAD: knife Reload()
+	// toggles a sniper-style zoom that disrupts close-quarters aim.
+	if (is_gameplay == GAME_SHIDDEN && pEdict->v.fuser4 == 1 /*SHIDDEN_DEALTER*/)
+	{
+		pEdict->v.button &= ~(IN_ATTACK2 | IN_RELOAD);
+	}
 
 	g_engfuncs.pfnRunPlayerMove( pEdict, pEdict->v.v_angle, pBot->f_move_speed * speed_mod[pBot->bot_skill],
 		pBot->f_strafe_speed * speed_mod[pBot->bot_skill], 0, pEdict->v.button, 0, pBot->msecval);

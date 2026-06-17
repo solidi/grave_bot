@@ -290,6 +290,7 @@
     <ClCompile Include="bot_combat.cpp" />
     <ClCompile Include="bot_navigate.cpp" />
     <ClCompile Include="bot_prophunt.cpp" />
+    <ClCompile Include="bot_shidden.cpp" />
     <ClCompile Include="bot_start.cpp" />
     <ClCompile Include="bot_weapons.cpp" />
     <ClCompile Include="bot_weapons_hldm.cpp" />
