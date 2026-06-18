@@ -409,7 +409,6 @@ void BotSpawnInit( bot_t *pBot )
 	pBot->p_shidden_target         = NULL;
 	pBot->f_shidden_target_time    = 0.0f;
 	pBot->f_shidden_fart_cooldown  = 0.0f;
-	pBot->b_shidden_pending_finish = false;
 	pBot->f_shidden_unseen_until   = 0.0f;
 
 	pBot->respawn_time = 0;

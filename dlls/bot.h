@@ -602,7 +602,6 @@ typedef struct
 	edict_t *p_shidden_target;         // pursued smelter / frozen victim / threatened teammate
 	float  f_shidden_target_time;      // when target was set (for staleness clear)
 	float  f_shidden_fart_cooldown;    // local IN_ATTACK pacing (server cooldown is 0.75s)
-	bool   b_shidden_pending_finish;   // dealter: target just frozen, keep knife out + chase
 	float  f_shidden_unseen_until;     // smelter: damage-reaction sensitivity boost expiry
 } bot_t;
 
