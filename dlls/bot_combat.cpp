@@ -4574,16 +4574,16 @@ bool BotFireWeapon(Vector v_enemy, bot_t *pBot, int weapon_choice, bool nofire)
 		// pBot->i_shidden_role.  i_shidden_role is only refreshed inside
 		// BotShiddenThink, which runs only in the no-enemy branch; once
 		// pBotEnemy is set (i.e. the moment we acquire a smelter to fart),
-		// BotShiddenThink never runs again until the enemy is cleared, so
-		// i_shidden_role would stay HUNTER even after the fart freezes the
-		// target.  Checking the enemy's freeze mirror (iuser4) here makes
-		// the fart → freeze → knife → frag → fart loop self-correcting on
-		// the same target.
-		const bool enemyFrozen = pBot->pBotEnemy
+		// BotShiddenThink never runs again until the enemy is cleared, so a
+		// stale role fallback here would keep the knife equipped past the
+		// frag (target now dead, iuser4 = -1) and on the first combat tick
+		// of a new round if last round ended as FINISHER.  Only the live
+		// freeze mirror (iuser4 > 0) on the *current* enemy promotes us to
+		// FINISHER; everything else means hold fists to fart.
+		const bool isFinisher = pBot->pBotEnemy
 			&& !FNullEnt(pBot->pBotEnemy)
+			&& IsAlive(pBot->pBotEnemy)
 			&& pBot->pBotEnemy->v.iuser4 > 0;
-		const bool isFinisher = enemyFrozen
-			|| (pBot->i_shidden_role == SHIDDEN_ROLE_FINISHER);
 		const int  wantId     = isFinisher ? VALVE_WEAPON_KNIFE : VALVE_WEAPON_FISTS;
 		const char *wantName  = isFinisher ? "weapon_knife" : "weapon_fists";
 		const float fireRange = isFinisher ? 64.0f : 240.0f;

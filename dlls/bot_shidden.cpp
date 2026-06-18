@@ -180,6 +180,21 @@ void BotShiddenPreUpdate(bot_t *pBot)
 
 	if (team == SHIDDEN_DEALTER)
 	{
+		// Hunting fallback: whenever no smelter is frozen anywhere on the
+		// map, we are by definition in HUNTER mode and must hold fists so
+		// the next IN_ATTACK farts (knife is excluded from the fart path
+		// in weapons.cpp).  Done here in PreUpdate because BotShiddenThink
+		// is skipped once BotFindEnemy sets pBotEnemy, leaving the combat
+		// gate as the only weapon-selector — and the combat gate may stay
+		// on knife for a tick after the frag if any state is stale.  Also
+		// covers the round-start case where the engine auto-switched to
+		// the knife (lower priority number) when GiveNamedItem ran.
+		if (s_cache.n_frozen_smelters == 0)
+		{
+			pBot->i_shidden_role = SHIDDEN_ROLE_HUNTER;
+			BotShiddenForceWeapon(pBot, VALVE_WEAPON_FISTS, "weapon_fists");
+		}
+
 		// Prefer a frozen smelter (finisher takes priority); otherwise
 		// the nearest visible smelter, then nearest known smelter.
 		edict_t *pTarget = BotShiddenClosest(pBot,
