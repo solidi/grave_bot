@@ -217,6 +217,23 @@ void BotShiddenPreUpdate(bot_t *pBot)
 	}
 	else if (team == SHIDDEN_SMELTER)
 	{
+		// No live dealter exists on the map: clear any stale alert state
+		// the Valve damage hook armed on the killing-fart frame.  That
+		// hook extends f_dmg_time to 3.0s for unfrozen smelters so they
+		// face the (invisible) attacker long enough to spot the dealter,
+		// but once the dealter is dead or in spectator there is nothing
+		// left to spot — without this sweep the killer freezes facing the
+		// stale dmg_origin for the full 3 seconds (pitch wobbles as the
+		// bot bobs / steps) AND the f_dmg_time < now gates in
+		// bot_navigate.cpp block waypoint following + pickup yaw, so the
+		// bot also "stops and does nothing" for that window.
+		if (s_cache.n_dealters == 0)
+		{
+			pBot->f_dmg_time             = 0.0f;
+			pBot->dmg_origin             = g_vecZero;
+			pBot->f_shidden_unseen_until = 0.0f;
+		}
+
 		// If a teammate is frozen, swing toward them (defender pre-set).
 		edict_t *pFrozen = BotShiddenClosest(pBot,
 			s_cache.pFrozenSmelters, s_cache.n_frozen_smelters,

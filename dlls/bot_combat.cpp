@@ -4024,9 +4024,18 @@ edict_t *BotFindEnemy( bot_t *pBot )
 			if (!stillDribbler)
 				pBot->pBotEnemy = pRemember = NULL;
 		}
-		else if (pBot->pBotEnemy->v.rendermode == kRenderTransAlpha &&
-				 pBot->pBotEnemy->v.renderamt < 60 &&
-				 (pBot->pBotEnemy->v.origin - pEdict->v.origin).Length() > 192) {
+		else if ((pBot->pBotEnemy->v.rendermode == kRenderTransAlpha
+		          || pBot->pBotEnemy->v.rendermode == kRenderTransTexture)
+		         && pBot->pBotEnemy->v.renderamt < (renderamt_threshold[pBot->bot_skill] / 2)
+		         && (pBot->pBotEnemy->v.origin - pEdict->v.origin).Length() > 80) {
+			// Retention threshold is half the acquisition floor (hysteresis).
+			// Without this gap a cloaked enemy whose renderamt jitters across
+			// the acquisition threshold caused per-frame acquire/drop flicker,
+			// which snapped the bot's idealpitch toward the enemy on one tick
+			// and reset it to 0 on the next — producing a visible ~15-25 deg
+			// pitch oscillation (most often seen vs Shidden dealters, whose
+			// renderamt is scaled by next-attack time in player.cpp PostThink
+			// and naturally lands near the threshold during weapon idle).
 			pBot->pBotEnemy = NULL;
 		}
 		else if (FInViewCone( &vecEnd, pEdict ) &&
@@ -4095,7 +4104,8 @@ edict_t *BotFindEnemy( bot_t *pBot )
 				if (!IsAlive(pMonster))
 					continue; // discard dead or dying monsters
 				
-				if ((pMonster->v.rendermode == kRenderTransTexture &&
+				if (((pMonster->v.rendermode == kRenderTransTexture
+				      || pMonster->v.rendermode == kRenderTransAlpha) &&
 					pMonster->v.renderamt < renderamt_threshold[pBot->bot_skill]) ||
 					pMonster->v.effects & EF_NODRAW)
 					continue;
@@ -4186,7 +4196,8 @@ edict_t *BotFindEnemy( bot_t *pBot )
 				if ((b_observer_mode) && !(pPlayer->v.flags & FL_FAKECLIENT))
 					continue;
 				// can we see them?
-				if ((pPlayer->v.rendermode == kRenderTransTexture &&
+				if (((pPlayer->v.rendermode == kRenderTransTexture
+				      || pPlayer->v.rendermode == kRenderTransAlpha) &&
 					pPlayer->v.renderamt < renderamt_threshold[pBot->bot_skill]) ||
 					pPlayer->v.effects & EF_NODRAW)
 					continue;

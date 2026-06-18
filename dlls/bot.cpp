@@ -3471,6 +3471,24 @@ void BotThink( bot_t *pBot )
 	if (is_gameplay == GAME_SHIDDEN && pEdict->v.fuser4 == 1 /*SHIDDEN_DEALTER*/)
 	{
 		pEdict->v.button &= ~(IN_ATTACK2 | IN_RELOAD);
+
+		// While closing in with the knife on a frozen smelter, suppress
+		// off-hand melee impulses (kick 206, punch 207, slide 208, flips
+		// 210-213, hurricane kick 214, force-grab 215, throw-weapon 216,
+		// throw-grenade 209, swap-dual 205).  StartKick / StartPunch
+		// fire DMG_KICK / DMG_PUNCH on contact which races the knife's
+		// primary stab — gamerules' isOffhand check then rejects the
+		// frag, so the bot bounces off the frozen target instead of
+		// finishing it.  Knife is held only during the finish window
+		// (PreUpdate forces fists when no smelter is frozen and after
+		// the frag), so keying off the active weapon naturally re-enables
+		// melee the moment we drop back to fists.
+		if (pBot->current_weapon.iId == VALVE_WEAPON_KNIFE
+			&& (int)pEdict->v.impulse >= 205
+			&& (int)pEdict->v.impulse <= 216)
+		{
+			pEdict->v.impulse = 0;
+		}
 	}
 
 	g_engfuncs.pfnRunPlayerMove( pEdict, pEdict->v.v_angle, pBot->f_move_speed * speed_mod[pBot->bot_skill],
@@ -3497,6 +3515,15 @@ void BotListenForFakeSound( bot_t *pBot )
 		if ((pPlayer) && (!pPlayer->free) && (pPlayer != pEdict) && (pPlayer->v.flags & FL_CLIENT))
 		{	// skip humans if observer mode is on
 			if (b_observer_mode && !(pPlayer->v.flags & FL_FAKECLIENT))
+				continue;
+
+			// Skip corpses.  A freshly killed player keeps FL_CLIENT until
+			// respawn; their pev->button may still hold IN_ATTACK from the
+			// death frame and the corpse glides with leftover velocity, so
+			// without this gate the killer bot latches dmg_origin to the
+			// dead body (every 0.5s refresh) and pegs its pitch to the
+			// corpse for ~3s — the visible "oscillating pitch then resume".
+			if (!IsAlive(pPlayer))
 				continue;
 
 			// is the player attacking?
@@ -3556,6 +3583,13 @@ void BotListenForSound(edict_t *pEntity, const char *pszSample, float fVolume)
 	int bot_index = 0;
 
 	if (!pEntity)
+		return;
+
+	// Ignore sound "emitted" by a corpse — the killed player's edict
+	// stays around with leftover velocity and (sometimes) IN_ATTACK
+	// from the death frame, which would otherwise refresh dmg_origin
+	// on every nearby bot and lock their pitch to the corpse.
+	if ((pEntity->v.flags & FL_CLIENT) && !IsAlive(pEntity))
 		return;
 
 	float distance;
