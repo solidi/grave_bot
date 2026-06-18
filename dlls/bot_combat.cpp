@@ -4024,9 +4024,18 @@ edict_t *BotFindEnemy( bot_t *pBot )
 			if (!stillDribbler)
 				pBot->pBotEnemy = pRemember = NULL;
 		}
-		else if (pBot->pBotEnemy->v.rendermode == kRenderTransAlpha &&
-				 pBot->pBotEnemy->v.renderamt < 60 &&
-				 (pBot->pBotEnemy->v.origin - pEdict->v.origin).Length() > 192) {
+		else if ((pBot->pBotEnemy->v.rendermode == kRenderTransAlpha
+		          || pBot->pBotEnemy->v.rendermode == kRenderTransTexture)
+		         && pBot->pBotEnemy->v.renderamt < (renderamt_threshold[pBot->bot_skill] / 2)
+		         && (pBot->pBotEnemy->v.origin - pEdict->v.origin).Length() > 80) {
+			// Retention threshold is half the acquisition floor (hysteresis).
+			// Without this gap a cloaked enemy whose renderamt jitters across
+			// the acquisition threshold caused per-frame acquire/drop flicker,
+			// which snapped the bot's idealpitch toward the enemy on one tick
+			// and reset it to 0 on the next — producing a visible ~15-25 deg
+			// pitch oscillation (most often seen vs Shidden dealters, whose
+			// renderamt is scaled by next-attack time in player.cpp PostThink
+			// and naturally lands near the threshold during weapon idle).
 			pBot->pBotEnemy = NULL;
 		}
 		else if (FInViewCone( &vecEnd, pEdict ) &&
@@ -4095,7 +4104,8 @@ edict_t *BotFindEnemy( bot_t *pBot )
 				if (!IsAlive(pMonster))
 					continue; // discard dead or dying monsters
 				
-				if ((pMonster->v.rendermode == kRenderTransTexture &&
+				if (((pMonster->v.rendermode == kRenderTransTexture
+				      || pMonster->v.rendermode == kRenderTransAlpha) &&
 					pMonster->v.renderamt < renderamt_threshold[pBot->bot_skill]) ||
 					pMonster->v.effects & EF_NODRAW)
 					continue;
@@ -4186,7 +4196,8 @@ edict_t *BotFindEnemy( bot_t *pBot )
 				if ((b_observer_mode) && !(pPlayer->v.flags & FL_FAKECLIENT))
 					continue;
 				// can we see them?
-				if ((pPlayer->v.rendermode == kRenderTransTexture &&
+				if (((pPlayer->v.rendermode == kRenderTransTexture
+				      || pPlayer->v.rendermode == kRenderTransAlpha) &&
 					pPlayer->v.renderamt < renderamt_threshold[pBot->bot_skill]) ||
 					pPlayer->v.effects & EF_NODRAW)
 					continue;
@@ -4561,6 +4572,52 @@ bool BotFireWeapon(Vector v_enemy, bot_t *pBot, int weapon_choice, bool nofire)
 	// Don't fire weapon if frozen
 	if (pBot->pEdict->v.flags & FL_FROZEN) {
 		return FALSE;
+	}
+
+	// Shidden dealters: own weapon selection here so the priority loop
+	// (knife priority 9 outranks fists priority 10) can't override the
+	// role weapon.  Also press IN_ATTACK ourselves — fart range 240u
+	// exceeds fists primary_max_distance=100u, so the default picker
+	// would never fire fists at fart range either.
+	if (is_gameplay == GAME_SHIDDEN && pEdict->v.fuser4 == 1 /* SHIDDEN_DEALTER */)
+	{
+		// FINISHER trigger is derived from the live enemy state — NOT from
+		// pBot->i_shidden_role.  i_shidden_role is only refreshed inside
+		// BotShiddenThink, which runs only in the no-enemy branch; once
+		// pBotEnemy is set (i.e. the moment we acquire a smelter to fart),
+		// BotShiddenThink never runs again until the enemy is cleared, so a
+		// stale role fallback here would keep the knife equipped past the
+		// frag (target now dead, iuser4 = -1) and on the first combat tick
+		// of a new round if last round ended as FINISHER.  Only the live
+		// freeze mirror (iuser4 > 0) on the *current* enemy promotes us to
+		// FINISHER; everything else means hold fists to fart.
+		const bool isFinisher = pBot->pBotEnemy
+			&& !FNullEnt(pBot->pBotEnemy)
+			&& IsAlive(pBot->pBotEnemy)
+			&& pBot->pBotEnemy->v.iuser4 > 0;
+		const int  wantId     = isFinisher ? VALVE_WEAPON_KNIFE : VALVE_WEAPON_FISTS;
+		const char *wantName  = isFinisher ? "weapon_knife" : "weapon_fists";
+		const float fireRange = isFinisher ? 64.0f : 240.0f;
+
+		if (pBot->current_weapon.iId != wantId
+			&& UTIL_HasWeaponId(pEdict, wantId)
+			&& pBot->f_switch_weapon_time <= gpGlobals->time)
+		{
+			UTIL_SelectItem(pEdict, (char *)wantName);
+			pBot->f_switch_weapon_time = gpGlobals->time + 0.25f;
+			pBot->f_shoot_time = gpGlobals->time + 0.4f;
+			return FALSE;
+		}
+
+		if (!nofire
+			&& pBot->current_weapon.iId == wantId
+			&& distance <= fireRange
+			&& pBot->f_shoot_time <= gpGlobals->time)
+		{
+			pEdict->v.button |= IN_ATTACK;
+			pBot->f_shoot_time = gpGlobals->time + (isFinisher ? 0.6f : 0.85f);
+		}
+		return TRUE;
 	}
 
 	if (is_gameplay == GAME_CTC)

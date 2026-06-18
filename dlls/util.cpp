@@ -609,6 +609,12 @@ bool UpdateSounds(edict_t *pEdict, edict_t *pPlayer)
 	
 	if (footstep_sounds_on > 0.0)
 	{
+		// Corpses can keep gliding at > 220 u/s from death knockback; skip
+		// them so the velocity check below doesn't tag a dead player as a
+		// noisy threat and lock the bot's pitch onto the body.
+		if (!IsAlive(pPlayer))
+			return FALSE;
+
 		// check if this player is moving fast enough to make sounds...
 		if (pPlayer->v.velocity.Length2D() > 220.0)
 		{

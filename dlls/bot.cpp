@@ -403,6 +403,14 @@ void BotSpawnInit( bot_t *pBot )
 	pBot->f_combat_stuck_last_dist   = 0.0f;
 	pBot->f_combat_stuck_since       = 0.0f;
 
+	// Clear per-life Shidden state.
+	pBot->i_shidden_role           = SHIDDEN_ROLE_NONE;
+	pBot->f_shidden_role_eval_time = 0.0f;
+	pBot->p_shidden_target         = NULL;
+	pBot->f_shidden_target_time    = 0.0f;
+	pBot->f_shidden_fart_cooldown  = 0.0f;
+	pBot->f_shidden_unseen_until   = 0.0f;
+
 	pBot->respawn_time = 0;
 	pBot->respawn_set = FALSE;
 	pBot->b_hasgrenade = FALSE;
@@ -1124,6 +1132,17 @@ void BotFindItem( bot_t *pBot )
 	// pickup keeps BotBustersThink's hunt goal from being overridden.
 	// Ghosts fall through to normal item scanning — they still need guns.
 	if (is_gameplay == GAME_BUSTERS && pEdict->v.fuser4 > 0)
+	{
+		pBot->pBotPickupItem = NULL;
+		pBot->item_waypoint  = -1;
+		return;
+	}
+
+	// Shidden dealters spawn with fists + knife only and cannot use other
+	// weapons (gamerules clears inventory each spawn).  Clearing pickup
+	// keeps BotShiddenThink's hunt goal from being overridden by stray
+	// world weapon scans.  Smelters fall through — they fight normally.
+	if (is_gameplay == GAME_SHIDDEN && pEdict->v.fuser4 == 1)
 	{
 		pBot->pBotPickupItem = NULL;
 		pBot->item_waypoint  = -1;
@@ -1982,6 +2001,8 @@ void BotThink( bot_t *pBot )
 		BotLootPreUpdate(pBot);
 	else if (is_gameplay == GAME_PROPHUNT)
 		BotProphuntPreUpdate(pBot);
+	else if (is_gameplay == GAME_SHIDDEN)
+		BotShiddenPreUpdate(pBot);
 
 	// it is time to look for a waypoint AND
 	// there are waypoints in this level...
@@ -2239,6 +2260,14 @@ void BotThink( bot_t *pBot )
 		if (is_gameplay == GAME_PROPHUNT)
 		{
 			BotProphuntPreUpdate(pBot);
+		}
+
+		// Shidden: refresh dealter/smelter caches, evaluate role, and pre-set
+		// v_goal toward prey / flock centroid / frozen teammate so the movement
+		// block always has a target on ticks where the enemy branch runs.
+		if (is_gameplay == GAME_SHIDDEN)
+		{
+			BotShiddenPreUpdate(pBot);
 		}
 
 		if (b_botdontshoot == 0)
@@ -2588,6 +2617,10 @@ void BotThink( bot_t *pBot )
 			else if (is_gameplay == GAME_PROPHUNT && BotProphuntThink(pBot))
 			{
 				// BotProphuntThink sets v_goal + f_move_speed for both prop and hunter roles.
+			}
+			else if (is_gameplay == GAME_SHIDDEN && BotShiddenThink(pBot))
+			{
+				// BotShiddenThink sets v_goal + f_move_speed for dealter HUNTER/FINISHER and smelter FLOCK/DEFENDER/SCOUT roles.
 			}
 			else if (pBot->pBotPickupItem)
 			{
@@ -3430,6 +3463,33 @@ void BotThink( bot_t *pBot )
 	if (UTIL_MutatorEnabled(MUTATOR_TOPSYTURVY))
 		pEdict->v.v_angle[2] = 180;
 
+	// Shidden dealters must never throw their knife (IN_ATTACK2 on the
+	// knife = throw, which destroys the weapon and breaks the
+	// fart-then-finish loop).  Also strip IN_RELOAD: knife Reload()
+	// toggles a sniper-style zoom that disrupts close-quarters aim.
+	if (is_gameplay == GAME_SHIDDEN && pEdict->v.fuser4 == 1 /*SHIDDEN_DEALTER*/)
+	{
+		pEdict->v.button &= ~(IN_ATTACK2 | IN_RELOAD);
+
+		// While closing in with the knife on a frozen smelter, suppress
+		// off-hand melee impulses (kick 206, punch 207, slide 208, flips
+		// 210-213, hurricane kick 214, force-grab 215, throw-weapon 216,
+		// throw-grenade 209, swap-dual 205).  StartKick / StartPunch
+		// fire DMG_KICK / DMG_PUNCH on contact which races the knife's
+		// primary stab — gamerules' isOffhand check then rejects the
+		// frag, so the bot bounces off the frozen target instead of
+		// finishing it.  Knife is held only during the finish window
+		// (PreUpdate forces fists when no smelter is frozen and after
+		// the frag), so keying off the active weapon naturally re-enables
+		// melee the moment we drop back to fists.
+		if (pBot->current_weapon.iId == VALVE_WEAPON_KNIFE
+			&& (int)pEdict->v.impulse >= 205
+			&& (int)pEdict->v.impulse <= 216)
+		{
+			pEdict->v.impulse = 0;
+		}
+	}
+
 	g_engfuncs.pfnRunPlayerMove( pEdict, pEdict->v.v_angle, pBot->f_move_speed * speed_mod[pBot->bot_skill],
 		pBot->f_strafe_speed * speed_mod[pBot->bot_skill], 0, pEdict->v.button, 0, pBot->msecval);
 	
@@ -3454,6 +3514,15 @@ void BotListenForFakeSound( bot_t *pBot )
 		if ((pPlayer) && (!pPlayer->free) && (pPlayer != pEdict) && (pPlayer->v.flags & FL_CLIENT))
 		{	// skip humans if observer mode is on
 			if (b_observer_mode && !(pPlayer->v.flags & FL_FAKECLIENT))
+				continue;
+
+			// Skip corpses.  A freshly killed player keeps FL_CLIENT until
+			// respawn; their pev->button may still hold IN_ATTACK from the
+			// death frame and the corpse glides with leftover velocity, so
+			// without this gate the killer bot latches dmg_origin to the
+			// dead body (every 0.5s refresh) and pegs its pitch to the
+			// corpse for ~3s — the visible "oscillating pitch then resume".
+			if (!IsAlive(pPlayer))
 				continue;
 
 			// is the player attacking?
@@ -3513,6 +3582,13 @@ void BotListenForSound(edict_t *pEntity, const char *pszSample, float fVolume)
 	int bot_index = 0;
 
 	if (!pEntity)
+		return;
+
+	// Ignore sound "emitted" by a corpse — the killed player's edict
+	// stays around with leftover velocity and (sometimes) IN_ATTACK
+	// from the death frame, which would otherwise refresh dmg_origin
+	// on every nearby bot and lock their pitch to the corpse.
+	if ((pEntity->v.flags & FL_CLIENT) && !IsAlive(pEntity))
 		return;
 
 	float distance;
