@@ -600,7 +600,7 @@ typedef struct
 	int    i_shidden_role;             // current Shidden role (SHIDDEN_ROLE_*)
 	float  f_shidden_role_eval_time;   // cadence for role re-evaluation
 	edict_t *p_shidden_target;         // pursued smelter / frozen victim / threatened teammate
-	float  f_shidden_target_time;      // when target was set (for staleness clear)
+	float  f_shidden_target_time;      // dealter: FINISHER lock expiry time (gpGlobals->time)
 	float  f_shidden_fart_cooldown;    // local IN_ATTACK pacing (server cooldown is 0.75s)
 	float  f_shidden_unseen_until;     // smelter: damage-reaction sensitivity boost expiry
 } bot_t;

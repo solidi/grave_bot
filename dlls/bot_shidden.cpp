@@ -80,7 +80,7 @@ typedef struct
 static shidden_cache_t s_cache;
 
 // Walk clients[] once per server frame and rebuild the role caches.
-// Skips spectators, dead players, and the calling bot itself.
+// Skips spectators and dead players.
 static void BotShiddenBuildCache(void)
 {
 	if (s_cache.f_built_time == gpGlobals->time)
@@ -382,7 +382,7 @@ bool BotShiddenThink(bot_t *pBot)
 	if (team == SHIDDEN_SMELTER)
 	{
 		// We're frozen — engine FL_FROZEN already locks input, but
-		// strip buttons + clear pickup so nothing leaks through.
+		// strip buttons so nothing leaks through.
 		if (pE->v.iuser4 > 0)
 		{
 			pBot->pBotEnemy   = NULL;
