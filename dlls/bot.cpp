@@ -321,6 +321,15 @@ void BotSpawnInit( bot_t *pBot )
 	pBot->b_rune = FALSE;
 	pBot->i_rune_type = 0;
 	pBot->f_rune_drop_cooldown = 0.0f;
+	// Clear per-life grappling-hook state.  See ai/grappling_hook.md.
+	pBot->f_hook_cooldown_until       = 0.0f;
+	pBot->f_hook_release_at           = 0.0f;
+	pBot->b_hook_active               = false;
+	pBot->i_hook_intent               = HOOK_INTENT_NONE;
+	pBot->pHookItem                   = NULL;
+	pBot->v_hook_target_point         = g_vecZero;
+	pBot->f_hook_velocity_check_time  = 0.0f;
+	pBot->i_hook_low_velocity_samples = 0;
 	// Clear per-life KTS possession state before recomputing it so stale
 	// values cannot leak across spawn/life boundaries into this think step.
 	pBot->b_kts_has_ball = false;
@@ -1666,6 +1675,13 @@ void BotFindItem( bot_t *pBot )
 		}
 		pBot->pBotPickupItem = pPickupEntity;  // save the item bot is trying to get
 		pBot->f_last_item_found = gpGlobals->time;
+
+		// Grappling-hook item detour: if the chosen pickup is well above
+		// the bot and we have line-of-sight to a ceiling/wall above it,
+		// fire the hook to swing in instead of walking the long way.
+		// BotConsiderHookForItem applies all gates (cvar, cooldown,
+		// no-enemy, Z-delta, distance, LOS).
+		BotConsiderHookForItem(pBot, pPickupEntity);
 	}
 }
 
@@ -2407,6 +2423,11 @@ void BotThink( bot_t *pBot )
 		if (pBot->pBotEnemy != NULL && pEdict->v.movetype != MOVETYPE_FLY &&
 			pBot->f_bot_spawn_time + 1.0 < gpGlobals->time)
 		{
+			// Grappling-hook ESCAPE: low HP + active enemy.  Considered
+			// before BotShootAtEnemy so the hook fires the same tick the
+			// engagement begins.  Gated internally on sv_bots_hook,
+			// mp_grapplinghook, cooldown, !b_hook_active, anchor LOS.
+			BotConsiderHookForEscape(pBot);
 			BotShootAtEnemy( pBot );  // shoot at the enemy
 
 			pBot->f_pause_time = 0;  // dont't pause if enemy exists
@@ -2966,6 +2987,9 @@ void BotThink( bot_t *pBot )
 	// If BotFindItem queued a strictly-better rune as our pickup target,
 	// drop our current rune just before contact so we can swap on touch.
 	BotMaybeDropRuneForSwap( pBot );
+
+	// Per-frame grappling-hook safety (timeout / target-invalid / anti-stuck).
+	BotMaybeReleaseHook( pBot );
 
 	if ((pBot->f_role_check < gpGlobals->time) && (!pBot->b_role_locked))
 	{	// redo our role every 5 seconds
