@@ -614,8 +614,8 @@ typedef struct
 	float  f_shidden_fart_cooldown;    // local IN_ATTACK pacing (server cooldown is 0.75s)
 	float  f_shidden_unseen_until;     // smelter: damage-reaction sensitivity boost expiry
 
-	// Grappling-hook (CIR impulse 217/218) state.  See ai/grappling_hook.md
-	// and /memories/repo/gravebot_hook_usage.md for the full state machine.
+	// Grappling-hook (CIR impulse 217/218) state.
+	// Lifecycle handled by BotFireHook/BotReleaseHook/BotMaybeReleaseHook (see bot_combat.cpp).
 	float    f_hook_cooldown_until;    // gpGlobals->time before which bot may not refire
 	float    f_hook_release_at;        // hard timeout: forced impulse 218 if not released sooner
 	bool     b_hook_active;            // TRUE between impulse 217 fire and impulse 218 release
@@ -632,8 +632,8 @@ int   BotRuneClassToType(const char *classname);
 float BotEvaluateRuneScore(bot_t *pBot, int rune_type);
 void  BotMaybeDropRuneForSwap(bot_t *pBot);
 
-// Grappling-hook helpers (defined in bot_combat.cpp).  See the plan in
-// ai/grappling_hook.md and /memories/repo/gravebot_hook_usage.md.
+// Grappling-hook helpers (defined in bot_combat.cpp).
+// See BotFireHook/BotReleaseHook/BotMaybeReleaseHook for the lifecycle and safety gates.
 void BotFireHook(bot_t *pBot, int intent, edict_t *pTargetItem, const Vector &vAimPoint);
 void BotReleaseHook(bot_t *pBot);
 void BotMaybeReleaseHook(bot_t *pBot);

@@ -39,8 +39,7 @@ extern bool b_chat_debug;
 extern float bot_aim_difficulty;
 FILE *fp;
 
-// Grappling-hook tuning constants (bots only).  See ai/grappling_hook.md
-// and /memories/repo/gravebot_hook_usage.md for design rationale.
+// Grappling-hook tuning constants (bots only). Rationale and state machine are documented inline below.
 extern cvar_t sv_bots_hook;
 static const float BOT_HOOK_COOLDOWN          = 3.0f;    // base re-fire cooldown
 static const float BOT_HOOK_MAX_DURATION      = 2.0f;    // forced release timeout
@@ -6196,6 +6195,10 @@ static bool BotHookEnabled(bot_t *pBot)
 {
 	if (pBot == NULL || pBot->pEdict == NULL)
 		return false;
+	if (pBot->pEdict->v.waterlevel == 3)
+		return false;
+	if (pBot->pEdict->v.iuser1 != 0)
+		return false;
 	if (sv_bots_hook.value <= 0)
 		return false;
 	if (CVAR_GET_FLOAT("mp_grapplinghook") <= 0)
@@ -6368,7 +6371,7 @@ bool BotConsiderHookForItem(bot_t *pBot, edict_t *pItem)
 	if (pBot->b_hook_active) return false;
 	if (gpGlobals->time < pBot->f_hook_cooldown_until) return false;
 	if (pBot->pBotEnemy != NULL) return false;   // ITEM intent: only when out of combat
-	if (pBot->pEdict->v.flags & FL_ONGROUND ? false : false) {}  // (no-op; future air gate)
+	// (future) Consider adding an in-air gate for ITEM hook attempts.
 
 	Vector vAim, vAnchor;
 	if (!BotComputeHookAimForItem(pBot, pItem, &vAim, &vAnchor))
@@ -6385,7 +6388,7 @@ bool BotConsiderHookForItem(bot_t *pBot, edict_t *pItem)
 	pBot->pEdict->v.ideal_yaw = vAng.y;
 	BotFixIdealYaw(pBot->pEdict);
 	pBot->pEdict->v.v_angle.x = vAng.x;
-	pBot->pEdict->v.angles.x  = vAng.x / 3.0f;
+	pBot->pEdict->v.angles.x  = -pBot->pEdict->v.v_angle.x / 3.0f;
 
 	BotFireHook(pBot, HOOK_INTENT_ITEM, pItem, vAnchor);
 	return true;
@@ -6467,7 +6470,7 @@ bool BotConsiderHookForEscape(bot_t *pBot)
 	pBot->pEdict->v.ideal_yaw = vAng.y;
 	BotFixIdealYaw(pBot->pEdict);
 	pBot->pEdict->v.v_angle.x = vAng.x;
-	pBot->pEdict->v.angles.x  = vAng.x / 3.0f;
+	pBot->pEdict->v.angles.x  = -pBot->pEdict->v.v_angle.x / 3.0f;
 
 	BotFireHook(pBot, HOOK_INTENT_ESCAPE, NULL, vAnchor);
 	return true;
@@ -6541,7 +6544,7 @@ bool BotConsiderHookForPursuit(bot_t *pBot)
 	pBot->pEdict->v.ideal_yaw = vAng.y;
 	BotFixIdealYaw(pBot->pEdict);
 	pBot->pEdict->v.v_angle.x = vAng.x;
-	pBot->pEdict->v.angles.x  = vAng.x / 3.0f;
+	pBot->pEdict->v.angles.x  = -pBot->pEdict->v.v_angle.x / 3.0f;
 
 	BotFireHook(pBot, HOOK_INTENT_PURSUIT, NULL, vAnchor);
 	return true;
@@ -6575,7 +6578,7 @@ bool BotConsiderHookForDamage(bot_t *pBot)
 	pBot->pEdict->v.ideal_yaw = vAng.y;
 	BotFixIdealYaw(pBot->pEdict);
 	pBot->pEdict->v.v_angle.x = vAng.x;
-	pBot->pEdict->v.angles.x  = vAng.x / 3.0f;
+	pBot->pEdict->v.angles.x  = -pBot->pEdict->v.v_angle.x / 3.0f;
 
 	BotFireHook(pBot, HOOK_INTENT_DAMAGE, NULL, vAnchor);
 	return true;

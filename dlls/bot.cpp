@@ -321,7 +321,7 @@ void BotSpawnInit( bot_t *pBot )
 	pBot->b_rune = FALSE;
 	pBot->i_rune_type = 0;
 	pBot->f_rune_drop_cooldown = 0.0f;
-	// Clear per-life grappling-hook state.  See ai/grappling_hook.md.
+	// Clear per-life grappling-hook state.
 	pBot->f_hook_cooldown_until       = 0.0f;
 	pBot->f_hook_release_at           = 0.0f;
 	pBot->b_hook_active               = false;
