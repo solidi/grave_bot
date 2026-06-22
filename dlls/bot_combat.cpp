@@ -39,6 +39,19 @@ extern bool b_chat_debug;
 extern float bot_aim_difficulty;
 FILE *fp;
 
+// Grappling-hook tuning constants (bots only). Rationale and state machine are documented inline below.
+extern cvar_t sv_bots_hook;
+static const float BOT_HOOK_COOLDOWN          = 3.0f;    // base re-fire cooldown
+static const float BOT_HOOK_MAX_DURATION      = 2.0f;    // forced release timeout
+static const float BOT_HOOK_ITEM_Z_THRESHOLD  = 96.0f;   // min height delta to detour-hook
+static const float BOT_HOOK_ITEM_MAX_RANGE    = 1024.0f; // max hook range for any intent
+static const int   BOT_HOOK_ESCAPE_HP         = 25;      // HP at or below which escape triggers
+static const float BOT_HOOK_PURSUIT_MIN_DIST  = 600.0f;  // min enemy dist to consider pursuit
+static const float BOT_HOOK_PURSUIT_MIN_VEL   = 200.0f;  // min enemy speed to consider pursuit
+static const float BOT_HOOK_PURSUIT_AWAY_DOT  = 0.3f;    // dot(enemy_vel_dir, away_from_bot)
+static const int   BOT_HOOK_PURSUIT_MIN_HP    = 35;      // don't pursue if HP below this
+static const float hook_cooldown_mult[5] = { 1.0f, 1.2f, 1.5f, 2.0f, 3.0f };
+
 static edict_t *BotGetKtsSnowballCached()
  {
  	static float flCachedTime = -1.0f;
@@ -5057,8 +5070,29 @@ bool BotFireWeapon(Vector v_enemy, bot_t *pBot, int weapon_choice, bool nofire)
 				pEdict->v.button |= IN_ATTACK2;
 
 
-			if (sv_botsmelee.value > 0 && is_gameplay != GAME_GUNGAME)
+			if (sv_botsmelee.value > 0 && is_gameplay != GAME_GUNGAME
+				&& !pBot->b_hook_active)
 			{
+				// While the bot is mid-grapple, the whole melee-impulse
+				// block is suppressed — riding the hook is the action,
+				// and impulse 215 (force grab) would also steal a weapon
+				// the bot can't use mid-flight.
+
+				// Grappling-hook PURSUIT: enemy is far + running away, we
+				// have HP to commit.  Check first (free roll) so it can
+				// fire on the same tick the engagement registers.  Internal
+				// gates: dist >= 600, enemy speed >= 200, away-dot >= 0.3,
+				// HP >= 35, cooldown, anchor LOS.
+				if (BotConsiderHookForPursuit(pBot))
+				{
+					// fired hook; skip remaining melee impulses this tick
+				}
+				else if (BotConsiderHookForDamage(pBot))
+				{
+					// damage-fallback fired (close gap when out of options)
+				}
+				else
+				{
 				// Scale melee-impulse frequency with bot_aim_difficulty so
 				// softened bots don't become lethal the moment a player closes
 				// in.  Linear: 0.0 -> 100% (unchanged), 1.0 -> ~55%, 2.0 -> 10%.
@@ -5093,6 +5127,7 @@ bool BotFireWeapon(Vector v_enemy, bot_t *pBot, int weapon_choice, bool nofire)
 					}
 				}
 				}
+				}  // end else (no hook fired this tick)
 			}
 
 			if (pSelect[final_index].primary_fire_charge)
@@ -6136,4 +6171,415 @@ void BotMaybeDropRuneForSwap(bot_t *pBot)
 	pBot->b_rune = FALSE;
 	pBot->i_rune_type = 0;
 	pBot->f_rune_drop_cooldown = gpGlobals->time + 1.5f;
+}
+
+//=========================================================
+// Grappling-hook bot integration (impulse 217/218).
+//
+// Lifecycle:
+//   BotFireHook   -> sets impulse 217, populates state, sets release/cooldown timers
+//   BotReleaseHook-> sets impulse 218, clears state
+//   BotMaybeReleaseHook (per BotThink) -> timeout / target-invalid / anti-stuck checks
+//
+// Intent priority (highest first): ESCAPE > PURSUIT > DAMAGE_FALLBACK > ITEM.
+//=========================================================
+
+static float BotHookCooldownMult(int skill)
+{
+	if (skill < 0) skill = 0;
+	if (skill > 4) skill = 4;
+	return hook_cooldown_mult[skill];
+}
+
+static bool BotHookEnabled(bot_t *pBot)
+{
+	if (pBot == NULL || pBot->pEdict == NULL)
+		return false;
+	if (pBot->pEdict->v.waterlevel == 3)
+		return false;
+	if (pBot->pEdict->v.iuser1 != 0)
+		return false;
+	if (sv_bots_hook.value <= 0)
+		return false;
+	if (CVAR_GET_FLOAT("mp_grapplinghook") <= 0)
+		return false;
+	return true;
+}
+
+void BotFireHook(bot_t *pBot, int intent, edict_t *pTargetItem, const Vector &vAimPoint)
+{
+	if (pBot == NULL || pBot->pEdict == NULL)
+		return;
+
+	edict_t *pEdict = pBot->pEdict;
+
+	// Skip in water (impulse 217 spawns a hook that immediately drops in
+	// liquid) and skip while spectating/dead-cam.
+	if (pEdict->v.waterlevel == 3)
+		return;
+	if (pEdict->v.iuser1 != 0)
+		return;
+
+	pEdict->v.impulse = 217;
+
+	pBot->b_hook_active               = true;
+	pBot->i_hook_intent               = intent;
+	pBot->pHookItem                   = pTargetItem;
+	pBot->v_hook_target_point         = vAimPoint;
+	pBot->f_hook_release_at           = gpGlobals->time + BOT_HOOK_MAX_DURATION;
+	pBot->f_hook_cooldown_until       = gpGlobals->time + BOT_HOOK_COOLDOWN * BotHookCooldownMult(pBot->bot_skill);
+	pBot->f_hook_velocity_check_time  = gpGlobals->time + 0.5f;
+	pBot->i_hook_low_velocity_samples = 0;
+
+	// Don't path-correct mid-fly.
+	pBot->f_ignore_wpt_time = gpGlobals->time + 0.1f;
+}
+
+void BotReleaseHook(bot_t *pBot)
+{
+	if (pBot == NULL || pBot->pEdict == NULL)
+		return;
+
+	if (pBot->b_hook_active)
+		pBot->pEdict->v.impulse = 218;
+
+	pBot->b_hook_active               = false;
+	pBot->i_hook_intent               = HOOK_INTENT_NONE;
+	pBot->pHookItem                   = NULL;
+	pBot->v_hook_target_point         = g_vecZero;
+	pBot->f_hook_release_at           = 0.0f;
+	pBot->f_hook_velocity_check_time  = 0.0f;
+	pBot->i_hook_low_velocity_samples = 0;
+}
+
+void BotMaybeReleaseHook(bot_t *pBot)
+{
+	if (pBot == NULL || pBot->pEdict == NULL)
+		return;
+	if (!pBot->b_hook_active)
+		return;
+
+	edict_t *pEdict = pBot->pEdict;
+
+	// Hard timeout.
+	if (pBot->f_hook_release_at > 0.0f && gpGlobals->time >= pBot->f_hook_release_at)
+	{
+		BotReleaseHook(pBot);
+		return;
+	}
+
+	// ITEM intent: target validity.
+	if (pBot->i_hook_intent == HOOK_INTENT_ITEM)
+	{
+		edict_t *pItem = pBot->pHookItem;
+		if (pItem == NULL || FNullEnt(pItem) || (pItem->v.effects & EF_NODRAW))
+		{
+			BotReleaseHook(pBot);
+			return;
+		}
+	}
+
+	// PURSUIT intent: drop hook the moment we re-acquire reasonable melee range.
+	if (pBot->i_hook_intent == HOOK_INTENT_PURSUIT
+		&& pBot->pBotEnemy != NULL && !FNullEnt(pBot->pBotEnemy))
+	{
+		float dist = (pBot->pBotEnemy->v.origin - pEdict->v.origin).Length();
+		if (dist < 200.0f)
+		{
+			BotReleaseHook(pBot);
+			return;
+		}
+	}
+
+	// Submerged / observer guard (state can change mid-hook).
+	if (pEdict->v.waterlevel == 3 || pEdict->v.iuser1 != 0)
+	{
+		BotReleaseHook(pBot);
+		return;
+	}
+
+	// Anti-stuck: sample horizontal speed every 0.5s, release on 2 low samples.
+	if (gpGlobals->time >= pBot->f_hook_velocity_check_time)
+	{
+		Vector vVel = pEdict->v.velocity;
+		vVel.z = 0;
+		const float speed = vVel.Length();
+		if (speed < 32.0f)
+		{
+			pBot->i_hook_low_velocity_samples++;
+			if (pBot->i_hook_low_velocity_samples >= 2)
+			{
+				BotReleaseHook(pBot);
+				return;
+			}
+		}
+		else
+		{
+			pBot->i_hook_low_velocity_samples = 0;
+		}
+		pBot->f_hook_velocity_check_time = gpGlobals->time + 0.5f;
+	}
+}
+
+//---------------------------------------------------------
+// ITEM detour: compute an aim point above pItem with clear
+// line-of-sight from the bot's view origin.  outAim is the
+// world point to look at; outAnchor is the predicted hook
+// impact (ceiling point).
+//---------------------------------------------------------
+bool BotComputeHookAimForItem(bot_t *pBot, edict_t *pItem, Vector *pOutAim, Vector *pOutAnchor)
+{
+	if (pBot == NULL || pBot->pEdict == NULL || pItem == NULL || FNullEnt(pItem))
+		return false;
+
+	edict_t *pEdict = pBot->pEdict;
+
+	// Item must be meaningfully above bot.
+	const float zDelta = pItem->v.origin.z - pEdict->v.origin.z;
+	if (zDelta < BOT_HOOK_ITEM_Z_THRESHOLD)
+		return false;
+
+	// Distance gate.
+	const float dist = (pItem->v.origin - pEdict->v.origin).Length();
+	if (dist > BOT_HOOK_ITEM_MAX_RANGE)
+		return false;
+
+	// Find a ceiling/anchor point above the item: trace straight up 256u.
+	TraceResult tr;
+	UTIL_TraceLine(pItem->v.origin, pItem->v.origin + Vector(0,0,256), ignore_monsters, pItem, &tr);
+	if (tr.flFraction >= 1.0f)
+		return false;  // open sky above the item, nothing to hook to
+
+	Vector vAnchor = tr.vecEndPos;
+
+	// Anchor must be visible from the bot's eye position.
+	const Vector vEye = pEdict->v.origin + pEdict->v.view_ofs;
+	UTIL_TraceLine(vEye, vAnchor, ignore_monsters, pEdict, &tr);
+	if (tr.flFraction < 0.95f)
+		return false;  // something is between us and the anchor
+
+	if (pOutAim)    *pOutAim    = vAnchor;
+	if (pOutAnchor) *pOutAnchor = vAnchor;
+	return true;
+}
+
+bool BotConsiderHookForItem(bot_t *pBot, edict_t *pItem)
+{
+	if (pBot == NULL || pBot->pEdict == NULL || pItem == NULL || FNullEnt(pItem))
+		return false;
+	if (!BotHookEnabled(pBot)) return false;
+	if (pBot->b_hook_active) return false;
+	if (gpGlobals->time < pBot->f_hook_cooldown_until) return false;
+	if (pBot->pBotEnemy != NULL) return false;   // ITEM intent: only when out of combat
+	// (future) Consider adding an in-air gate for ITEM hook attempts.
+
+	Vector vAim, vAnchor;
+	if (!BotComputeHookAimForItem(pBot, pItem, &vAim, &vAnchor))
+		return false;
+
+	// Snap-aim the bot at the anchor and fire.  Aim is set via ideal_yaw +
+	// v_angle.x; the per-tick aim controller will close the residual error.
+	Vector vEye = pBot->pEdict->v.origin + pBot->pEdict->v.view_ofs;
+	Vector vDir = vAim - vEye;
+	Vector vAng = UTIL_VecToAngles(vDir);
+	if (vAng.x > 180.0f) vAng.x -= 360.0f;
+	vAng.x = -vAng.x;  // engine convention: positive pitch = look down
+
+	pBot->pEdict->v.ideal_yaw = vAng.y;
+	BotFixIdealYaw(pBot->pEdict);
+	pBot->pEdict->v.v_angle.x = vAng.x;
+	pBot->pEdict->v.angles.x  = -pBot->pEdict->v.v_angle.x / 3.0f;
+
+	BotFireHook(pBot, HOOK_INTENT_ITEM, pItem, vAnchor);
+	return true;
+}
+
+//---------------------------------------------------------
+// ESCAPE: pick the best anchor among backward / straight-up
+// / lateral-away traces.  Score = dist(impact, enemy) - 0.1 * dist(impact, bot).
+//---------------------------------------------------------
+bool BotComputeEscapeAnchor(bot_t *pBot, Vector *pOutAnchor)
+{
+	if (pBot == NULL || pBot->pEdict == NULL || pBot->pBotEnemy == NULL || FNullEnt(pBot->pBotEnemy))
+		return false;
+
+	edict_t *pEdict = pBot->pEdict;
+	const Vector vEye   = pEdict->v.origin + pEdict->v.view_ofs;
+	const Vector vEnemy = pBot->pBotEnemy->v.origin;
+
+	Vector vAway = pEdict->v.origin - vEnemy;
+	vAway.z = 0;
+	if (vAway.Length() < 1.0f) return false;
+	vAway = vAway.Normalize();
+	Vector vLateral( -vAway.y, vAway.x, 0 );
+
+	const Vector vDirs[3] = {
+		(vAway * 1.0f + Vector(0,0,1.5f)).Normalize(),  // back & up
+		Vector(0,0,1),                                   // straight up
+		(vLateral * 1.0f + Vector(0,0,1.0f)).Normalize() // lateral & up
+	};
+
+	float bestScore = -1.0e9f;
+	Vector bestAnchor = g_vecZero;
+	bool found = false;
+
+	TraceResult tr;
+	for (int i = 0; i < 3; ++i)
+	{
+		Vector vEnd = vEye + vDirs[i] * BOT_HOOK_ITEM_MAX_RANGE;
+		UTIL_TraceLine(vEye, vEnd, ignore_monsters, pEdict, &tr);
+		if (tr.flFraction >= 1.0f) continue;        // open sky — no anchor
+		if (tr.flFraction <= 0.05f) continue;       // wall in our face
+
+		const float distToEnemy = (tr.vecEndPos - vEnemy).Length();
+		const float distToBot   = (tr.vecEndPos - pEdict->v.origin).Length();
+		if (distToBot > BOT_HOOK_ITEM_MAX_RANGE) continue;
+		if (distToBot < 64.0f) continue;          // too close to bounce off
+
+		const float score = distToEnemy - 0.1f * distToBot;
+		if (score > bestScore)
+		{
+			bestScore  = score;
+			bestAnchor = tr.vecEndPos;
+			found      = true;
+		}
+	}
+
+	if (!found) return false;
+	if (pOutAnchor) *pOutAnchor = bestAnchor;
+	return true;
+}
+
+bool BotConsiderHookForEscape(bot_t *pBot)
+{
+	if (pBot == NULL || pBot->pEdict == NULL) return false;
+	if (!BotHookEnabled(pBot)) return false;
+	if (pBot->b_hook_active) return false;
+	if (gpGlobals->time < pBot->f_hook_cooldown_until) return false;
+	if (pBot->pBotEnemy == NULL || FNullEnt(pBot->pBotEnemy)) return false;
+	if (pBot->pEdict->v.health > BOT_HOOK_ESCAPE_HP) return false;
+
+	Vector vAnchor;
+	if (!BotComputeEscapeAnchor(pBot, &vAnchor)) return false;
+
+	Vector vEye = pBot->pEdict->v.origin + pBot->pEdict->v.view_ofs;
+	Vector vDir = vAnchor - vEye;
+	Vector vAng = UTIL_VecToAngles(vDir);
+	if (vAng.x > 180.0f) vAng.x -= 360.0f;
+	vAng.x = -vAng.x;
+	pBot->pEdict->v.ideal_yaw = vAng.y;
+	BotFixIdealYaw(pBot->pEdict);
+	pBot->pEdict->v.v_angle.x = vAng.x;
+	pBot->pEdict->v.angles.x  = -pBot->pEdict->v.v_angle.x / 3.0f;
+
+	BotFireHook(pBot, HOOK_INTENT_ESCAPE, NULL, vAnchor);
+	return true;
+}
+
+//---------------------------------------------------------
+// PURSUIT: enemy is running away.  Anchor is past the enemy
+// along the bot->enemy line, on a wall/ceiling.
+//---------------------------------------------------------
+bool BotComputePursuitAnchor(bot_t *pBot, edict_t *pEnemy, Vector *pOutAnchor)
+{
+	if (pBot == NULL || pBot->pEdict == NULL || pEnemy == NULL || FNullEnt(pEnemy))
+		return false;
+
+	edict_t *pEdict = pBot->pEdict;
+	const Vector vEye = pEdict->v.origin + pEdict->v.view_ofs;
+	const Vector vEnemyShoulder = pEnemy->v.origin + Vector(0,0,16);
+
+	Vector vDir = vEnemyShoulder - vEye;
+	const float distToEnemy = vDir.Length();
+	if (distToEnemy < 1.0f) return false;
+	vDir = vDir.Normalize();
+
+	Vector vEnd = vEnemyShoulder + vDir * 256.0f;
+	TraceResult tr;
+	UTIL_TraceLine(vEye, vEnd, ignore_monsters, pEdict, &tr);
+
+	if (tr.flFraction >= 1.0f) return false;   // no wall past enemy
+	const float totalDist = (tr.vecEndPos - vEye).Length();
+	if (totalDist > BOT_HOOK_ITEM_MAX_RANGE) return false;
+	if (totalDist < distToEnemy) return false;  // anchor must be past enemy
+
+	if (pOutAnchor) *pOutAnchor = tr.vecEndPos;
+	return true;
+}
+
+bool BotConsiderHookForPursuit(bot_t *pBot)
+{
+	if (pBot == NULL || pBot->pEdict == NULL) return false;
+	if (!BotHookEnabled(pBot)) return false;
+	if (pBot->b_hook_active) return false;
+	if (gpGlobals->time < pBot->f_hook_cooldown_until) return false;
+
+	edict_t *pEnemy = pBot->pBotEnemy;
+	if (pEnemy == NULL || FNullEnt(pEnemy)) return false;
+	if (pBot->pEdict->v.health < BOT_HOOK_PURSUIT_MIN_HP) return false;
+
+	const float distEnemy = (pEnemy->v.origin - pBot->pEdict->v.origin).Length();
+	if (distEnemy < BOT_HOOK_PURSUIT_MIN_DIST) return false;
+
+	// Enemy must be moving away from us at meaningful speed.
+	Vector vEnemyVel = pEnemy->v.velocity;
+	vEnemyVel.z = 0;
+	const float enemySpeed = vEnemyVel.Length();
+	if (enemySpeed < BOT_HOOK_PURSUIT_MIN_VEL) return false;
+	Vector vAway = (pEnemy->v.origin - pBot->pEdict->v.origin);
+	vAway.z = 0;
+	if (vAway.Length() < 1.0f) return false;
+	vAway = vAway.Normalize();
+	const Vector vEnemyDir = vEnemyVel.Normalize();
+	if (DotProduct(vEnemyDir, vAway) < BOT_HOOK_PURSUIT_AWAY_DOT) return false;
+
+	Vector vAnchor;
+	if (!BotComputePursuitAnchor(pBot, pEnemy, &vAnchor)) return false;
+
+	Vector vEye = pBot->pEdict->v.origin + pBot->pEdict->v.view_ofs;
+	Vector vDir = vAnchor - vEye;
+	Vector vAng = UTIL_VecToAngles(vDir);
+	if (vAng.x > 180.0f) vAng.x -= 360.0f;
+	vAng.x = -vAng.x;
+	pBot->pEdict->v.ideal_yaw = vAng.y;
+	BotFixIdealYaw(pBot->pEdict);
+	pBot->pEdict->v.v_angle.x = vAng.x;
+	pBot->pEdict->v.angles.x  = -pBot->pEdict->v.v_angle.x / 3.0f;
+
+	BotFireHook(pBot, HOOK_INTENT_PURSUIT, NULL, vAnchor);
+	return true;
+}
+
+//---------------------------------------------------------
+// DAMAGE fallback: out of ammo / no good weapon, but enemy
+// recently visible.  Reuses pursuit's anchor solver.
+//---------------------------------------------------------
+bool BotConsiderHookForDamage(bot_t *pBot)
+{
+	if (pBot == NULL || pBot->pEdict == NULL) return false;
+	if (!BotHookEnabled(pBot)) return false;
+	if (pBot->b_hook_active) return false;
+	if (gpGlobals->time < pBot->f_hook_cooldown_until) return false;
+
+	edict_t *pEnemy = pBot->pBotEnemy;
+	if (pEnemy == NULL || FNullEnt(pEnemy)) return false;
+
+	// Recent LOS gate.
+	if (pBot->f_last_enemy_los_time + 1.5f < gpGlobals->time) return false;
+
+	Vector vAnchor;
+	if (!BotComputePursuitAnchor(pBot, pEnemy, &vAnchor)) return false;
+
+	Vector vEye = pBot->pEdict->v.origin + pBot->pEdict->v.view_ofs;
+	Vector vDir = vAnchor - vEye;
+	Vector vAng = UTIL_VecToAngles(vDir);
+	if (vAng.x > 180.0f) vAng.x -= 360.0f;
+	vAng.x = -vAng.x;
+	pBot->pEdict->v.ideal_yaw = vAng.y;
+	BotFixIdealYaw(pBot->pEdict);
+	pBot->pEdict->v.v_angle.x = vAng.x;
+	pBot->pEdict->v.angles.x  = -pBot->pEdict->v.v_angle.x / 3.0f;
+
+	BotFireHook(pBot, HOOK_INTENT_DAMAGE, NULL, vAnchor);
+	return true;
 }

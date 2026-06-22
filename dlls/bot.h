@@ -91,6 +91,16 @@ void FakeClientCommand(edict_t *pBot, char *arg1, char *arg2, char *arg3);
 #define BOT_RUNE_CLOAK    8
 #define BOT_RUNE_AMMO     9
 
+// Grappling-hook bot intent (why the bot fired impulse 217).
+// Priority ordering (highest first): ESCAPE > PURSUIT > DAMAGE_FALLBACK > ITEM.
+enum {
+	HOOK_INTENT_NONE = 0,
+	HOOK_INTENT_ITEM,
+	HOOK_INTENT_DAMAGE,
+	HOOK_INTENT_ESCAPE,
+	HOOK_INTENT_PURSUIT,
+};
+
 
 const char *Cmd_Args();
 const char *Cmd_Argv( int argc );
@@ -603,6 +613,17 @@ typedef struct
 	float  f_shidden_target_time;      // dealter: FINISHER lock expiry time (gpGlobals->time)
 	float  f_shidden_fart_cooldown;    // local IN_ATTACK pacing (server cooldown is 0.75s)
 	float  f_shidden_unseen_until;     // smelter: damage-reaction sensitivity boost expiry
+
+	// Grappling-hook (CIR impulse 217/218) state.
+	// Lifecycle handled by BotFireHook/BotReleaseHook/BotMaybeReleaseHook (see bot_combat.cpp).
+	float    f_hook_cooldown_until;    // gpGlobals->time before which bot may not refire
+	float    f_hook_release_at;        // hard timeout: forced impulse 218 if not released sooner
+	bool     b_hook_active;            // TRUE between impulse 217 fire and impulse 218 release
+	int      i_hook_intent;            // HOOK_INTENT_* (why the bot fired the hook)
+	edict_t *pHookItem;                // ITEM intent: item edict we're hooking toward
+	Vector   v_hook_target_point;      // anchor world point we aimed at when firing
+	float    f_hook_velocity_check_time; // next anti-stuck velocity sample time
+	int      i_hook_low_velocity_samples; // consecutive low-velocity samples (release at 2)
 } bot_t;
 
 // Rune helpers (defined in bot_combat.cpp). Declared after bot_t typedef
@@ -610,6 +631,19 @@ typedef struct
 int   BotRuneClassToType(const char *classname);
 float BotEvaluateRuneScore(bot_t *pBot, int rune_type);
 void  BotMaybeDropRuneForSwap(bot_t *pBot);
+
+// Grappling-hook helpers (defined in bot_combat.cpp).
+// See BotFireHook/BotReleaseHook/BotMaybeReleaseHook for the lifecycle and safety gates.
+void BotFireHook(bot_t *pBot, int intent, edict_t *pTargetItem, const Vector &vAimPoint);
+void BotReleaseHook(bot_t *pBot);
+void BotMaybeReleaseHook(bot_t *pBot);
+bool BotComputeHookAimForItem(bot_t *pBot, edict_t *pItem, Vector *pOutAim, Vector *pOutAnchor);
+bool BotConsiderHookForItem(bot_t *pBot, edict_t *pItem);
+bool BotComputeEscapeAnchor(bot_t *pBot, Vector *pOutAnchor);
+bool BotConsiderHookForEscape(bot_t *pBot);
+bool BotComputePursuitAnchor(bot_t *pBot, edict_t *pEnemy, Vector *pOutAnchor);
+bool BotConsiderHookForPursuit(bot_t *pBot);
+bool BotConsiderHookForDamage(bot_t *pBot);
 
 
 #define MAX_TEAMS 32

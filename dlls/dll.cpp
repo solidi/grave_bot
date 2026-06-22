@@ -144,6 +144,7 @@ float msecval;
 cvar_t sv_bot = {"gravebot",""};
 cvar_t sv_defaultbots = {"sv_defaultbots","0"};
 cvar_t sv_botsmelee = {"sv_botsmelee","1"};
+cvar_t sv_bots_hook = {"sv_bots_hook","1"};
 
 // Master scalar for combat lethality (aim error + reaction delay).
 // 0.0 = perfect aim / instant reaction (hardest), 1.0 = tuned human feel,
@@ -274,6 +275,7 @@ C_DLLEXPORT int Meta_Attach (PLUG_LOADTIME now, META_FUNCTIONS *pFunctionTable, 
    CVAR_REGISTER (&sv_bot);
    CVAR_REGISTER (&sv_defaultbots);
    CVAR_REGISTER (&sv_botsmelee);
+   CVAR_REGISTER (&sv_bots_hook);
 
    return (TRUE); // returning TRUE enables metamod to attach this plugin
 }
@@ -307,6 +309,7 @@ void GameDLLInit()
 		CVAR_REGISTER (&sv_bot);
 		CVAR_REGISTER (&sv_defaultbots);
 		CVAR_REGISTER (&sv_botsmelee);
+		CVAR_REGISTER (&sv_bots_hook);
    #endif
 	
 	for (i=0; i<32; i++)

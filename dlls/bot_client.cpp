@@ -434,6 +434,16 @@ void BotClient_Valve_ItemPickup(void *p, edict_t *pEdict)
 		pBot->b_rune = true;
 		pBot->i_rune_type = BotRuneClassToType(itemname);
 	}
+
+	// Grappling-hook ITEM-intent release: any pickup notification while the
+	// bot is hooked toward an item ends the swing.  We don't try to match
+	// the exact item classname (some item events arrive without a class
+	// hint via this callback); any pickup is sufficient evidence the swing
+	// did its job, and BotMaybeReleaseHook would catch it shortly anyway.
+	if (pBot->b_hook_active && pBot->i_hook_intent == HOOK_INTENT_ITEM)
+	{
+		BotReleaseHook(pBot);
+	}
 }
 
 void BotClient_Valve_WeapPickup(void *p, edict_t *pEdict)
