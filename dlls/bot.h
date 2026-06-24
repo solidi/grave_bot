@@ -509,6 +509,9 @@ typedef struct
 	float f_ctc_drop_consider_time; // cooldown for strategic drop evaluation
 	float f_ctc_next_juke_time;    // next time to jump or duck evasively
 	float f_ctc_next_move_time;    // next time to do a special move (slide/flip/kick)
+	int   i_ctc_pending_jumps;     // remaining IN_JUMP edges to fire for chase triple-jump
+	float f_ctc_next_jump_press;   // time of next IN_JUMP press in the sequence
+	float f_ctc_jump_seq_until;    // cooldown until next jump sequence may start
 
 	// CTF — Capture The Flag state
 	bool  b_ctf_has_flag;          // TRUE when bot carries enemy flag

@@ -344,6 +344,9 @@ void BotSpawnInit( bot_t *pBot )
 	pBot->f_ctc_drop_consider_time = 0.0f;
 	pBot->f_ctc_next_juke_time   = 0.0f;
 	pBot->f_ctc_next_move_time   = 0.0f;
+	pBot->i_ctc_pending_jumps    = 0;
+	pBot->f_ctc_next_jump_press  = 0.0f;
+	pBot->f_ctc_jump_seq_until   = 0.0f;
 
 	// Clear per-life CTF state.
 	pBot->b_ctf_has_flag       = false;

@@ -2069,6 +2069,55 @@ bool BotArenaThink( bot_t *pBot )
 }
 
 //=========================================================
+// BotCtcTryVerticalRecovery — chase helper used by Case 2
+// (holder pursuit) and Case 3 (loose toad).  When the target
+// is above the bot AND the bot is close horizontally (i.e.
+// running into the wall below a ledge), attempt:
+//   1. Grappling hook (preferred — long range, high climb)
+//   2. Triple-jump press sequence (close-range fallback)
+// Returns true if a recovery action was started this tick.
+//=========================================================
+static bool BotCtcTryVerticalRecovery(bot_t *pBot, edict_t *pTarget)
+{
+	if (pBot == NULL || pBot->pEdict == NULL || pTarget == NULL || FNullEnt(pTarget))
+		return false;
+
+	edict_t *pEdict = pBot->pEdict;
+	const float zDelta = pTarget->v.origin.z - pEdict->v.origin.z;
+
+	Vector vXY = pTarget->v.origin - pEdict->v.origin;
+	vXY.z = 0;
+	const float xyDist = vXY.Length();
+
+	// Not a "stuck under a ledge" scenario.
+	if (zDelta < 48.0f) return false;
+	if (xyDist > 384.0f) return false;
+
+	// Tall ledge with room to swing — try grappling hook first.
+	// BotConsiderHookForItem handles its own gating (cvars, cooldown,
+	// water, anchor visibility, range, Z threshold of 96u).
+	if (zDelta >= 96.0f)
+	{
+		if (BotConsiderHookForItem(pBot, pTarget))
+			return true;
+	}
+
+	// Fallback: queue a triple-jump press sequence.  Only start a new
+	// sequence when on the ground and not currently cooling down.
+	if (pBot->i_ctc_pending_jumps == 0 &&
+		pBot->f_ctc_jump_seq_until < gpGlobals->time &&
+		(pEdict->v.flags & FL_ONGROUND))
+	{
+		pBot->i_ctc_pending_jumps   = 3;
+		pBot->f_ctc_next_jump_press = gpGlobals->time; // press this tick
+		pBot->f_ctc_jump_seq_until  = gpGlobals->time + 1.5f;
+		return true;
+	}
+
+	return false;
+}
+
+//=========================================================
 // BotCtcThink — called from BotThink when in Capture The
 // Chumtoad mode and no combat is active.
 //
@@ -2088,6 +2137,17 @@ bool BotCtcThink( bot_t *pBot )
 		return false;
 
 	edict_t *pEdict = pBot->pEdict;
+
+	// Service any pending triple-jump press sequence (chase recovery).
+	// Edge-presses IN_JUMP with ~0.20s gaps so the engine's per-jump
+	// trigger fires multiple times for double/triple-jump.
+	if (pBot->i_ctc_pending_jumps > 0 &&
+		pBot->f_ctc_next_jump_press <= gpGlobals->time)
+	{
+		pEdict->v.button |= IN_JUMP;
+		--pBot->i_ctc_pending_jumps;
+		pBot->f_ctc_next_jump_press = gpGlobals->time + 0.20f;
+	}
 
 	// -----------------------------------------------------------------
 	// Case 1: Bot IS holding the chumtoad — evade and score.
@@ -2241,6 +2301,9 @@ bool BotCtcThink( bot_t *pBot )
 			pEdict->v.ideal_yaw = vecAngles.y;
 			BotFixIdealYaw(pEdict);
 
+			// If holder is on a ledge above us, try hook / triple-jump.
+			BotCtcTryVerticalRecovery(pBot, pHolder);
+
 			return true;
 		}
 	}
@@ -2264,6 +2327,9 @@ bool BotCtcThink( bot_t *pBot )
 			Vector vecAngles = UTIL_VecToAngles(vecDir);
 			pEdict->v.ideal_yaw = vecAngles.y;
 			BotFixIdealYaw(pEdict);
+
+			// If toad sits on a ledge above us, try hook / triple-jump.
+			BotCtcTryVerticalRecovery(pBot, pToad);
 
 			return true;
 		}
