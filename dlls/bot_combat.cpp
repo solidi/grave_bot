@@ -4052,8 +4052,19 @@ edict_t *BotFindEnemy( bot_t *pBot )
 	{
 		vecEnd = UTIL_GetOrigin(pBot->pBotEnemy) + pBot->pBotEnemy->v.view_ofs;
 
+		// Teamplay safety: never keep a teammate as the active enemy.
+		// This guard runs before remember/reacquire logic so transient
+		// team-id mismatches can't persist into ongoing friendly fire.
+		if (is_team_play > 0.0 &&
+			(pBot->pBotEnemy->v.flags & (FL_CLIENT | FL_FAKECLIENT)) &&
+			UTIL_GetTeam(pBot->pBotEnemy) == UTIL_GetTeam(pEdict))
+		{
+			pBot->pBotEnemy = NULL;
+			pRemember = NULL;
+		}
+
 		// if the enemy is dead?
-		if (!IsAlive(pBot->pBotEnemy))  // is the enemy dead?, assume bot killed it
+		if (pBot->pBotEnemy != NULL && !IsAlive(pBot->pBotEnemy))  // is the enemy dead?, assume bot killed it
 		{
 			// the enemy is dead, jump for joy about 10% of the time
 			//if (RANDOM_LONG(1, 100) <= 10)
@@ -4062,12 +4073,12 @@ edict_t *BotFindEnemy( bot_t *pBot )
 			// don't have an enemy anymore so null out the pointer...
 			pBot->pBotEnemy = NULL;
 		}
-		else if (pBot->pBotEnemy->v.flags & FL_GODMODE)
+		else if (pBot->pBotEnemy != NULL && pBot->pBotEnemy->v.flags & FL_GODMODE)
 		{
 			pBot->pBotEnemy = NULL;
 		// Cannot see transparent player (with rune)
 		}
-		else if (is_gameplay == GAME_CTC)
+		else if (pBot->pBotEnemy != NULL && is_gameplay == GAME_CTC)
 		{
 			// Void enemy if they dropped the chumtoad
 			if (pBot->pEdict->v.health > 25 && pBot->pBotEnemy->v.fuser4 == 0)
@@ -4086,7 +4097,7 @@ edict_t *BotFindEnemy( bot_t *pBot )
 				pBot->pBotEnemy = pRemember = NULL;
 			}
 		}
-		else if (is_gameplay == GAME_LOOT)
+		else if (pBot->pBotEnemy != NULL && is_gameplay == GAME_LOOT)
 		{
 			// Carrier pacifism — when this bot is the loot holder and
 			// healthy, drop the enemy so the bot keeps running to the
@@ -4097,7 +4108,7 @@ edict_t *BotFindEnemy( bot_t *pBot )
 				pBot->pBotEnemy = pRemember = NULL;
 			}
 		}
-		else if (is_gameplay == GAME_KTS)
+		else if (pBot->pBotEnemy != NULL && is_gameplay == GAME_KTS)
 		{
 			// In KTS, only keep an enemy while they are actively dribbling.
 			// Use pev->euser1 (set in CaptureCharm) — zero-flicker authoritative check.
@@ -4108,7 +4119,7 @@ edict_t *BotFindEnemy( bot_t *pBot )
 			if (!stillDribbler)
 				pBot->pBotEnemy = pRemember = NULL;
 		}
-		else if ((pBot->pBotEnemy->v.rendermode == kRenderTransAlpha
+		else if (pBot->pBotEnemy != NULL && (pBot->pBotEnemy->v.rendermode == kRenderTransAlpha
 		          || pBot->pBotEnemy->v.rendermode == kRenderTransTexture)
 		         && pBot->pBotEnemy->v.renderamt < (renderamt_threshold[pBot->bot_skill] / 2)
 		         && (pBot->pBotEnemy->v.origin - pEdict->v.origin).Length() > 80) {
@@ -4122,7 +4133,7 @@ edict_t *BotFindEnemy( bot_t *pBot )
 			// and naturally lands near the threshold during weapon idle).
 			pBot->pBotEnemy = NULL;
 		}
-		else if (FInViewCone( &vecEnd, pEdict ) &&
+		else if (pBot->pBotEnemy != NULL && FInViewCone( &vecEnd, pEdict ) &&
 			FVisible( vecEnd, pEdict ))
 		{
 			// if enemy is still visible and in field of view, keep it
@@ -4132,7 +4143,7 @@ edict_t *BotFindEnemy( bot_t *pBot )
 			// remember our current enemy and check for a new one
 			pRemember = pBot->pBotEnemy;
 		}
-		else if ((!FInViewCone( &vecEnd, pEdict ) ||
+		else if (pBot->pBotEnemy != NULL && (!FInViewCone( &vecEnd, pEdict ) ||
 			!FVisible( vecEnd, pEdict )) && (!pBot->b_engaging_enemy || is_gameplay == GAME_CTF || is_gameplay == GAME_ARENA))
 		{	// remember our enemy for 2 seconds even if they're not visible
 			// Arena: extend the remember window to 5 seconds for the sole opponent
@@ -4401,6 +4412,18 @@ edict_t *BotFindEnemy( bot_t *pBot )
 	// couldn't find a new enemy so remember the old one we can't see
 	if (pNewEnemy == NULL && pRemember != NULL)
 		pNewEnemy = pRemember;
+
+	// Teamplay safety (final gate): never return a teammate target.
+	// This catches any path that can bypass earlier filtering, such as
+	// remembered-enemy fallback after state transitions.
+	if (pNewEnemy != NULL && is_team_play > 0.0 &&
+		(pNewEnemy->v.flags & (FL_CLIENT | FL_FAKECLIENT)) &&
+		UTIL_GetTeam(pNewEnemy) == UTIL_GetTeam(pEdict))
+	{
+		pNewEnemy = NULL;
+		pRemember = NULL;
+		pBot->pBotEnemy = NULL;
+	}
 
 	// Horde is strict PvE: final safety guard against any player fallback path.
 	if (is_gameplay == GAME_HORDE && pNewEnemy != NULL
