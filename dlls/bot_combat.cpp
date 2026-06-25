@@ -3997,6 +3997,11 @@ edict_t *BotFindEnemy( bot_t *pBot )
 			pBot->pBotEnemy = NULL;
 			return NULL;
 		}
+
+		// Horde is strict PvE: never keep a player/bot client as the active enemy.
+		if (pBot->pBotEnemy && (pBot->pBotEnemy->v.flags & (FL_CLIENT | FL_FAKECLIENT)))
+			pBot->pBotEnemy = NULL;
+
 		// If the sticky horde target is still valid and currently visible,
 		// select it immediately instead of falling through to normal target
 		// acquisition.
@@ -4142,6 +4147,11 @@ edict_t *BotFindEnemy( bot_t *pBot )
 	pent = NULL;
 	pNewEnemy = NULL;
 	nearestdistance = 1000;
+
+	// Horde is strict PvE: never carry a remembered player target forward.
+	if (is_gameplay == GAME_HORDE && pRemember != NULL
+		&& (pRemember->v.flags & (FL_CLIENT | FL_FAKECLIENT)))
+		pRemember = NULL;
 	
 	if (pNewEnemy == NULL)
 	{
@@ -4248,6 +4258,10 @@ edict_t *BotFindEnemy( bot_t *pBot )
 		// search the world for players...
 		for (i = 1; i <= gpGlobals->maxClients; i++)
 		{
+			// Horde bots must never target players; all valid enemies are monsters.
+			if (is_gameplay == GAME_HORDE)
+				continue;
+
 			edict_t *pPlayer = INDEXENT(i);
 			
 			// skip invalid players and skip self (i.e. this bot)
@@ -4387,10 +4401,17 @@ edict_t *BotFindEnemy( bot_t *pBot )
 	// couldn't find a new enemy so remember the old one we can't see
 	if (pNewEnemy == NULL && pRemember != NULL)
 		pNewEnemy = pRemember;
+
+	// Horde is strict PvE: final safety guard against any player fallback path.
+	if (is_gameplay == GAME_HORDE && pNewEnemy != NULL
+		&& (pNewEnemy->v.flags & (FL_CLIENT | FL_FAKECLIENT)))
+		pNewEnemy = NULL;
+
 	// are we engaging an enemy?  Don't forget about them
 	// In CTF / Arena / Cold Spot / LMS, let the enemy go so the bot returns to objective play.
 	if (pNewEnemy == NULL && pBot->b_engaging_enemy && pBot->pBotEnemy != NULL
-		&& is_gameplay != GAME_CTF && is_gameplay != GAME_ARENA && is_gameplay != GAME_COLDSPOT && is_gameplay != GAME_LMS)
+		&& is_gameplay != GAME_CTF && is_gameplay != GAME_ARENA && is_gameplay != GAME_COLDSPOT && is_gameplay != GAME_LMS
+		&& is_gameplay != GAME_HORDE)
 		pNewEnemy = pBot->pBotEnemy;
 
 	if (pNewEnemy)
