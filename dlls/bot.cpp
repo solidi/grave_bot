@@ -2617,6 +2617,13 @@ void BotThink( bot_t *pBot )
 			// gamemodes, so skipping the Think on the ladder costs
 			// nothing — the synthesis block at L3437 picks up v_goal
 			// the moment the bot exits the ladder waypoint.
+			// If we just got off a ladder, reset direction so the next ladder touch can re-square.
+			if (pEdict->v.movetype != MOVETYPE_FLY &&
+				(pBot->f_end_use_ladder_time + 1.0) > gpGlobals->time)
+			{
+				pBot->ladder_dir = LADDER_UNKNOWN;
+			}
+
 			if (pEdict->v.movetype == MOVETYPE_FLY)
 			{
 				if ((pBot->f_end_use_ladder_time + 1.0) < gpGlobals->time)

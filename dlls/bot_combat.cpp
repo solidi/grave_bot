@@ -2108,8 +2108,9 @@ static bool BotCtcTryVerticalRecovery(bot_t *pBot, edict_t *pTarget)
 		pBot->f_ctc_jump_seq_until < gpGlobals->time &&
 		(pEdict->v.flags & FL_ONGROUND))
 	{
-		pBot->i_ctc_pending_jumps   = 3;
-		pBot->f_ctc_next_jump_press = gpGlobals->time; // press this tick
+		pEdict->v.button |= IN_JUMP;
+		pBot->i_ctc_pending_jumps   = 2;
+		pBot->f_ctc_next_jump_press = gpGlobals->time + 0.20f;
 		pBot->f_ctc_jump_seq_until  = gpGlobals->time + 1.5f;
 		return true;
 	}
