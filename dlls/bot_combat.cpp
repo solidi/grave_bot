@@ -2069,6 +2069,56 @@ bool BotArenaThink( bot_t *pBot )
 }
 
 //=========================================================
+// BotCtcTryVerticalRecovery — chase helper used by Case 2
+// (holder pursuit) and Case 3 (loose toad).  When the target
+// is above the bot AND the bot is close horizontally (i.e.
+// running into the wall below a ledge), attempt:
+//   1. Grappling hook (preferred — long range, high climb)
+//   2. Triple-jump press sequence (close-range fallback)
+// Returns true if a recovery action was started this tick.
+//=========================================================
+static bool BotCtcTryVerticalRecovery(bot_t *pBot, edict_t *pTarget)
+{
+	if (pBot == NULL || pBot->pEdict == NULL || pTarget == NULL || FNullEnt(pTarget))
+		return false;
+
+	edict_t *pEdict = pBot->pEdict;
+	const float zDelta = pTarget->v.origin.z - pEdict->v.origin.z;
+
+	Vector vXY = pTarget->v.origin - pEdict->v.origin;
+	vXY.z = 0;
+	const float xyDist = vXY.Length();
+
+	// Not a "stuck under a ledge" scenario.
+	if (zDelta < 48.0f) return false;
+	if (xyDist > 384.0f) return false;
+
+	// Tall ledge with room to swing — try grappling hook first.
+	// BotConsiderHookForItem handles its own gating (cvars, cooldown,
+	// water, anchor visibility, range, Z threshold of 96u).
+	if (zDelta >= 96.0f)
+	{
+		if (BotConsiderHookForItem(pBot, pTarget))
+			return true;
+	}
+
+	// Fallback: queue a triple-jump press sequence.  Only start a new
+	// sequence when on the ground and not currently cooling down.
+	if (pBot->i_ctc_pending_jumps == 0 &&
+		pBot->f_ctc_jump_seq_until < gpGlobals->time &&
+		(pEdict->v.flags & FL_ONGROUND))
+	{
+		pEdict->v.button |= IN_JUMP;
+		pBot->i_ctc_pending_jumps   = 2;
+		pBot->f_ctc_next_jump_press = gpGlobals->time + 0.20f;
+		pBot->f_ctc_jump_seq_until  = gpGlobals->time + 1.5f;
+		return true;
+	}
+
+	return false;
+}
+
+//=========================================================
 // BotCtcThink — called from BotThink when in Capture The
 // Chumtoad mode and no combat is active.
 //
@@ -2088,6 +2138,17 @@ bool BotCtcThink( bot_t *pBot )
 		return false;
 
 	edict_t *pEdict = pBot->pEdict;
+
+	// Service any pending triple-jump press sequence (chase recovery).
+	// Edge-presses IN_JUMP with ~0.20s gaps so the engine's per-jump
+	// trigger fires multiple times for double/triple-jump.
+	if (pBot->i_ctc_pending_jumps > 0 &&
+		pBot->f_ctc_next_jump_press <= gpGlobals->time)
+	{
+		pEdict->v.button |= IN_JUMP;
+		--pBot->i_ctc_pending_jumps;
+		pBot->f_ctc_next_jump_press = gpGlobals->time + 0.20f;
+	}
 
 	// -----------------------------------------------------------------
 	// Case 1: Bot IS holding the chumtoad — evade and score.
@@ -2241,6 +2302,9 @@ bool BotCtcThink( bot_t *pBot )
 			pEdict->v.ideal_yaw = vecAngles.y;
 			BotFixIdealYaw(pEdict);
 
+			// If holder is on a ledge above us, try hook / triple-jump.
+			BotCtcTryVerticalRecovery(pBot, pHolder);
+
 			return true;
 		}
 	}
@@ -2264,6 +2328,9 @@ bool BotCtcThink( bot_t *pBot )
 			Vector vecAngles = UTIL_VecToAngles(vecDir);
 			pEdict->v.ideal_yaw = vecAngles.y;
 			BotFixIdealYaw(pEdict);
+
+			// If toad sits on a ledge above us, try hook / triple-jump.
+			BotCtcTryVerticalRecovery(pBot, pToad);
 
 			return true;
 		}
@@ -3931,6 +3998,11 @@ edict_t *BotFindEnemy( bot_t *pBot )
 			pBot->pBotEnemy = NULL;
 			return NULL;
 		}
+
+		// Horde is strict PvE: never keep a player/bot client as the active enemy.
+		if (pBot->pBotEnemy && (pBot->pBotEnemy->v.flags & (FL_CLIENT | FL_FAKECLIENT)))
+			pBot->pBotEnemy = NULL;
+
 		// If the sticky horde target is still valid and currently visible,
 		// select it immediately instead of falling through to normal target
 		// acquisition.
@@ -3981,8 +4053,19 @@ edict_t *BotFindEnemy( bot_t *pBot )
 	{
 		vecEnd = UTIL_GetOrigin(pBot->pBotEnemy) + pBot->pBotEnemy->v.view_ofs;
 
+		// Teamplay safety: never keep a teammate as the active enemy.
+		// This guard runs before remember/reacquire logic so transient
+		// team-id mismatches can't persist into ongoing friendly fire.
+		if (is_team_play > 0.0 &&
+			(pBot->pBotEnemy->v.flags & (FL_CLIENT | FL_FAKECLIENT)) &&
+			UTIL_GetTeam(pBot->pBotEnemy) == UTIL_GetTeam(pEdict))
+		{
+			pBot->pBotEnemy = NULL;
+			pRemember = NULL;
+		}
+
 		// if the enemy is dead?
-		if (!IsAlive(pBot->pBotEnemy))  // is the enemy dead?, assume bot killed it
+		if (pBot->pBotEnemy != NULL && !IsAlive(pBot->pBotEnemy))  // is the enemy dead?, assume bot killed it
 		{
 			// the enemy is dead, jump for joy about 10% of the time
 			//if (RANDOM_LONG(1, 100) <= 10)
@@ -3991,12 +4074,12 @@ edict_t *BotFindEnemy( bot_t *pBot )
 			// don't have an enemy anymore so null out the pointer...
 			pBot->pBotEnemy = NULL;
 		}
-		else if (pBot->pBotEnemy->v.flags & FL_GODMODE)
+		else if (pBot->pBotEnemy != NULL && pBot->pBotEnemy->v.flags & FL_GODMODE)
 		{
 			pBot->pBotEnemy = NULL;
 		// Cannot see transparent player (with rune)
 		}
-		else if (is_gameplay == GAME_CTC)
+		else if (pBot->pBotEnemy != NULL && is_gameplay == GAME_CTC)
 		{
 			// Void enemy if they dropped the chumtoad
 			if (pBot->pEdict->v.health > 25 && pBot->pBotEnemy->v.fuser4 == 0)
@@ -4015,7 +4098,7 @@ edict_t *BotFindEnemy( bot_t *pBot )
 				pBot->pBotEnemy = pRemember = NULL;
 			}
 		}
-		else if (is_gameplay == GAME_LOOT)
+		else if (pBot->pBotEnemy != NULL && is_gameplay == GAME_LOOT)
 		{
 			// Carrier pacifism — when this bot is the loot holder and
 			// healthy, drop the enemy so the bot keeps running to the
@@ -4026,7 +4109,7 @@ edict_t *BotFindEnemy( bot_t *pBot )
 				pBot->pBotEnemy = pRemember = NULL;
 			}
 		}
-		else if (is_gameplay == GAME_KTS)
+		else if (pBot->pBotEnemy != NULL && is_gameplay == GAME_KTS)
 		{
 			// In KTS, only keep an enemy while they are actively dribbling.
 			// Use pev->euser1 (set in CaptureCharm) — zero-flicker authoritative check.
@@ -4037,7 +4120,7 @@ edict_t *BotFindEnemy( bot_t *pBot )
 			if (!stillDribbler)
 				pBot->pBotEnemy = pRemember = NULL;
 		}
-		else if ((pBot->pBotEnemy->v.rendermode == kRenderTransAlpha
+		else if (pBot->pBotEnemy != NULL && (pBot->pBotEnemy->v.rendermode == kRenderTransAlpha
 		          || pBot->pBotEnemy->v.rendermode == kRenderTransTexture)
 		         && pBot->pBotEnemy->v.renderamt < (renderamt_threshold[pBot->bot_skill] / 2)
 		         && (pBot->pBotEnemy->v.origin - pEdict->v.origin).Length() > 80) {
@@ -4051,7 +4134,7 @@ edict_t *BotFindEnemy( bot_t *pBot )
 			// and naturally lands near the threshold during weapon idle).
 			pBot->pBotEnemy = NULL;
 		}
-		else if (FInViewCone( &vecEnd, pEdict ) &&
+		else if (pBot->pBotEnemy != NULL && FInViewCone( &vecEnd, pEdict ) &&
 			FVisible( vecEnd, pEdict ))
 		{
 			// if enemy is still visible and in field of view, keep it
@@ -4061,7 +4144,7 @@ edict_t *BotFindEnemy( bot_t *pBot )
 			// remember our current enemy and check for a new one
 			pRemember = pBot->pBotEnemy;
 		}
-		else if ((!FInViewCone( &vecEnd, pEdict ) ||
+		else if (pBot->pBotEnemy != NULL && (!FInViewCone( &vecEnd, pEdict ) ||
 			!FVisible( vecEnd, pEdict )) && (!pBot->b_engaging_enemy || is_gameplay == GAME_CTF || is_gameplay == GAME_ARENA))
 		{	// remember our enemy for 2 seconds even if they're not visible
 			// Arena: extend the remember window to 5 seconds for the sole opponent
@@ -4076,6 +4159,11 @@ edict_t *BotFindEnemy( bot_t *pBot )
 	pent = NULL;
 	pNewEnemy = NULL;
 	nearestdistance = 1000;
+
+	// Horde is strict PvE: never carry a remembered player target forward.
+	if (is_gameplay == GAME_HORDE && pRemember != NULL
+		&& (pRemember->v.flags & (FL_CLIENT | FL_FAKECLIENT)))
+		pRemember = NULL;
 	
 	if (pNewEnemy == NULL)
 	{
@@ -4182,6 +4270,10 @@ edict_t *BotFindEnemy( bot_t *pBot )
 		// search the world for players...
 		for (i = 1; i <= gpGlobals->maxClients; i++)
 		{
+			// Horde bots must never target players; all valid enemies are monsters.
+			if (is_gameplay == GAME_HORDE)
+				continue;
+
 			edict_t *pPlayer = INDEXENT(i);
 			
 			// skip invalid players and skip self (i.e. this bot)
@@ -4321,10 +4413,29 @@ edict_t *BotFindEnemy( bot_t *pBot )
 	// couldn't find a new enemy so remember the old one we can't see
 	if (pNewEnemy == NULL && pRemember != NULL)
 		pNewEnemy = pRemember;
+
+	// Teamplay safety (final gate): never return a teammate target.
+	// This catches any path that can bypass earlier filtering, such as
+	// remembered-enemy fallback after state transitions.
+	if (pNewEnemy != NULL && is_team_play > 0.0 &&
+		(pNewEnemy->v.flags & (FL_CLIENT | FL_FAKECLIENT)) &&
+		UTIL_GetTeam(pNewEnemy) == UTIL_GetTeam(pEdict))
+	{
+		pNewEnemy = NULL;
+		pRemember = NULL;
+		pBot->pBotEnemy = NULL;
+	}
+
+	// Horde is strict PvE: final safety guard against any player fallback path.
+	if (is_gameplay == GAME_HORDE && pNewEnemy != NULL
+		&& (pNewEnemy->v.flags & (FL_CLIENT | FL_FAKECLIENT)))
+		pNewEnemy = NULL;
+
 	// are we engaging an enemy?  Don't forget about them
 	// In CTF / Arena / Cold Spot / LMS, let the enemy go so the bot returns to objective play.
 	if (pNewEnemy == NULL && pBot->b_engaging_enemy && pBot->pBotEnemy != NULL
-		&& is_gameplay != GAME_CTF && is_gameplay != GAME_ARENA && is_gameplay != GAME_COLDSPOT && is_gameplay != GAME_LMS)
+		&& is_gameplay != GAME_CTF && is_gameplay != GAME_ARENA && is_gameplay != GAME_COLDSPOT && is_gameplay != GAME_LMS
+		&& is_gameplay != GAME_HORDE)
 		pNewEnemy = pBot->pBotEnemy;
 
 	if (pNewEnemy)

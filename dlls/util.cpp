@@ -245,6 +245,22 @@ int UTIL_GetTeam(edict_t *pEntity)
 			return 1;
 		}
 
+		if (is_gameplay == GAME_COLDSPOT)
+		{
+			// Cold Spot teams are authoritative in player fuser4
+			// (TEAM_BLUE=0, TEAM_RED=1). Keep bot-side mapping 1/2.
+			if ((int)pEntity->v.fuser4 == 1)
+				return 2;
+
+			if (!strcmp("santa",
+				(g_engfuncs.pfnInfoKeyValue((*g_engfuncs.pfnGetInfoKeyBuffer)( pEntity ), "model"))))
+			{
+				return 2;
+			}
+
+			return 1;
+		}
+
 		if (is_gameplay == GAME_SHIDDEN)
 		{
 			if (pEntity->v.fuser3 > 0)

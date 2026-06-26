@@ -344,6 +344,9 @@ void BotSpawnInit( bot_t *pBot )
 	pBot->f_ctc_drop_consider_time = 0.0f;
 	pBot->f_ctc_next_juke_time   = 0.0f;
 	pBot->f_ctc_next_move_time   = 0.0f;
+	pBot->i_ctc_pending_jumps    = 0;
+	pBot->f_ctc_next_jump_press  = 0.0f;
+	pBot->f_ctc_jump_seq_until   = 0.0f;
 
 	// Clear per-life CTF state.
 	pBot->b_ctf_has_flag       = false;
@@ -2595,7 +2598,43 @@ void BotThink( bot_t *pBot )
 				pBot->item_waypoint  = -1;
 			}
 
-			if (is_gameplay == GAME_KTS && BotKtsThink(pBot))
+			// LADDER PRIORITY GUARD — must run BEFORE the gamemode Think
+			// chain below.  Every BotXxxThink (KTS / Cold Spot / LMS /
+			// CTF / Loot / Arena / Horde / Prophunt / Shidden / etc.)
+			// unconditionally returns true via its default: case,
+			// which short-circuits the if/else-if chain and prevents
+			// the original BotOnLadder call (deeper down in the same
+			// else) from ever running.  Symptom: in custom gamemodes
+			// the bot reaches the ladder, MOVETYPE_FLY engages on
+			// brush touch, but BotOnLadder is never reached — so
+			// v_angle.x is never set to the climb pitch, the bot
+			// looks sideways and hangs on the ladder forever.  FFA /
+			// Gungame escape this because no gamemode Think matches,
+			// the chain falls through to the trailing else, and
+			// BotOnLadder runs as designed.
+			// PreUpdate (called every frame above) already refreshes
+			// v_goal / f_goal_proximity / role state for these
+			// gamemodes, so skipping the Think on the ladder costs
+			// nothing — the synthesis block at L3437 picks up v_goal
+			// the moment the bot exits the ladder waypoint.
+			// If we just got off a ladder, reset direction so the next ladder touch can re-square.
+			if (pEdict->v.movetype != MOVETYPE_FLY &&
+				(pBot->f_end_use_ladder_time + 1.0) > gpGlobals->time)
+			{
+				pBot->ladder_dir = LADDER_UNKNOWN;
+			}
+
+			if (pEdict->v.movetype == MOVETYPE_FLY)
+			{
+				if ((pBot->f_end_use_ladder_time + 1.0) < gpGlobals->time)
+					pBot->f_start_use_ladder_time = gpGlobals->time;
+
+				BotOnLadder( pBot, moved_distance );
+
+				pBot->f_dont_avoid_wall_time = gpGlobals->time + 2.0;
+				pBot->f_end_use_ladder_time = gpGlobals->time;
+			}
+			else if (is_gameplay == GAME_KTS && BotKtsThink(pBot))
 			{
 				// BotKtsThink sets v_goal + f_move_speed for all KTS cases.
 			}
