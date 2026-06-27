@@ -1974,6 +1974,32 @@ int BotFindWaypointGoal( bot_t *pBot )
 		{
 			pBot->v_goal = vecTarget;
 
+			// If the objective is not currently visible and we already have a
+			// valid route goal, keep following it until we get near that waypoint.
+			// This prevents 0.5s retarget jitter from flipping routes back/forth.
+			float targetDist = (vecTarget - pEdict->v.origin).Length();
+			bool targetVisible = (targetDist < 224.0f) || FVisible(vecTarget, pEdict);
+			if (!targetVisible
+				&& pBot->wpt_goal_type == WPT_GOAL_ITEM
+				&& pBot->waypoint_goal >= 0
+				&& pBot->waypoint_goal < num_waypoints)
+			{
+				int oldGoal = pBot->waypoint_goal;
+				if (!(waypoints[oldGoal].flags & W_FL_DELETED)
+					&& !(waypoints[oldGoal].flags & W_FL_AIMING)
+					&& ((team == -1)
+						|| !(waypoints[oldGoal].flags & W_FL_TEAM_SPECIFIC)
+						|| ((waypoints[oldGoal].flags & W_FL_TEAM) == team)))
+				{
+					float distToOldGoal = (waypoints[oldGoal].origin - pEdict->v.origin).Length();
+					if (distToOldGoal > 128.0f)
+					{
+						pBot->wpt_goal_type = WPT_GOAL_ITEM;
+						return oldGoal;
+					}
+				}
+			}
+
 			// Find nearest waypoint to target by pure distance (no LOS).
 			float nearDist = 9e9f;
 			for (int w = 0; w < num_waypoints; w++)

@@ -43,6 +43,7 @@ FILE *fp;
 extern cvar_t sv_bots_hook;
 static const float BOT_HOOK_COOLDOWN          = 3.0f;    // base re-fire cooldown
 static const float BOT_HOOK_MAX_DURATION      = 2.0f;    // forced release timeout
+static const float BOT_HOOK_RELEASE_RETRY     = 0.35f;   // re-send 218 briefly after release request
 static const float BOT_HOOK_ITEM_Z_THRESHOLD  = 96.0f;   // min height delta to detour-hook
 static const float BOT_HOOK_ITEM_MAX_RANGE    = 1024.0f; // max hook range for any intent
 static const int   BOT_HOOK_ESCAPE_HP         = 25;      // HP at or below which escape triggers
@@ -2357,6 +2358,21 @@ static float    s_busters_cache_time = -1.0f;
 static edict_t *s_pBuster = NULL;
 static edict_t *s_pBusterWeaponbox = NULL;
 
+#define BUSTERS_GHOST_DIRECT_TRACK_DIST 300.0f
+#define BUSTERS_GHOST_LAST_SEEN_AGE     6.0f
+
+static bool BotBustersGhostHasDirectTrack(bot_t *pBot, edict_t *pBuster)
+{
+	if (pBot == NULL || pBot->pEdict == NULL || pBuster == NULL || FNullEnt(pBuster))
+		return false;
+
+	float flDist = (pBuster->v.origin - pBot->pEdict->v.origin).Length();
+	if (flDist <= BUSTERS_GHOST_DIRECT_TRACK_DIST)
+		return true;
+
+	return FVisible(pBuster->v.origin, pBot->pEdict);
+}
+
 static void BotBustersFindEntities()
 {
 	if (s_busters_cache_time == gpGlobals->time)
@@ -2467,10 +2483,23 @@ void BotBustersPreUpdate( bot_t *pBot )
 	// Ghost: pursue buster if alive, else race for dropped weaponbox.
 	if (s_pBuster)
 	{
-		pBot->v_busters_last_seen      = s_pBuster->v.origin;
-		pBot->f_busters_last_seen_time = gpGlobals->time;
-		pBot->v_goal                   = s_pBuster->v.origin;
-		pBot->f_goal_proximity         = 96.0f;
+		bool bDirectTrack = BotBustersGhostHasDirectTrack(pBot, s_pBuster);
+
+		if (bDirectTrack || pBot->f_busters_last_seen_time <= 0.0f)
+		{
+			pBot->v_busters_last_seen      = s_pBuster->v.origin;
+			pBot->f_busters_last_seen_time = gpGlobals->time;
+		}
+
+		if (bDirectTrack)
+			pBot->v_goal = s_pBuster->v.origin;
+		else if (pBot->f_busters_last_seen_time > 0.0f
+			&& gpGlobals->time - pBot->f_busters_last_seen_time < BUSTERS_GHOST_LAST_SEEN_AGE)
+			pBot->v_goal = pBot->v_busters_last_seen;
+		else
+			pBot->v_goal = s_pBuster->v.origin;
+
+		pBot->f_goal_proximity = 96.0f;
 	}
 	else if (s_pBusterWeaponbox)
 	{
@@ -2481,7 +2510,7 @@ void BotBustersPreUpdate( bot_t *pBot )
 		pBot->item_waypoint  = -1;
 	}
 	else if (pBot->f_busters_last_seen_time > 0
-		&& gpGlobals->time - pBot->f_busters_last_seen_time < 6.0f)
+		&& gpGlobals->time - pBot->f_busters_last_seen_time < BUSTERS_GHOST_LAST_SEEN_AGE)
 	{
 		// Fall back to the Buster's last-known origin briefly.
 		pBot->v_goal           = pBot->v_busters_last_seen;
@@ -2578,10 +2607,20 @@ bool BotBustersThink( bot_t *pBot )
 		if (pBot->i_engage_aggressiveness < 85)
 			pBot->i_engage_aggressiveness = 85;
 
-		pBot->v_busters_last_seen      = s_pBuster->v.origin;
-		pBot->f_busters_last_seen_time = gpGlobals->time;
+		bool bDirectTrack = BotBustersGhostHasDirectTrack(pBot, s_pBuster);
+		Vector vecHunterGoal = s_pBuster->v.origin;
 
-		pBot->v_goal           = s_pBuster->v.origin;
+		if (bDirectTrack || pBot->f_busters_last_seen_time <= 0.0f)
+		{
+			pBot->v_busters_last_seen      = s_pBuster->v.origin;
+			pBot->f_busters_last_seen_time = gpGlobals->time;
+		}
+		else if (gpGlobals->time - pBot->f_busters_last_seen_time < BUSTERS_GHOST_LAST_SEEN_AGE)
+		{
+			vecHunterGoal = pBot->v_busters_last_seen;
+		}
+
+		pBot->v_goal           = vecHunterGoal;
 		pBot->f_goal_proximity = 96.0f;
 		pBot->f_move_speed     = pBot->f_max_speed * pBot->f_busters_pace_scale;
 
@@ -2598,10 +2637,14 @@ bool BotBustersThink( bot_t *pBot )
 			pBot->f_busters_juke_time = gpGlobals->time + RANDOM_FLOAT(0.8f, 2.0f);
 		}
 
-		Vector vecDir    = s_pBuster->v.origin - pEdict->v.origin;
-		Vector vecAngles = UTIL_VecToAngles(vecDir);
-		pEdict->v.ideal_yaw = vecAngles.y;
-		BotFixIdealYaw(pEdict);
+		// Keep waypoint-driven facing unless the Buster is close or visible.
+		if (bDirectTrack)
+		{
+			Vector vecDir    = s_pBuster->v.origin - pEdict->v.origin;
+			Vector vecAngles = UTIL_VecToAngles(vecDir);
+			pEdict->v.ideal_yaw = vecAngles.y;
+			BotFixIdealYaw(pEdict);
+		}
 		return true;
 	}
 
@@ -6338,6 +6381,7 @@ void BotFireHook(bot_t *pBot, int intent, edict_t *pTargetItem, const Vector &vA
 	pBot->pHookItem                   = pTargetItem;
 	pBot->v_hook_target_point         = vAimPoint;
 	pBot->f_hook_release_at           = gpGlobals->time + BOT_HOOK_MAX_DURATION;
+	pBot->f_hook_release_retry_until  = 0.0f;
 	pBot->f_hook_cooldown_until       = gpGlobals->time + BOT_HOOK_COOLDOWN * BotHookCooldownMult(pBot->bot_skill);
 	pBot->f_hook_velocity_check_time  = gpGlobals->time + 0.5f;
 	pBot->i_hook_low_velocity_samples = 0;
@@ -6351,8 +6395,8 @@ void BotReleaseHook(bot_t *pBot)
 	if (pBot == NULL || pBot->pEdict == NULL)
 		return;
 
-	if (pBot->b_hook_active)
-		pBot->pEdict->v.impulse = 218;
+	pBot->pEdict->v.impulse = 218;
+	pBot->f_hook_release_retry_until  = gpGlobals->time + BOT_HOOK_RELEASE_RETRY;
 
 	pBot->b_hook_active               = false;
 	pBot->i_hook_intent               = HOOK_INTENT_NONE;
@@ -6367,13 +6411,42 @@ void BotMaybeReleaseHook(bot_t *pBot)
 {
 	if (pBot == NULL || pBot->pEdict == NULL)
 		return;
-	if (!pBot->b_hook_active)
-		return;
 
 	edict_t *pEdict = pBot->pEdict;
 
+	// Keep sending release for a short burst so hook teardown survives a
+	// one-frame impulse loss.
+	if (pBot->f_hook_release_retry_until > gpGlobals->time)
+		pEdict->v.impulse = 218;
+
+	if (!pBot->b_hook_active)
+	{
+		// Desync failsafe: if our local state says "not hooked" but we still
+		// look latched (FLY + negative gravity), keep forcing release.
+		if (pEdict->v.iuser1 == 0
+			&& pEdict->v.waterlevel != 3
+			&& pEdict->v.movetype == MOVETYPE_FLY
+			&& pEdict->v.gravity < 0.0f)
+		{
+			pEdict->v.impulse = 218;
+			pBot->f_hook_release_retry_until = gpGlobals->time + BOT_HOOK_RELEASE_RETRY;
+		}
+		return;
+	}
+
 	// Hard timeout.
 	if (pBot->f_hook_release_at > 0.0f && gpGlobals->time >= pBot->f_hook_release_at)
+	{
+		BotReleaseHook(pBot);
+		return;
+	}
+
+	// CtC holder transition: if we became a chumtoad holder mid-hook,
+	// immediately kill the hook so we can resume score movement.
+	if (is_gameplay == GAME_CTC
+		&& (pEdict->v.fuser4 > 0
+			|| pBot->b_ctc_has_chumtoad
+			|| pBot->current_weapon.iId == VALVE_WEAPON_CHUMTOAD))
 	{
 		BotReleaseHook(pBot);
 		return;

@@ -512,6 +512,7 @@ typedef struct
 	int   i_ctc_pending_jumps;     // remaining IN_JUMP edges to fire for chase triple-jump
 	float f_ctc_next_jump_press;   // time of next IN_JUMP press in the sequence
 	float f_ctc_jump_seq_until;    // cooldown until next jump sequence may start
+	float f_ctc_direct_chase_until; // short hysteresis timer to prevent waypoint/direct-steer ping-pong
 
 	// CTF — Capture The Flag state
 	bool  b_ctf_has_flag;          // TRUE when bot carries enemy flag
@@ -621,6 +622,7 @@ typedef struct
 	// Lifecycle handled by BotFireHook/BotReleaseHook/BotMaybeReleaseHook (see bot_combat.cpp).
 	float    f_hook_cooldown_until;    // gpGlobals->time before which bot may not refire
 	float    f_hook_release_at;        // hard timeout: forced impulse 218 if not released sooner
+	float    f_hook_release_retry_until; // keep sending 218 briefly to survive one-frame command loss
 	bool     b_hook_active;            // TRUE between impulse 217 fire and impulse 218 release
 	int      i_hook_intent;            // HOOK_INTENT_* (why the bot fired the hook)
 	edict_t *pHookItem;                // ITEM intent: item edict we're hooking toward
