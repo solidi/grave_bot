@@ -324,6 +324,7 @@ void BotSpawnInit( bot_t *pBot )
 	// Clear per-life grappling-hook state.
 	pBot->f_hook_cooldown_until       = 0.0f;
 	pBot->f_hook_release_at           = 0.0f;
+	pBot->f_hook_release_retry_until  = 0.0f;
 	pBot->b_hook_active               = false;
 	pBot->i_hook_intent               = HOOK_INTENT_NONE;
 	pBot->pHookItem                   = NULL;

@@ -43,6 +43,7 @@ FILE *fp;
 extern cvar_t sv_bots_hook;
 static const float BOT_HOOK_COOLDOWN          = 3.0f;    // base re-fire cooldown
 static const float BOT_HOOK_MAX_DURATION      = 2.0f;    // forced release timeout
+static const float BOT_HOOK_RELEASE_RETRY     = 0.35f;   // re-send 218 briefly after release request
 static const float BOT_HOOK_ITEM_Z_THRESHOLD  = 96.0f;   // min height delta to detour-hook
 static const float BOT_HOOK_ITEM_MAX_RANGE    = 1024.0f; // max hook range for any intent
 static const int   BOT_HOOK_ESCAPE_HP         = 25;      // HP at or below which escape triggers
@@ -6338,6 +6339,7 @@ void BotFireHook(bot_t *pBot, int intent, edict_t *pTargetItem, const Vector &vA
 	pBot->pHookItem                   = pTargetItem;
 	pBot->v_hook_target_point         = vAimPoint;
 	pBot->f_hook_release_at           = gpGlobals->time + BOT_HOOK_MAX_DURATION;
+	pBot->f_hook_release_retry_until  = 0.0f;
 	pBot->f_hook_cooldown_until       = gpGlobals->time + BOT_HOOK_COOLDOWN * BotHookCooldownMult(pBot->bot_skill);
 	pBot->f_hook_velocity_check_time  = gpGlobals->time + 0.5f;
 	pBot->i_hook_low_velocity_samples = 0;
@@ -6351,8 +6353,8 @@ void BotReleaseHook(bot_t *pBot)
 	if (pBot == NULL || pBot->pEdict == NULL)
 		return;
 
-	if (pBot->b_hook_active)
-		pBot->pEdict->v.impulse = 218;
+	pBot->pEdict->v.impulse = 218;
+	pBot->f_hook_release_retry_until  = gpGlobals->time + BOT_HOOK_RELEASE_RETRY;
 
 	pBot->b_hook_active               = false;
 	pBot->i_hook_intent               = HOOK_INTENT_NONE;
@@ -6367,13 +6369,42 @@ void BotMaybeReleaseHook(bot_t *pBot)
 {
 	if (pBot == NULL || pBot->pEdict == NULL)
 		return;
-	if (!pBot->b_hook_active)
-		return;
 
 	edict_t *pEdict = pBot->pEdict;
 
+	// Keep sending release for a short burst so hook teardown survives a
+	// one-frame impulse loss.
+	if (pBot->f_hook_release_retry_until > gpGlobals->time)
+		pEdict->v.impulse = 218;
+
+	if (!pBot->b_hook_active)
+	{
+		// Desync failsafe: if our local state says "not hooked" but we still
+		// look latched (FLY + negative gravity), keep forcing release.
+		if (pEdict->v.iuser1 == 0
+			&& pEdict->v.waterlevel != 3
+			&& pEdict->v.movetype == MOVETYPE_FLY
+			&& pEdict->v.gravity < 0.0f)
+		{
+			pEdict->v.impulse = 218;
+			pBot->f_hook_release_retry_until = gpGlobals->time + BOT_HOOK_RELEASE_RETRY;
+		}
+		return;
+	}
+
 	// Hard timeout.
 	if (pBot->f_hook_release_at > 0.0f && gpGlobals->time >= pBot->f_hook_release_at)
+	{
+		BotReleaseHook(pBot);
+		return;
+	}
+
+	// CtC holder transition: if we became a chumtoad holder mid-hook,
+	// immediately kill the hook so we can resume score movement.
+	if (is_gameplay == GAME_CTC
+		&& (pEdict->v.fuser4 > 0
+			|| pBot->b_ctc_has_chumtoad
+			|| pBot->current_weapon.iId == VALVE_WEAPON_CHUMTOAD))
 	{
 		BotReleaseHook(pBot);
 		return;
