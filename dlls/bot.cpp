@@ -3329,8 +3329,8 @@ void BotThink( bot_t *pBot )
 				}
 				else
 				{
-					bool ctcVisible = FVisible(pBot->v_goal, pEdict);
 					bool ctcClose = (ctcDist < 128.0f);
+					bool ctcVisible = ctcClose ? true : FVisible(pBot->v_goal, pEdict);
 					bool ctcOrganic = (ctcDist < 450.0f && ctcVisible);
 
 					if (ctcClose || ctcOrganic)

@@ -1980,6 +1980,7 @@ int BotFindWaypointGoal( bot_t *pBot )
 			float targetDist = (vecTarget - pEdict->v.origin).Length();
 			bool targetVisible = (targetDist < 224.0f) || FVisible(vecTarget, pEdict);
 			if (!targetVisible
+				&& pBot->wpt_goal_type == WPT_GOAL_ITEM
 				&& pBot->waypoint_goal >= 0
 				&& pBot->waypoint_goal < num_waypoints)
 			{
