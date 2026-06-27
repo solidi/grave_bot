@@ -348,6 +348,7 @@ void BotSpawnInit( bot_t *pBot )
 	pBot->i_ctc_pending_jumps    = 0;
 	pBot->f_ctc_next_jump_press  = 0.0f;
 	pBot->f_ctc_jump_seq_until   = 0.0f;
+	pBot->f_ctc_direct_chase_until = 0.0f;
 
 	// Clear per-life CTF state.
 	pBot->b_ctf_has_flag       = false;
@@ -3311,15 +3312,40 @@ void BotThink( bot_t *pBot )
 				&& pBot->v_goal != g_vecZero
 				&& ((pBot->v_goal - pEdict->v.origin).Length() < 300.0f
 					|| FVisible(pBot->v_goal, pEdict)));
-			// CtC: direct-steer toward the chumtoad objective.
-			// Carrier: steer toward escape direction set by BotCtcThink.
-			// Chaser: steer toward holder or loose chumtoad.
-			// For close targets (< 300u) skip FVisible — the chumtoad
-			// entity or player may be at an awkward elevation.
-			bool ctcChase = (is_gameplay == GAME_CTC
-				&& pBot->v_goal != g_vecZero
-				&& ((pBot->v_goal - pEdict->v.origin).Length() < 300.0f
-					|| FVisible(pBot->v_goal, pEdict)));
+			// CtC: direct-steer toward the chumtoad objective only when
+			// locally actionable.  Otherwise keep waypoint routing.
+			// This avoids rapid waypoint/direct-steer toggling when chasing
+			// unseen holders/toads through walls and corridors.
+			bool ctcChase = false;
+			if (is_gameplay == GAME_CTC && pBot->v_goal != g_vecZero)
+			{
+				float ctcDist = (pBot->v_goal - pEdict->v.origin).Length();
+
+				if (pBot->b_ctc_has_chumtoad)
+				{
+					// Carrier escape vectors are synthetic and should be followed directly.
+					ctcChase = true;
+					pBot->f_ctc_direct_chase_until = gpGlobals->time + 0.25f;
+				}
+				else
+				{
+					bool ctcVisible = FVisible(pBot->v_goal, pEdict);
+					bool ctcClose = (ctcDist < 128.0f);
+					bool ctcOrganic = (ctcDist < 450.0f && ctcVisible);
+
+					if (ctcClose || ctcOrganic)
+					{
+						ctcChase = true;
+						pBot->f_ctc_direct_chase_until = gpGlobals->time + 0.40f;
+					}
+					else if (pBot->f_ctc_direct_chase_until > gpGlobals->time
+						&& ctcDist < 224.0f)
+					{
+						// Brief hysteresis near the objective smooths LOS jitter.
+						ctcChase = true;
+					}
+				}
+			}
 			// CTF: direct-steer toward the flag/base objective.
 			// Two tiers: visible within 500u (safe approach), or
 			// very close (< 128u) regardless of visibility so the
