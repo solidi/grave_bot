@@ -2795,7 +2795,9 @@ unsigned short WaypointRouteFromTo(int src, int dest, int team)
    char msg[80];
 	unsigned short *pFromTo;
 	
-	if (src == -1 || dest == -1 || src > num_waypoints || dest > num_waypoints)
+	if ((route_num_waypoints == 0) || (src < 0) || (dest < 0) ||
+		(src >= static_cast<int>(route_num_waypoints)) ||
+		(dest >= static_cast<int>(route_num_waypoints)))
 	{
 		sprintf (msg, "WaypointRouteFromTo: invalid src (%i) or dest (%i) index!\n",
 			src, dest);
@@ -2836,7 +2838,9 @@ int WaypointDistanceFromTo(int src, int dest, int team)
    char msg[80];
 	unsigned short *pShortestPath;
 	
-	if (src == -1 || dest == -1)
+	if ((route_num_waypoints == 0) || (src < 0) || (dest < 0) ||
+		(src >= static_cast<int>(route_num_waypoints)) ||
+		(dest >= static_cast<int>(route_num_waypoints)))
 	{
       sprintf (msg, "WaypointDistanceFromTo: invalid src (%i) or dest (%i) index!\n",
 			src, dest);
@@ -2858,7 +2862,7 @@ int WaypointDistanceFromTo(int src, int dest, int team)
 	
 	pShortestPath = shortest_path[team];
 
-	if (pShortestPath[team] == 0)  // no info, return
+	if (pShortestPath == NULL)  // no info, return
 		return -1;
 	
 	return (int)(pShortestPath[src * route_num_waypoints + dest]);
