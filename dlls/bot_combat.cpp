@@ -6349,6 +6349,8 @@ static bool BotHookEnabled(bot_t *pBot)
 {
 	if (pBot == NULL || pBot->pEdict == NULL)
 		return false;
+	if ((pBot->pEdict->v.flags & FL_FROZEN) != 0)
+		return false;
 	if (pBot->pEdict->v.waterlevel == 3)
 		return false;
 	if (pBot->pEdict->v.iuser1 != 0)
@@ -6369,6 +6371,8 @@ void BotFireHook(bot_t *pBot, int intent, edict_t *pTargetItem, const Vector &vA
 
 	// Skip in water (impulse 217 spawns a hook that immediately drops in
 	// liquid) and skip while spectating/dead-cam.
+	if ((pEdict->v.flags & FL_FROZEN) != 0)
+		return;
 	if (pEdict->v.waterlevel == 3)
 		return;
 	if (pEdict->v.iuser1 != 0)
@@ -6436,6 +6440,13 @@ void BotMaybeReleaseHook(bot_t *pBot)
 
 	// Hard timeout.
 	if (pBot->f_hook_release_at > 0.0f && gpGlobals->time >= pBot->f_hook_release_at)
+	{
+		BotReleaseHook(pBot);
+		return;
+	}
+
+	// Freeze guard: if we become frozen after deploy, drop the hook.
+	if ((pEdict->v.flags & FL_FROZEN) != 0)
 	{
 		BotReleaseHook(pBot);
 		return;
