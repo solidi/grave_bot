@@ -37,6 +37,7 @@ extern bool checked_teamplay;
 extern edict_t *listenserver_edict;
 extern bool b_chat_debug;
 extern float bot_aim_difficulty;
+extern WAYPOINT waypoints[MAX_WAYPOINTS];
 FILE *fp;
 
 // Grappling-hook tuning constants (bots only). Rationale and state machine are documented inline below.
@@ -2727,6 +2728,49 @@ bool BotBustersThink( bot_t *pBot )
 }
 
 //=========================================================
+// KTS vertical recovery: when the objective (carrier/ball)
+// is above the bot and nearby in XY, try hook first (high
+// ledges) then fall back to the generic multi-jump helper.
+// Returns true if a hook fired or a jump sequence is active.
+//=========================================================
+static bool BotKtsTryVerticalRecovery(bot_t *pBot, edict_t *pTarget)
+{
+	if (pBot == NULL || pBot->pEdict == NULL || pTarget == NULL || FNullEnt(pTarget))
+		return false;
+
+	edict_t *pEdict = pBot->pEdict;
+	const float zDelta = pTarget->v.origin.z - pEdict->v.origin.z;
+
+	Vector vXY = pTarget->v.origin - pEdict->v.origin;
+	vXY.z = 0;
+	const float xyDist = vXY.Length();
+
+	// Not an "objective is above us" recovery scenario.
+	if (zDelta < 48.0f)
+		return false;
+	if (xyDist > 384.0f)
+		return false;
+
+	// Let waypoint-driven special traversal (ladder/lift/jump) run first.
+	if (pBot->curr_waypoint_index >= 0 && pBot->curr_waypoint_index < MAX_WAYPOINTS)
+	{
+		int wf = waypoints[pBot->curr_waypoint_index].flags;
+		if (wf & (W_FL_LADDER | W_FL_LIFT | W_FL_JUMP | W_FL_DUCKJUMP | W_FL_DOUBLEJUMP))
+			return false;
+	}
+
+	// Tall ledge with room to swing: prefer hook.
+	if (zDelta >= BOT_HOOK_ITEM_Z_THRESHOLD)
+	{
+		if (BotConsiderHookForItem(pBot, pTarget))
+			return true;
+	}
+
+	// Fallback: generic double/triple-jump combo toward the target.
+	return BotGoalElevatedJump(pBot, pTarget->v.origin);
+}
+
+//=========================================================
 // BotKtsThink — called from BotThink when in KTS mode and
 // no combat is active.
 //
@@ -3003,6 +3047,13 @@ bool BotKtsThink( bot_t *pBot )
 			pEdict->v.ideal_yaw = angles.y;
 			BotFixIdealYaw(pEdict);
 
+			// Carrier above/ledge recovery: hook first, then multi-jump.
+			if (BotKtsTryVerticalRecovery(pBot, pCarrier))
+			{
+				pBot->f_move_speed = pBot->f_max_speed;
+				return true;
+			}
+
 			// Anti-huddle strip parity: when close and facing the carrier,
 			// perform a deliberate kick attempt rather than relying on passive
 			// overlap possession churn.
@@ -3035,6 +3086,14 @@ bool BotKtsThink( bot_t *pBot )
 	// -----------------------------------------------------------------
 	if (!ballBeingDribbled && distToBall <= 120.0f)
 	{
+		pBot->v_goal           = ballOrigin;
+		pBot->f_goal_proximity = 0.0f;
+		pBot->f_move_speed     = pBot->f_max_speed;
+
+		// Loose-ball above us (ledge/platform): try hook or multi-jump first.
+		if (BotKtsTryVerticalRecovery(pBot, pBall))
+			return true;
+
 		edict_t *pGoal = NULL;
 		edict_t *pEnemyGoal = NULL;
 		while ((pGoal = UTIL_FindEntityByClassname(pGoal, "kts_goal")) != NULL)
@@ -3072,6 +3131,10 @@ bool BotKtsThink( bot_t *pBot )
 	pBot->v_goal           = ballOrigin;
 	pBot->f_goal_proximity = 0.0f;
 	pBot->f_move_speed     = pBot->f_max_speed;
+
+	// Loose-ball above us (ledge/platform): try hook or multi-jump first.
+	if (BotKtsTryVerticalRecovery(pBot, pBall))
+		return true;
 
 	// Face the ball — BotHeadTowardWaypoint runs BEFORE this function and
 	// sets ideal_yaw toward the (possibly stale) curr_waypoint_index.
