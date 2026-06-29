@@ -339,6 +339,7 @@ void BotSpawnInit( bot_t *pBot )
 	pBot->f_kts_kick_time    = 0.0f;
 	pBot->b_kts_kick_pending = false;
 	pBot->f_kts_stall_time   = 0.0f;
+	pBot->f_kts_tackle_attempt_time = 0.0f;
 	// Clear per-life CtC possession state.
 	pBot->b_ctc_has_chumtoad     = false;
 	pBot->f_ctc_escape_time      = 0.0f;

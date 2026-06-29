@@ -2995,12 +2995,35 @@ bool BotKtsThink( bot_t *pBot )
 			&& (pCarrier->v.flags & FL_CLIENT) && IsAlive(pCarrier)
 			&& UTIL_GetTeam(pCarrier) != botTeam)
 		{
+			float distToCarrier = (pCarrier->v.origin - pEdict->v.origin).Length();
 			pBot->v_goal           = pCarrier->v.origin;
 			pBot->f_goal_proximity = 48.0f;
 			Vector dir    = pCarrier->v.origin - pEdict->v.origin;
 			Vector angles = UTIL_VecToAngles(dir);
 			pEdict->v.ideal_yaw = angles.y;
 			BotFixIdealYaw(pEdict);
+
+			// Anti-huddle strip parity: when close and facing the carrier,
+			// perform a deliberate kick attempt rather than relying on passive
+			// overlap possession churn.
+			if (distToCarrier < 96.0f && pBot->f_kts_tackle_attempt_time < gpGlobals->time)
+			{
+				Vector toCarrier = pCarrier->v.origin - (pEdict->v.origin + pEdict->v.view_ofs);
+				float toLen = toCarrier.Length();
+				if (toLen > 0.01f)
+				{
+					toCarrier = toCarrier * (1.0f / toLen);
+					MAKE_VECTORS(pEdict->v.v_angle);
+					Vector botAimDir = gpGlobals->v_forward;
+					float facing = DotProduct(botAimDir, toCarrier);
+					if (facing > 0.65f)
+					{
+						pEdict->v.impulse = 206;
+						pBot->f_kts_tackle_attempt_time = gpGlobals->time + 0.6f;
+					}
+				}
+			}
+
 			pBot->f_move_speed = pBot->f_max_speed;
 			return true;
 		}

@@ -502,6 +502,7 @@ typedef struct
 	float f_kts_kick_time;     // when set, bot is backing up to kick the ball at the goal
 	bool  b_kts_kick_pending;  // true while the bot is in the back-up-and-kick sequence
 	float f_kts_stall_time;    // time when the bot first detected it was stalled on the goal
+	float f_kts_tackle_attempt_time; // cooldown for deliberate strip attempts on enemy carrier
 
 	// CtC — set true while this bot is detected as the chumtoad holder
 	bool  b_ctc_has_chumtoad;
