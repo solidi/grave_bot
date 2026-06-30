@@ -37,6 +37,7 @@ extern bool checked_teamplay;
 extern edict_t *listenserver_edict;
 extern bool b_chat_debug;
 extern float bot_aim_difficulty;
+extern WAYPOINT waypoints[MAX_WAYPOINTS];
 FILE *fp;
 
 // Grappling-hook tuning constants (bots only). Rationale and state machine are documented inline below.
@@ -2727,6 +2728,129 @@ bool BotBustersThink( bot_t *pBot )
 }
 
 //=========================================================
+// KTS vertical recovery: when the objective (carrier/ball)
+// is above the bot and nearby in XY, try hook first (high
+// ledges) then fall back to the generic multi-jump helper.
+// Returns true if a hook fired or a jump sequence is active.
+//=========================================================
+static bool BotKtsTryVerticalRecovery(bot_t *pBot, edict_t *pTarget)
+{
+	if (pBot == NULL || pBot->pEdict == NULL || pTarget == NULL || FNullEnt(pTarget))
+		return false;
+
+	edict_t *pEdict = pBot->pEdict;
+	const float zDelta = pTarget->v.origin.z - pEdict->v.origin.z;
+
+	Vector vXY = pTarget->v.origin - pEdict->v.origin;
+	vXY.z = 0;
+	const float xyDist = vXY.Length();
+
+	// Not an "objective is above us" recovery scenario.
+	if (zDelta < 48.0f)
+		return false;
+	if (xyDist > 384.0f)
+		return false;
+
+	// Let waypoint-driven special traversal (ladder/lift/jump) run first.
+	if (pBot->curr_waypoint_index >= 0 && pBot->curr_waypoint_index < MAX_WAYPOINTS)
+	{
+		int wf = waypoints[pBot->curr_waypoint_index].flags;
+		if (wf & (W_FL_LADDER | W_FL_LIFT | W_FL_JUMP | W_FL_DUCKJUMP | W_FL_DOUBLEJUMP))
+			return false;
+	}
+
+	// Tall ledge with room to swing: prefer hook.
+	if (zDelta >= BOT_HOOK_ITEM_Z_THRESHOLD)
+	{
+		if (BotConsiderHookForItem(pBot, pTarget))
+			return true;
+	}
+
+	// Fallback: generic double/triple-jump combo toward the target.
+	return BotGoalElevatedJump(pBot, pTarget->v.origin);
+}
+
+//=========================================================
+// KTS teammate support positioning. Computes a non-stacking
+// escort target around the allied carrier so supporters stop
+// colliding with the dribbler while still advancing play.
+//=========================================================
+bool BotComputeKtsSupportGoal(bot_t *pBot, edict_t *pCarrier, Vector *pOutGoal)
+{
+	if (pBot == NULL || pBot->pEdict == NULL || pCarrier == NULL || FNullEnt(pCarrier) || pOutGoal == NULL)
+		return false;
+
+	edict_t *pEdict = pBot->pEdict;
+	int botTeam = UTIL_GetTeam(pEdict);
+	if (botTeam < 1)
+		return false;
+
+	// Resolve enemy goal for the carrier's team so support can advance the lane.
+	int enemyGoalBody = (botTeam == 1) ? 1 : 0;
+	edict_t *pGoal = NULL;
+	Vector vForward = g_vecZero;
+	while ((pGoal = UTIL_FindEntityByClassname(pGoal, "kts_goal")) != NULL)
+	{
+		if (pGoal->v.body == enemyGoalBody)
+		{
+			vForward = pGoal->v.origin - pCarrier->v.origin;
+			break;
+		}
+	}
+
+	// Fallback: use carrier facing if goal lookup failed.
+	if (vForward == g_vecZero)
+	{
+		Vector vCarrierAngles = pCarrier->v.v_angle;
+		if ((vCarrierAngles.x == 0.0f) && (vCarrierAngles.y == 0.0f) && (vCarrierAngles.z == 0.0f))
+			vCarrierAngles = pCarrier->v.angles;
+		MAKE_VECTORS(vCarrierAngles);
+		vForward = gpGlobals->v_forward;
+	}
+
+	vForward.z = 0;
+	if (vForward.Length() < 1.0f)
+		vForward = Vector(1, 0, 0);
+	else
+		vForward = vForward.Normalize();
+
+	Vector vSide(-vForward.y, vForward.x, 0);
+	int lane = ENTINDEX(pEdict) % 3;
+	Vector vSupportPos;
+	if (lane == 0)
+	{
+		// One bot leads a little to pressure/clear ahead.
+		vSupportPos = pCarrier->v.origin + vForward * 96.0f;
+	}
+	else if (lane == 1)
+	{
+		// Flank left and slightly trail.
+		vSupportPos = pCarrier->v.origin + vSide * 96.0f - vForward * 32.0f;
+	}
+	else
+	{
+		// Flank right and slightly trail.
+		vSupportPos = pCarrier->v.origin - vSide * 96.0f - vForward * 32.0f;
+	}
+
+	// If we are crowding the carrier, force a separation nudge.
+	Vector vFromCarrier = pEdict->v.origin - pCarrier->v.origin;
+	vFromCarrier.z = 0;
+	if (vFromCarrier.Length() < 72.0f)
+	{
+		Vector vAway = vFromCarrier;
+		if (vAway.Length() < 1.0f)
+			vAway = vSide;
+		else
+			vAway = vAway.Normalize();
+		vSupportPos = pCarrier->v.origin + vAway * 96.0f - vForward * 24.0f;
+	}
+
+	*pOutGoal = vSupportPos;
+	return true;
+}
+
+//=========================================================
 // BotKtsThink — called from BotThink when in KTS mode and
 // no combat is active.
 //
@@ -2992,15 +3116,67 @@ bool BotKtsThink( bot_t *pBot )
 		// Use pev->euser1 (set by CaptureCharm) to identify the carrier directly.
 		edict_t *pCarrier = !FNullEnt(pBall->v.euser1) ? pBall->v.euser1 : NULL;
 		if (pCarrier && pCarrier != pEdict
+			&& (pCarrier->v.flags & (FL_CLIENT | FL_FAKECLIENT)) && IsAlive(pCarrier)
+			&& UTIL_GetTeam(pCarrier) == botTeam)
+		{
+			Vector supportGoal;
+			if (!BotComputeKtsSupportGoal(pBot, pCarrier, &supportGoal))
+				supportGoal = pCarrier->v.origin;
+
+			pBot->v_goal           = supportGoal;
+			pBot->f_goal_proximity = 64.0f;
+			pBot->f_move_speed     = pBot->f_max_speed;
+
+			Vector supportDir = supportGoal - pEdict->v.origin;
+			Vector supportAngles = UTIL_VecToAngles(supportDir);
+			pEdict->v.ideal_yaw = supportAngles.y;
+			BotFixIdealYaw(pEdict);
+
+			// If the support target is elevated with the carrier, recover vertically.
+			BotKtsTryVerticalRecovery(pBot, pCarrier);
+			return true;
+		}
+
+		if (pCarrier && pCarrier != pEdict
 			&& (pCarrier->v.flags & FL_CLIENT) && IsAlive(pCarrier)
 			&& UTIL_GetTeam(pCarrier) != botTeam)
 		{
+			float distToCarrier = (pCarrier->v.origin - pEdict->v.origin).Length();
 			pBot->v_goal           = pCarrier->v.origin;
 			pBot->f_goal_proximity = 48.0f;
 			Vector dir    = pCarrier->v.origin - pEdict->v.origin;
 			Vector angles = UTIL_VecToAngles(dir);
 			pEdict->v.ideal_yaw = angles.y;
 			BotFixIdealYaw(pEdict);
+
+			// Carrier above/ledge recovery: hook first, then multi-jump.
+			if (BotKtsTryVerticalRecovery(pBot, pCarrier))
+			{
+				pBot->f_move_speed = pBot->f_max_speed;
+				return true;
+			}
+
+			// Anti-huddle strip parity: when close and facing the carrier,
+			// perform a deliberate kick attempt rather than relying on passive
+			// overlap possession churn.
+			if (distToCarrier < 96.0f && pBot->f_kts_tackle_attempt_time < gpGlobals->time)
+			{
+				Vector toCarrier = pCarrier->v.origin - (pEdict->v.origin + pEdict->v.view_ofs);
+				float toLen = toCarrier.Length();
+				if (toLen > 0.01f)
+				{
+					toCarrier = toCarrier * (1.0f / toLen);
+					MAKE_VECTORS(pEdict->v.v_angle);
+					Vector botAimDir = gpGlobals->v_forward;
+					float facing = DotProduct(botAimDir, toCarrier);
+					if (facing > 0.65f)
+					{
+						pEdict->v.impulse = 206;
+						pBot->f_kts_tackle_attempt_time = gpGlobals->time + 0.6f;
+					}
+				}
+			}
+
 			pBot->f_move_speed = pBot->f_max_speed;
 			return true;
 		}
@@ -3012,6 +3188,14 @@ bool BotKtsThink( bot_t *pBot )
 	// -----------------------------------------------------------------
 	if (!ballBeingDribbled && distToBall <= 120.0f)
 	{
+		pBot->v_goal           = ballOrigin;
+		pBot->f_goal_proximity = 0.0f;
+		pBot->f_move_speed     = pBot->f_max_speed;
+
+		// Loose-ball above us (ledge/platform): try hook or multi-jump first.
+		if (BotKtsTryVerticalRecovery(pBot, pBall))
+			return true;
+
 		edict_t *pGoal = NULL;
 		edict_t *pEnemyGoal = NULL;
 		while ((pGoal = UTIL_FindEntityByClassname(pGoal, "kts_goal")) != NULL)
@@ -3049,6 +3233,10 @@ bool BotKtsThink( bot_t *pBot )
 	pBot->v_goal           = ballOrigin;
 	pBot->f_goal_proximity = 0.0f;
 	pBot->f_move_speed     = pBot->f_max_speed;
+
+	// Loose-ball above us (ledge/platform): try hook or multi-jump first.
+	if (BotKtsTryVerticalRecovery(pBot, pBall))
+		return true;
 
 	// Face the ball — BotHeadTowardWaypoint runs BEFORE this function and
 	// sets ideal_yaw toward the (possibly stale) curr_waypoint_index.

@@ -502,6 +502,7 @@ typedef struct
 	float f_kts_kick_time;     // when set, bot is backing up to kick the ball at the goal
 	bool  b_kts_kick_pending;  // true while the bot is in the back-up-and-kick sequence
 	float f_kts_stall_time;    // time when the bot first detected it was stalled on the goal
+	float f_kts_tackle_attempt_time; // cooldown for deliberate strip attempts on enemy carrier
 
 	// CtC — set true while this bot is detected as the chumtoad holder
 	bool  b_ctc_has_chumtoad;
@@ -644,6 +645,7 @@ void BotReleaseHook(bot_t *pBot);
 void BotMaybeReleaseHook(bot_t *pBot);
 bool BotComputeHookAimForItem(bot_t *pBot, edict_t *pItem, Vector *pOutAim, Vector *pOutAnchor);
 bool BotConsiderHookForItem(bot_t *pBot, edict_t *pItem);
+bool BotComputeKtsSupportGoal(bot_t *pBot, edict_t *pCarrier, Vector *pOutGoal);
 bool BotComputeEscapeAnchor(bot_t *pBot, Vector *pOutAnchor);
 bool BotConsiderHookForEscape(bot_t *pBot);
 bool BotComputePursuitAnchor(bot_t *pBot, edict_t *pEnemy, Vector *pOutAnchor);

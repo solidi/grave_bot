@@ -1847,20 +1847,32 @@ int BotFindWaypointGoal( bot_t *pBot )
 			return -1;
 		}
 
-		// Ball is loose: always route toward it.
-		// Never fall through to tour/health picks — in KTS the ball is always
-		// the objective.  Use pure distance (no LOS, no range cap) so a ball
-		// that has bounced into a corner or against a wall still gets a valid
-		// waypoint target.  Explicit return on every path prevents fallthrough.
+		// Non-carrier behavior:
+		// - teammate dribbling: escort/flank the carrier to avoid pile-ups
+		// - loose ball: route directly toward the ball
+		// Never fall through to tour/health picks — KTS objective logic owns this.
 		{
 			edict_t *pBall = UTIL_FindEntityByClassname((edict_t *)NULL, "kts_snowball");
 			if (FNullEnt(pBall))
 				return -1;  // no ball — do not pick a tour waypoint
 
-			Vector ballPos = pBall->v.origin;
-			pBot->v_goal = ballPos;   // direct-steer fallback when ball is visible
+			Vector navTarget = pBall->v.origin;
+			if (pBall->v.movetype == MOVETYPE_NOCLIP && !FNullEnt(pBall->v.euser1))
+			{
+				edict_t *pCarrier = pBall->v.euser1;
+				if (pCarrier != pEdict
+					&& (pCarrier->v.flags & (FL_CLIENT | FL_FAKECLIENT))
+					&& IsAlive(pCarrier)
+					&& team == UTIL_GetTeam(pCarrier))
+				{
+					if (!BotComputeKtsSupportGoal(pBot, pCarrier, &navTarget))
+						navTarget = pCarrier->v.origin;
+				}
+			}
 
-			// Find nearest waypoint to ball by pure distance — no LOS, no range cap.
+			pBot->v_goal = navTarget;   // direct-steer fallback when target is visible
+
+			// Find nearest waypoint to target by pure distance — no LOS, no range cap.
 			float nearDist = 9e9f;
 			for (int w = 0; w < num_waypoints; w++)
 			{
@@ -1868,7 +1880,7 @@ int BotFindWaypointGoal( bot_t *pBot )
 				if (waypoints[w].flags & W_FL_AIMING)  continue;
 				if ((team != -1) && (waypoints[w].flags & W_FL_TEAM_SPECIFIC) &&
 					((waypoints[w].flags & W_FL_TEAM) != team)) continue;
-				float d = (waypoints[w].origin - ballPos).Length();
+				float d = (waypoints[w].origin - navTarget).Length();
 				if (d < nearDist) { nearDist = d; index = w; }
 			}
 			pBot->wpt_goal_type = WPT_GOAL_LOCATION;
