@@ -645,6 +645,7 @@ void BotReleaseHook(bot_t *pBot);
 void BotMaybeReleaseHook(bot_t *pBot);
 bool BotComputeHookAimForItem(bot_t *pBot, edict_t *pItem, Vector *pOutAim, Vector *pOutAnchor);
 bool BotConsiderHookForItem(bot_t *pBot, edict_t *pItem);
+bool BotComputeKtsSupportGoal(bot_t *pBot, edict_t *pCarrier, Vector *pOutGoal);
 bool BotComputeEscapeAnchor(bot_t *pBot, Vector *pOutAnchor);
 bool BotConsiderHookForEscape(bot_t *pBot);
 bool BotComputePursuitAnchor(bot_t *pBot, edict_t *pEnemy, Vector *pOutAnchor);

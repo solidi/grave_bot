@@ -2771,6 +2771,86 @@ static bool BotKtsTryVerticalRecovery(bot_t *pBot, edict_t *pTarget)
 }
 
 //=========================================================
+// KTS teammate support positioning. Computes a non-stacking
+// escort target around the allied carrier so supporters stop
+// colliding with the dribbler while still advancing play.
+//=========================================================
+bool BotComputeKtsSupportGoal(bot_t *pBot, edict_t *pCarrier, Vector *pOutGoal)
+{
+	if (pBot == NULL || pBot->pEdict == NULL || pCarrier == NULL || FNullEnt(pCarrier) || pOutGoal == NULL)
+		return false;
+
+	edict_t *pEdict = pBot->pEdict;
+	int botTeam = UTIL_GetTeam(pEdict);
+	if (botTeam < 1)
+		return false;
+
+	// Resolve enemy goal for the carrier's team so support can advance the lane.
+	int enemyGoalBody = (botTeam == 1) ? 1 : 0;
+	edict_t *pGoal = NULL;
+	Vector vForward = g_vecZero;
+	while ((pGoal = UTIL_FindEntityByClassname(pGoal, "kts_goal")) != NULL)
+	{
+		if (pGoal->v.body == enemyGoalBody)
+		{
+			vForward = pGoal->v.origin - pCarrier->v.origin;
+			break;
+		}
+	}
+
+	// Fallback: use carrier facing if goal lookup failed.
+	if (vForward == g_vecZero)
+	{
+		Vector vCarrierAngles = pCarrier->v.v_angle;
+		if ((vCarrierAngles.x == 0.0f) && (vCarrierAngles.y == 0.0f) && (vCarrierAngles.z == 0.0f))
+			vCarrierAngles = pCarrier->v.angles;
+		MAKE_VECTORS(vCarrierAngles);
+		vForward = gpGlobals->v_forward;
+	}
+
+	vForward.z = 0;
+	if (vForward.Length() < 1.0f)
+		vForward = Vector(1, 0, 0);
+	else
+		vForward = vForward.Normalize();
+
+	Vector vSide(-vForward.y, vForward.x, 0);
+	int lane = ENTINDEX(pEdict) % 3;
+	Vector vSupportPos;
+	if (lane == 0)
+	{
+		// One bot leads a little to pressure/clear ahead.
+		vSupportPos = pCarrier->v.origin + vForward * 96.0f;
+	}
+	else if (lane == 1)
+	{
+		// Flank left and slightly trail.
+		vSupportPos = pCarrier->v.origin + vSide * 96.0f - vForward * 32.0f;
+	}
+	else
+	{
+		// Flank right and slightly trail.
+		vSupportPos = pCarrier->v.origin - vSide * 96.0f - vForward * 32.0f;
+	}
+
+	// If we are crowding the carrier, force a separation nudge.
+	Vector vFromCarrier = pEdict->v.origin - pCarrier->v.origin;
+	vFromCarrier.z = 0;
+	if (vFromCarrier.Length() < 72.0f)
+	{
+		Vector vAway = vFromCarrier;
+		if (vAway.Length() < 1.0f)
+			vAway = vSide;
+		else
+			vAway = vAway.Normalize();
+		vSupportPos = pCarrier->v.origin + vAway * 96.0f - vForward * 24.0f;
+	}
+
+	*pOutGoal = vSupportPos;
+	return true;
+}
+
+//=========================================================
 // BotKtsThink — called from BotThink when in KTS mode and
 // no combat is active.
 //
@@ -3035,6 +3115,28 @@ bool BotKtsThink( bot_t *pBot )
 	{
 		// Use pev->euser1 (set by CaptureCharm) to identify the carrier directly.
 		edict_t *pCarrier = !FNullEnt(pBall->v.euser1) ? pBall->v.euser1 : NULL;
+		if (pCarrier && pCarrier != pEdict
+			&& (pCarrier->v.flags & (FL_CLIENT | FL_FAKECLIENT)) && IsAlive(pCarrier)
+			&& UTIL_GetTeam(pCarrier) == botTeam)
+		{
+			Vector supportGoal;
+			if (!BotComputeKtsSupportGoal(pBot, pCarrier, &supportGoal))
+				supportGoal = pCarrier->v.origin;
+
+			pBot->v_goal           = supportGoal;
+			pBot->f_goal_proximity = 64.0f;
+			pBot->f_move_speed     = pBot->f_max_speed;
+
+			Vector supportDir = supportGoal - pEdict->v.origin;
+			Vector supportAngles = UTIL_VecToAngles(supportDir);
+			pEdict->v.ideal_yaw = supportAngles.y;
+			BotFixIdealYaw(pEdict);
+
+			// If the support target is elevated with the carrier, recover vertically.
+			BotKtsTryVerticalRecovery(pBot, pCarrier);
+			return true;
+		}
+
 		if (pCarrier && pCarrier != pEdict
 			&& (pCarrier->v.flags & FL_CLIENT) && IsAlive(pCarrier)
 			&& UTIL_GetTeam(pCarrier) != botTeam)
