@@ -148,6 +148,184 @@ bot_research_t g_Researched[2][NUM_RESEARCH_OPTIONS];
 
 float g_flWeaponSwitch = 0;
 
+static bool BotIsSnarkOrChumtoadClassname(const char *classname)
+{
+	if (classname == NULL)
+		return false;
+
+	return (strcmp(classname, "monster_snark") == 0) ||
+		(strcmp(classname, "monster_chumtoad") == 0);
+}
+
+static bool BotIsSnarkOrChumtoadThreat(edict_t *pEnemy)
+{
+	if (pEnemy == NULL || FNullEnt(pEnemy))
+		return false;
+
+	return BotIsSnarkOrChumtoadClassname(STRING(pEnemy->v.classname));
+}
+
+static bool BotIsSelfSpawnBioWeaponId(int weaponId)
+{
+	return weaponId == VALVE_WEAPON_SNARK || weaponId == VALVE_WEAPON_CHUMTOAD;
+}
+
+static bool BotIsMeleeWeaponId(int weaponId)
+{
+	if (weaponId == SI_WEAPON_BRIEFCASE)
+		return true;
+
+	switch (weaponId)
+	{
+	case VALVE_WEAPON_CROWBAR:
+	case VALVE_WEAPON_KNIFE:
+	case VALVE_WEAPON_WRENCH:
+	case VALVE_WEAPON_CHAINSAW:
+	case VALVE_WEAPON_ROCKETCROWBAR:
+	case VALVE_WEAPON_DUAL_WRENCH:
+	case VALVE_WEAPON_VICE:
+	case VALVE_WEAPON_FISTS:
+		return true;
+	default:
+		break;
+	}
+
+	return false;
+}
+
+static bool BotCanUseWeaponAgainstDistance(bot_t *pBot, int select_index, float distance)
+{
+	if (pBot == NULL || pBot->pEdict == NULL)
+		return false;
+
+	bot_weapon_select_t *pSelect = WeaponGetSelectPointer();
+	if (pSelect == NULL || pSelect[select_index].iId == 0)
+		return false;
+
+	edict_t *pEdict = pBot->pEdict;
+	int iId = pSelect[select_index].iId;
+
+	if (!UTIL_HasWeaponId(pEdict, iId))
+		return false;
+
+	if ((pBot->bot_skill + 1) > pSelect[select_index].skill_level)
+		return false;
+
+	if ((pEdict->v.waterlevel == 3) && !(pSelect[select_index].can_use_underwater))
+		return false;
+
+	if (mod_id == SI_DLL && iId == SI_WEAPON_MINDRAY && (!pBot->pBotEnemy ||
+		!FStrEq(STRING(pBot->pBotEnemy->v.classname), "monster_scientist") ||
+		(pBot->pBotEnemy && UTIL_GetTeam(pBot->pBotEnemy) != pBot->bot_team &&
+		pBot->i_carry_type == CARRY_NONE)))
+		return false;
+
+	if (mod_id == SI_DLL && iId == SI_WEAPON_VOMIT && pBot->pBotEnemy &&
+		(g_flVomiting[ENTINDEX(pBot->pBotEnemy)-1] + 0.5f) > gpGlobals->time)
+		return false;
+
+	if (mod_id == SI_DLL && iId == SI_WEAPON_EMPCANNON && pBot->pBotEnemy &&
+		pBot->pBotEnemy->v.armorvalue <= 0)
+		return false;
+
+	float primary_assess = BotAssessPrimaryAmmo(pBot, iId);
+	float secondary_assess = BotAssessSecondaryAmmo(pBot, iId);
+
+	bool use_secondary = false;
+	bool use_primary = false;
+
+	if (pSelect[select_index].primary_fire_percent < 100 &&
+		(secondary_assess != AMMO_CRITICAL ||
+		(pBot->current_weapon.iId == iId &&
+		pBot->current_weapon.iClip2 >= pSelect[select_index].min_secondary_ammo) ||
+		(pBot->current_weapon.iId == iId &&
+		pBot->current_weapon.iClip2 < pSelect[select_index].min_secondary_ammo &&
+		pBot->current_weapon.iClip2 != -1 && secondary_assess != AMMO_CRITICAL)) &&
+		distance >= pSelect[select_index].secondary_min_distance &&
+		distance <= pSelect[select_index].secondary_max_distance)
+	{
+		use_secondary = true;
+	}
+
+	if (!use_secondary && ((mod_id != SI_DLL) ||
+		(mod_id == SI_DLL && iId != SI_WEAPON_EMPCANNON)) &&
+		(primary_assess != AMMO_CRITICAL ||
+		(pBot->current_weapon.iId == iId &&
+		pBot->current_weapon.iClip >= pSelect[select_index].min_primary_ammo) ||
+		(pBot->current_weapon.iId == iId &&
+		pBot->current_weapon.iClip < pSelect[select_index].min_primary_ammo &&
+		pBot->current_weapon.iClip != -1 && primary_assess != AMMO_CRITICAL)) &&
+		distance >= pSelect[select_index].primary_min_distance &&
+		distance <= pSelect[select_index].primary_max_distance)
+	{
+		use_primary = true;
+	}
+
+	if (!use_secondary && mod_id == SI_DLL && iId == SI_WEAPON_EMPCANNON &&
+		((pBot->current_weapon.iId == iId &&
+		pBot->current_weapon.iClip >= pSelect[select_index].min_primary_ammo) ||
+		(pBot->m_rgAmmo[weapon_defs[iId].iAmmo2] > 0)) &&
+		distance >= pSelect[select_index].primary_min_distance &&
+		distance <= pSelect[select_index].primary_max_distance)
+	{
+		use_primary = true;
+	}
+
+	return use_primary || use_secondary;
+}
+
+static bool BotHasUsableNonMeleeCounterWeapon(bot_t *pBot, float distance)
+{
+	if (pBot == NULL)
+		return false;
+
+	bot_weapon_select_t *pSelect = WeaponGetSelectPointer();
+	if (pSelect == NULL)
+		return false;
+
+	for (int select_index = 0; pSelect[select_index].iId; ++select_index)
+	{
+		int iId = pSelect[select_index].iId;
+
+		if (BotIsSelfSpawnBioWeaponId(iId) || BotIsMeleeWeaponId(iId))
+			continue;
+
+		if (BotCanUseWeaponAgainstDistance(pBot, select_index, distance))
+			return true;
+	}
+
+	return false;
+}
+
+static void BotEvadeBioThreat(bot_t *pBot, const Vector &v_enemy_origin)
+{
+	if (pBot == NULL || pBot->pEdict == NULL)
+		return;
+
+	edict_t *pEdict = pBot->pEdict;
+	Vector v_away = pEdict->v.origin - v_enemy_origin;
+	v_away.z = 0.0f;
+
+	if (v_away.Length() < 1.0f)
+	{
+		Vector fallback = gpGlobals->v_forward;
+		fallback.z = 0.0f;
+		v_away = fallback;
+	}
+
+	if (v_away.Length() > 1.0f)
+	{
+		Vector away_angle = UTIL_VecToAngles(v_away);
+		pEdict->v.ideal_yaw = away_angle.y;
+		BotFixIdealYaw(pEdict);
+	}
+
+	pBot->f_ignore_wpt_time = gpGlobals->time + 0.3f;
+	pBot->f_move_speed = pBot->f_max_speed;
+	pBot->f_strafe_speed = 0.0f;
+	pBot->b_engaging_enemy = FALSE;
+}
+
 void BotCheckTeamplay()
 {
 //	ALERT(at_console, "BotCheckTeamplay\n");
@@ -4920,6 +5098,7 @@ bool BotFireWeapon(Vector v_enemy, bot_t *pBot, int weapon_choice, bool nofire)
 	
 	pSelect = WeaponGetSelectPointer();
 	pDelay = WeaponGetDelayPointer();
+	const bool bBioThreatEnemy = BotIsSnarkOrChumtoadThreat(pBot ? pBot->pBotEnemy : NULL);
 	
 	bool use_primary[MAX_WEAPONS];
 	bool use_secondary[MAX_WEAPONS];
@@ -5078,6 +5257,7 @@ bool BotFireWeapon(Vector v_enemy, bot_t *pBot, int weapon_choice, bool nofire)
 		select_index = 0;
 		int best_priority = MAX_WEAPONS;
 		int final_index = 0;
+		bool found_weapon = false;
 /*
 		while (pSelect[select_index].iId)
 		{
@@ -5165,6 +5345,21 @@ bool BotFireWeapon(Vector v_enemy, bot_t *pBot, int weapon_choice, bool nofire)
 				select_index++;
 				continue;
 			}
+
+			if (bBioThreatEnemy)
+			{
+				if (BotIsSelfSpawnBioWeaponId(pSelect[select_index].iId))
+				{
+					select_index++;
+					continue;
+				}
+
+				if (weapon_choice == 0 && BotIsMeleeWeaponId(pSelect[select_index].iId))
+				{
+					select_index++;
+					continue;
+				}
+			}
 			
 			// is this weapon worse than our previous choice?
 			if (((pSelect[select_index].priority >= best_priority) ||
@@ -5249,9 +5444,13 @@ bool BotFireWeapon(Vector v_enemy, bot_t *pBot, int weapon_choice, bool nofire)
 
 			final_index = select_index;
 			best_priority = pSelect[select_index].priority;
+			found_weapon = true;
 
 			select_index++;
 		}
+
+		if (!found_weapon)
+			return FALSE;
 	
 //		ALERT( at_console, "Selected %s\n", pSelect[final_index].weapon_name);
 
@@ -5413,6 +5612,7 @@ bool BotFireWeapon(Vector v_enemy, bot_t *pBot, int weapon_choice, bool nofire)
 
 
 			if (sv_botsmelee.value > 0 && is_gameplay != GAME_GUNGAME
+				&& !bBioThreatEnemy
 				&& !pBot->b_hook_active)
 			{
 				// While the bot is mid-grapple, the whole melee-impulse
@@ -5922,6 +6122,17 @@ void BotShootAtEnemy( bot_t *pBot )
 		return;
 	}
 
+	if (BotIsSnarkOrChumtoadThreat(pBot->pBotEnemy))
+	{
+		// Never counter snarks/chumtoads by deploying more snarks/chumtoads.
+		// If no non-melee weapon can answer at the current range, evade.
+		if (!BotHasUsableNonMeleeCounterWeapon(pBot, f_distance))
+		{
+			BotEvadeBioThreat(pBot, v_enemy_origin);
+			return;
+		}
+	}
+
 	if (pBot->f_engage_enemy_check <= gpGlobals->time)
 		pBot->b_last_engage = BotShouldEngageEnemy(pBot, pBot->pBotEnemy);
 
@@ -6129,6 +6340,7 @@ void BotShootAtEnemy( bot_t *pBot )
 	//   skill 4 (worst)  -> 1.5 + 0.3 jitter
 	// not overpowered: still capped at one impulse per cooldown window.
 	if (sv_botsmelee.value > 0 && is_gameplay != GAME_GUNGAME &&
+		!BotIsSnarkOrChumtoadThreat(pBot->pBotEnemy) &&
 		pBot->pBotEnemy && f_distance <= 96.0f &&
 		pBot->f_next_melee_time < gpGlobals->time &&
 		FInViewCone(&v_enemy_origin, pEdict) &&
