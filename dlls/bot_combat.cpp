@@ -308,8 +308,11 @@ static void BotEvadeBioThreat(bot_t *pBot, const Vector &v_enemy_origin)
 
 	if (v_away.Length() < 1.0f)
 	{
+		MAKE_VECTORS(pEdict->v.v_angle);
 		Vector fallback = gpGlobals->v_forward;
 		fallback.z = 0.0f;
+		if (fallback.Length() < 1.0f)
+			fallback = Vector(1.0f, 0.0f, 0.0f);
 		v_away = fallback;
 	}
 
