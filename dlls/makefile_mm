@@ -3,6 +3,10 @@ TARGET = gravebot_mm
 ARCHFLAG = i686
 BASEFLAGS = -Dstricmp=strcasecmp -Dstrcmpi=strcasecmp -DMETAMOD_BUILD
 OPTFLAGS = 
+ifeq "$(CFG)" ""
+CFG=Release_Metamod
+endif
+OUTDIR = $(CFG)
 CPPFLAGS = ${BASEFLAGS} ${OPTFLAGS} -march=${ARCHFLAG} -mtune=generic -msse2 -O2 -m32 -mfpmath=sse -finline-functions -pipe -w -I"../common" -I"../dlls" -I"../engine" -I"../pm_shared" -I"../metamod" 
 LDFLAGS = -Wl,--no-undefined
 
@@ -25,17 +29,17 @@ OBJ = 	bot.o \
 ${TARGET}.so: ${OBJ}
 	${CPP} -fPIC -shared -static ${LDFLAGS} -o $@ ${OBJ} -Xlinker -Map -Xlinker ${TARGET}.map -ldl
 	strip -s ${TARGET}.so 
-	mv *.o Release_Metamod
-	mv *.map Release_Metamod
-	mv $@ Release_Metamod
+	mv *.o ${OUTDIR}
+	mv *.map ${OUTDIR}
+	mv $@ ${OUTDIR}
 
 clean:
-	rm -f Release_Metamod/*.o
-	rm -f Release_Metamod/*.map
+	rm -f ${OUTDIR}/*.o
+	rm -f ${OUTDIR}/*.map
 
 distclean:
-	rm -rf Release_Metamod
-	mkdir Release_Metamod	
+	rm -rf ${OUTDIR}
+	mkdir ${OUTDIR}	
 
 %.o:	%.cpp
 	${CPP} ${CPPFLAGS} -c $< -o $@
