@@ -29,7 +29,7 @@ SRC = 	bot.cpp \
 OBJ = $(patsubst %.cpp,$(OUTDIR)/%.o,$(SRC))
 
 ${OUTDIR}/${TARGET}.so: ${OBJ}
-	${CPP} -fPIC -shared -static ${LDFLAGS} -o $@ ${OBJ} -Xlinker -Map -Xlinker ${OUTDIR}/${TARGET}.map -ldl
+	${CPP} -m32 -fPIC -shared -static ${LDFLAGS} -o $@ ${OBJ} -Xlinker -Map -Xlinker ${OUTDIR}/${TARGET}.map -ldl
 	strip -s $@
 
 ${OUTDIR}:
