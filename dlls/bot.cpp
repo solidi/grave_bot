@@ -3596,6 +3596,20 @@ void BotListenForFakeSound( bot_t *pBot )
 	float distance = 10000;
 	float nearest = 9999;
 	bool bHearingSound = FALSE;
+	bool bUsingStation = false;
+
+	if (!pEdict || FNullEnt(pEdict))
+		return;
+
+	if (pBot->pBotPickupItem && FNullEnt(pBot->pBotPickupItem))
+		pBot->pBotPickupItem = NULL;
+
+	if (pBot->pBotPickupItem)
+	{
+		const char *pickupClass = STRING(pBot->pBotPickupItem->v.classname);
+		bUsingStation = (FStrEq(pickupClass, "func_healthcharger") ||
+			FStrEq(pickupClass, "func_recharge"));
+	}
 
 	for (int i = 1; i <= gpGlobals->maxClients; i++)
 	{
@@ -3645,10 +3659,7 @@ void BotListenForFakeSound( bot_t *pBot )
 			{
 				bHearingSound = FALSE;
 				if (pBot->pBotEnemy == NULL && pPlayer != pEdict && pPlayer->v.owner != pEdict &&
-					UTIL_GetTeam(pEdict) != UTIL_GetTeam(pPlayer) && (!pBot->pBotPickupItem ||
-					(pBot->pBotPickupItem &&
-					!(FStrEq(STRING(pBot->pBotPickupItem->v.classname), "func_healthcharger") ||
-					FStrEq(STRING(pBot->pBotPickupItem->v.classname), "func_recharge")))))
+					UTIL_GetTeam(pEdict) != UTIL_GetTeam(pPlayer) && !bUsingStation)
 				{
 					if (b_chat_debug && pPlayer)
 					{
@@ -3672,7 +3683,7 @@ void BotListenForSound(edict_t *pEntity, const char *pszSample, float fVolume)
 	bot_t *pBot;
 	int bot_index = 0;
 
-	if (!pEntity)
+	if (!pEntity || FNullEnt(pEntity))
 		return;
 
 	// Ignore sound "emitted" by a corpse — the killed player's edict
@@ -3690,6 +3701,20 @@ void BotListenForSound(edict_t *pEntity, const char *pszSample, float fVolume)
 		if (pBot && pBot->is_used)
 		{
 			pEdict = pBot->pEdict;
+			if (!pEdict || FNullEnt(pEdict))
+				continue;
+
+			if (pBot->pBotPickupItem && FNullEnt(pBot->pBotPickupItem))
+				pBot->pBotPickupItem = NULL;
+
+			bool bUsingStation = false;
+			if (pBot->pBotPickupItem)
+			{
+				const char *pickupClass = STRING(pBot->pBotPickupItem->v.classname);
+				bUsingStation = (FStrEq(pickupClass, "func_healthcharger") ||
+					FStrEq(pickupClass, "func_recharge"));
+			}
+
 			// get our distance
 			distance = (pEntity->v.origin - pEdict->v.origin).Length();
 			// we're looking at something else right now
@@ -3700,12 +3725,15 @@ void BotListenForSound(edict_t *pEntity, const char *pszSample, float fVolume)
 					distance = 9999;
 			}
 			// are we close enough to hear this sound?
-			if (distance < (pBot->f_sound_sensitivity * fVolume) && (!pBot->pBotPickupItem || (pBot->pBotPickupItem &&
-			!(FStrEq(STRING(pBot->pBotPickupItem->v.classname), "func_healthcharger") ||
-			FStrEq(STRING(pBot->pBotPickupItem->v.classname), "func_recharge")))))
+			if (distance < (pBot->f_sound_sensitivity * fVolume) && !bUsingStation)
 			{
+				int botTeam = UTIL_GetTeam(pEdict);
+				int sourceTeam = botTeam;
+				if (pEntity->v.flags & FL_CLIENT)
+					sourceTeam = UTIL_GetTeam(pEntity);
+
 				if (pBot->pBotEnemy == NULL && pEntity != pEdict && pEntity->v.owner != pEdict &&
-					UTIL_GetTeam(pEdict) != UTIL_GetTeam(pEntity))
+					botTeam != sourceTeam)
 				{
 					// just use dmg time, does the same thing
 					pBot->dmg_origin = pEntity->v.origin;
