@@ -536,6 +536,9 @@ void DispatchThink( edict_t *pent )
 
 BOOL ClientConnect( edict_t *pEntity, const char *pszName, const char *pszAddress, char szRejectReason[ 128 ]  )
 { 
+	const char *clientName = (pszName != NULL) ? pszName : "<null>";
+	const char *clientAddress = (pszAddress != NULL) ? pszAddress : "";
+
 	if (gpGlobals->deathmatch)
 	{
 		int i;
@@ -544,19 +547,19 @@ BOOL ClientConnect( edict_t *pEntity, const char *pszName, const char *pszAddres
 		if (debug_engine)
 		{
 			fp = fopen("bot.txt", "a");
-			fprintf(fp, "ClientConnect: pent=%x name=%s\n", unsigned(pEntity), pszName);
+			fprintf(fp, "ClientConnect: pent=%x name=%s\n", unsigned(pEntity), clientName);
 			fclose(fp);
 		}
 		
 		// check if this client is the listen server client
-		if (strcmp(pszAddress, "loopback") == 0)
+		if (strcmp(clientAddress, "loopback") == 0)
 		{
 			// save the edict of the listen server client...
 			listenserver_edict = pEntity;
 		}
 		
 		// check if this is NOT a bot joining the server and not the local listen client...
-		if ((strcmp(pszAddress, "127.0.0.1") != 0) && (strcmp(pszAddress, "loopback") != 0))
+		if ((strcmp(clientAddress, "127.0.0.1") != 0) && (strcmp(clientAddress, "loopback") != 0))
 		{
 			// don't try to add bots for 60 seconds, give client time to get added
 			bot_check_time = gpGlobals->time + 5.0;
@@ -583,6 +586,9 @@ BOOL ClientConnect( edict_t *pEntity, const char *pszName, const char *pszAddres
 					if (bots[i].is_used)  // is this slot used?
 					{
 						char cmd[80];
+
+						if (bots[i].name[0] == 0)
+							continue;
 						
 						sprintf(cmd, "kick \"%s\"\n", bots[i].name);
 						
@@ -596,7 +602,7 @@ BOOL ClientConnect( edict_t *pEntity, const char *pszName, const char *pszAddres
 	}
 	
    #ifndef METAMOD_BUILD
-	   return (*other_gFunctionTable.pfnClientConnect)(pEntity, pszName, pszAddress, szRejectReason);
+	   return (*other_gFunctionTable.pfnClientConnect)(pEntity, pszName, clientAddress, szRejectReason);
    #else
       RETURN_META_VALUE (MRES_IGNORED, 0);
    #endif
@@ -624,7 +630,8 @@ void ClientDisconnect( edict_t *pEntity )
 				// someone kicked this bot off of the server...				
 				bots[i].is_used = FALSE;  // this slot is now free to use
 				bots[i].kick_time = gpGlobals->time;  // save the kicked time
-				bots[i].pEdict->v.health = 0.0;
+				if (bots[i].pEdict != NULL)
+					bots[i].pEdict->v.health = 0.0;
 				break;
 			}
 		}
@@ -994,7 +1001,8 @@ void StartFrame()
 			{
 				char cmd_line[80];
 				const char *cmd, *arg1, *arg2, *arg3, *arg4, *arg5;
-				strcpy(cmd_line, cvar_bot);
+				strncpy(cmd_line, cvar_bot, sizeof(cmd_line)-1);
+				cmd_line[sizeof(cmd_line)-1] = 0;
 				
 				index = 0;
 				cmd = cmd_line;
@@ -1268,40 +1276,49 @@ void StartFrame()
 
 void FakeClientCommand(edict_t *pBot, char *arg1, char *arg2, char *arg3)
 {
-	int length;
-	
 	memset(g_argv, 0, sizeof(g_argv));
-	
-	isFakeClientCommand = 1;
-	
+	fake_arg_count = 0;
+
 	if ((arg1 == NULL) || (*arg1 == 0))
 		return;
-	
+
+	isFakeClientCommand = 1;
+
+	strncat(&g_argv[0], arg1, sizeof(g_argv)-1);
+	fake_arg_count = 1;
+
 	if ((arg2 == NULL) || (*arg2 == 0))
 	{
-		length = sprintf(&g_argv[0], "%s", arg1);
-		fake_arg_count = 1;
 	}
 	else if ((arg3 == NULL) || (*arg3 == 0))
 	{
-		length = sprintf(&g_argv[0], "%s %s", arg1, arg2);
+		strncat(&g_argv[0], " ", sizeof(g_argv)-strlen(&g_argv[0])-1);
+		strncat(&g_argv[0], arg2, sizeof(g_argv)-strlen(&g_argv[0])-1);
 		fake_arg_count = 2;
 	}
 	else
 	{
-		length = sprintf(&g_argv[0], "%s %s %s", arg1, arg2, arg3);
+		strncat(&g_argv[0], " ", sizeof(g_argv)-strlen(&g_argv[0])-1);
+		strncat(&g_argv[0], arg2, sizeof(g_argv)-strlen(&g_argv[0])-1);
+		strncat(&g_argv[0], " ", sizeof(g_argv)-strlen(&g_argv[0])-1);
+		strncat(&g_argv[0], arg3, sizeof(g_argv)-strlen(&g_argv[0])-1);
 		fake_arg_count = 3;
 	}
-	
-	g_argv[length] = 0;  // null terminate just in case
-	
-	strcpy(&g_argv[64], arg1);
-	
-	if (arg2)
-		strcpy(&g_argv[128], arg2);
-	
-	if (arg3)
-		strcpy(&g_argv[192], arg3);
+
+	strncpy(&g_argv[64], arg1, 63);
+	g_argv[64 + 63] = 0;
+
+	if (arg2 && *arg2)
+	{
+		strncpy(&g_argv[128], arg2, 63);
+		g_argv[128 + 63] = 0;
+	}
+
+	if (arg3 && *arg3)
+	{
+		strncpy(&g_argv[192], arg3, 63);
+		g_argv[192 + 63] = 0;
+	}
 	
 #ifndef METAMOD_BUILD
 	// allow the MOD DLL to execute the ClientCommand...
@@ -1343,17 +1360,16 @@ void ProcessBotCfgFile()
 	{
 		if (ch == '\t')  // convert tabs to spaces
 			ch = ' ';
-		
-		cmd_line[cmd_index] = ch;
+
+		if (cmd_index < (int)(sizeof(cmd_line) - 1))
+			cmd_line[cmd_index++] = ch;
 		
 		ch = fgetc(bot_cfg_fp);
 		
 		// skip multiple spaces in input file
-		while ((cmd_line[cmd_index] == ' ') &&
+		while ((cmd_index > 0) && (cmd_line[cmd_index - 1] == ' ') &&
 			(ch == ' '))      
 			ch = fgetc(bot_cfg_fp);
-		
-		cmd_index++;
 	}
 	
 	if (ch == '\r')  // is it a carriage return?
@@ -1374,7 +1390,8 @@ void ProcessBotCfgFile()
 	cmd_line[cmd_index] = 0;  // terminate the command line
 	
 	// copy the command line to a server command buffer...
-	strcpy(server_cmd, cmd_line);
+	strncpy(server_cmd, cmd_line, sizeof(server_cmd)-2);
+	server_cmd[sizeof(server_cmd)-2] = 0;
 	strcat(server_cmd, "\n");
 	
 	cmd_index = 0;

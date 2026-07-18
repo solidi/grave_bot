@@ -4373,6 +4373,9 @@ bool BotHordeThink( bot_t *pBot )
 edict_t *BotFindEnemy( bot_t *pBot )
 {
 //	ALERT(at_console, "BotFindEnemy\n");
+	if (pBot == NULL || pBot->pEdict == NULL)
+		return NULL;
+
 	Vector vecEnd;
 	static bool flag=TRUE;
 	edict_t *pent = NULL;
@@ -4981,6 +4984,8 @@ int BotGetEnemyWeapon( edict_t *pEnemy )
 bool BotShouldEngageEnemy( bot_t *pBot, edict_t *pEnemy )
 {	// this function might need some tweaking?
 //	ALERT(at_console, "BotShouldEngageEnemy\n");
+	if (pBot == NULL || pBot->pEdict == NULL)
+		return FALSE;
 	
 	bot_weapon_select_t *pSelect = NULL;
 	pSelect = WeaponGetSelectPointer();
@@ -5054,8 +5059,11 @@ Vector BotBodyTarget( edict_t *pBotEnemy, bot_t *pBot )
 {
 //	ALERT(at_console, "BotBodyTarget\n");
 
-	if (!pBotEnemy)
+	if (!pBotEnemy || FNullEnt(pBotEnemy))
 		return g_vecZero;
+
+	if (pBot == NULL)
+		return (pBotEnemy->v.origin + pBotEnemy->v.view_ofs);
 
 	// get our origin for world brush entities
 	if (strncmp(STRING(pBotEnemy->v.classname), "func_", 5) == 0)
@@ -5089,6 +5097,9 @@ extern cvar_t sv_botsmelee;
 bool BotFireWeapon(Vector v_enemy, bot_t *pBot, int weapon_choice, bool nofire)
 {
 //ALERT(at_console, "BotFireWeapon\n");
+	if (pBot == NULL || pBot->pEdict == NULL)
+		return FALSE;
+
 	bot_weapon_select_t *pSelect = NULL;
 	bot_fire_delay_t *pDelay = NULL;
 	int select_index;
@@ -5101,6 +5112,9 @@ bool BotFireWeapon(Vector v_enemy, bot_t *pBot, int weapon_choice, bool nofire)
 	
 	pSelect = WeaponGetSelectPointer();
 	pDelay = WeaponGetDelayPointer();
+	if (pSelect == NULL || pDelay == NULL)
+		return FALSE;
+
 	const bool bBioThreatEnemy = BotIsSnarkOrChumtoadThreat(pBot ? pBot->pBotEnemy : NULL);
 	
 	bool use_primary[MAX_WEAPONS];
@@ -5791,8 +5805,10 @@ Vector BotGetLead( bot_t *pBot, edict_t *pEntity, float flProjSpeed )
 void BotShootAtEnemy( bot_t *pBot )
 {
 //	ALERT(at_console, "BotShootAtEnemy\n");
+	if (pBot == NULL || pBot->pEdict == NULL)
+		return;
 
-	if (!pBot->pBotEnemy)
+	if (!pBot->pBotEnemy || FNullEnt(pBot->pBotEnemy) || pBot->pBotEnemy->free)
 		return;
 
 	int team = UTIL_GetTeam(pBot->pEdict);
