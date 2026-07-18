@@ -555,8 +555,8 @@ BOOL ClientConnect( edict_t *pEntity, const char *pszName, const char *pszAddres
 			listenserver_edict = pEntity;
 		}
 		
-		// check if this is NOT a bot joining the server...
-		if (strcmp(pszAddress, "127.0.0.1") != 0)
+		// check if this is NOT a bot joining the server and not the local listen client...
+		if ((strcmp(pszAddress, "127.0.0.1") != 0) && (strcmp(pszAddress, "loopback") != 0))
 		{
 			// don't try to add bots for 60 seconds, give client time to get added
 			bot_check_time = gpGlobals->time + 5.0;

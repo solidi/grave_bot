@@ -544,6 +544,7 @@ void BotNameInit()
 			if (name_buffer[0] != 0)
 			{
 				strncpy(bot_names[number_names], name_buffer, BOT_NAME_LEN);
+				bot_names[number_names][BOT_NAME_LEN] = 0;
 				
 				number_names++;
 			}
@@ -611,7 +612,8 @@ void BotPickName( char *name_buffer )
 		}
 	}
 	
-	strcpy(name_buffer, bot_names[name_index]);
+	strncpy(name_buffer, bot_names[name_index], BOT_NAME_LEN);
+	name_buffer[BOT_NAME_LEN] = 0;
 }
 
 
