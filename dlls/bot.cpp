@@ -3730,12 +3730,14 @@ void BotListenForSound(edict_t *pEntity, const char *pszSample, float fVolume)
 			if (distance < (pBot->f_sound_sensitivity * fVolume) && !bUsingStation)
 			{
 				int botTeam = UTIL_GetTeam(pEdict);
-				int sourceTeam = botTeam;
+				bool shouldReactToSource = TRUE;
+				// Only apply team filtering to client emitters. Non-client/world
+				// emitters should still be heard.
 				if (pEntity->v.flags & FL_CLIENT)
-					sourceTeam = UTIL_GetTeam(pEntity);
+					shouldReactToSource = (botTeam != UTIL_GetTeam(pEntity));
 
 				if (pBot->pBotEnemy == NULL && pEntity != pEdict && pEntity->v.owner != pEdict &&
-					botTeam != sourceTeam)
+					shouldReactToSource)
 				{
 					// just use dmg time, does the same thing
 					pBot->dmg_origin = pEntity->v.origin;
