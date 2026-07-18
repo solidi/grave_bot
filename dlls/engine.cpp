@@ -116,8 +116,11 @@ void pfnChangeLevel(char* s1, char* s2)
 	{
 		if (bots[index].is_used)  // is this slot used?
 		{
-			char cmd[40];
+			char cmd[80];
 			
+			if (bots[index].name[0] == 0)
+				continue;
+
 			sprintf(cmd, "kick \"%s\"\n", bots[index].name);
 			
 			bots[index].respawn_state = RESPAWN_NEED_TO_RESPAWN;
