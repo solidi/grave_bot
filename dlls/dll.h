@@ -9,6 +9,8 @@
 #ifndef DLL_H
 #define DLL_H
 
+#define ICE_MOD_NAME "ice_v1_1"
+
 // DLL prototypes (from engine\eiface.h)...
 void GameDLLInit( void );
 int DispatchSpawn( edict_t *pent );
