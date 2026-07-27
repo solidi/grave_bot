@@ -75,6 +75,18 @@ extern bool b_botdontshoot;
 extern bool b_botpause;
 extern bool b_random_color;
 extern bool b_botfinditem;
+extern float f_botmaxspeed;  // debug: clamp for bot forward/strafe run speed (0 = off)
+
+// Debug clamp: if f_botmaxspeed > 0, limit the signed run/strafe speed
+// passed to pfnRunPlayerMove to +/- f_botmaxspeed Half-Life units.
+static inline float BotClampDebugSpeed(float speed)
+{
+	if (f_botmaxspeed <= 0.0f)
+		return speed;
+	if (speed >  f_botmaxspeed) return  f_botmaxspeed;
+	if (speed < -f_botmaxspeed) return -f_botmaxspeed;
+	return speed;
+}
 extern bot_weapon_t weapon_defs[MAX_WEAPONS];
 extern bot_weapon_select_t valve_weapon_select[];
 extern edict_t *listenserver_edict;
@@ -1830,7 +1842,8 @@ void BotThink( bot_t *pBot )
 		BotFixViewAngles (pEdict);
 
 		g_engfuncs.pfnRunPlayerMove( pEdict, pEdict->v.v_angle,
-			pBot->f_move_speed * speed_mod[pBot->bot_skill], pBot->f_strafe_speed * speed_mod[pBot->bot_skill], 0,
+			BotClampDebugSpeed(pBot->f_move_speed * speed_mod[pBot->bot_skill]),
+			BotClampDebugSpeed(pBot->f_strafe_speed * speed_mod[pBot->bot_skill]), 0,
 			pEdict->v.button, 0, pBot->msecval);
 		
 		return;
@@ -1891,8 +1904,8 @@ void BotThink( bot_t *pBot )
 		BotFixViewAngles (pEdict);
 		
 		g_engfuncs.pfnRunPlayerMove( pEdict, pEdict->v.v_angle,
-			pBot->f_move_speed * speed_mod[pBot->bot_skill],
-			pBot->f_strafe_speed * speed_mod[pBot->bot_skill], 0, pEdict->v.button, 0, pBot->msecval);
+			BotClampDebugSpeed(pBot->f_move_speed * speed_mod[pBot->bot_skill]),
+			BotClampDebugSpeed(pBot->f_strafe_speed * speed_mod[pBot->bot_skill]), 0, pEdict->v.button, 0, pBot->msecval);
 		
 		return;
 	}
@@ -1951,8 +1964,8 @@ void BotThink( bot_t *pBot )
 		BotFixViewAngles (pEdict);
 		
 		g_engfuncs.pfnRunPlayerMove( pEdict, pEdict->v.v_angle,
-			pBot->f_move_speed * speed_mod[pBot->bot_skill],
-			pBot->f_strafe_speed * speed_mod[pBot->bot_skill], 0, pEdict->v.button, 0, pBot->msecval);
+			BotClampDebugSpeed(pBot->f_move_speed * speed_mod[pBot->bot_skill]),
+			BotClampDebugSpeed(pBot->f_strafe_speed * speed_mod[pBot->bot_skill]), 0, pEdict->v.button, 0, pBot->msecval);
 		
 		return;
 	}
@@ -3590,8 +3603,9 @@ void BotThink( bot_t *pBot )
 		}
 	}
 
-	g_engfuncs.pfnRunPlayerMove( pEdict, pEdict->v.v_angle, pBot->f_move_speed * speed_mod[pBot->bot_skill],
-		pBot->f_strafe_speed * speed_mod[pBot->bot_skill], 0, pEdict->v.button, 0, pBot->msecval);
+	g_engfuncs.pfnRunPlayerMove( pEdict, pEdict->v.v_angle,
+		BotClampDebugSpeed(pBot->f_move_speed * speed_mod[pBot->bot_skill]),
+		BotClampDebugSpeed(pBot->f_strafe_speed * speed_mod[pBot->bot_skill]), 0, pEdict->v.button, 0, pBot->msecval);
 	
 	return;
 }

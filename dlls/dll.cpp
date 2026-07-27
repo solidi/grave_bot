@@ -64,6 +64,10 @@ bool b_chat_debug;
 bool b_botdontshoot;
 bool b_botpause;
 bool b_botfinditem;
+// Debug: clamps every bot's final forward/strafe run speed (Half-Life units,
+// e.g. sv_maxspeed 320). 0.0f disables the cap and defers to sv_maxspeed.
+// Set at runtime via the "botmaxspeed <units>" server command.
+float f_botmaxspeed;
 char welcome_msg[] = "Grave Bot by Ghoul - Based on HPB Bot template 4 by botman and Pierre-Marie Baty\n";
 
 extern float g_flVomiting[32];
@@ -320,6 +324,7 @@ void GameDLLInit()
 	b_botdontshoot = FALSE;
 	b_botpause = FALSE;
 	b_botfinditem = TRUE;
+	f_botmaxspeed = 0.0f;  // debug clamp disabled by default
 
 	min_bots = -1;
 	max_bots = -1;
@@ -2154,6 +2159,26 @@ bool ProcessCommand( edict_t *pEntity, const char *pcmd, const char *arg1, const
 			else
 				SERVER_PRINT( "b_botpause DISABLED\n");
 			
+			return TRUE;
+		}
+		else if (FStrEq(pcmd, "botmaxspeed"))
+		{
+			// Debug clamp for bot run speed in Half-Life units. 0 (or negative)
+			// disables the cap; positive values clamp every bot regardless of skill.
+			if ((arg1 != NULL) && (*arg1 != 0))
+			{
+				float temp = (float)atof(arg1);
+				if (temp < 0.0f)
+					temp = 0.0f;
+				f_botmaxspeed = temp;
+			}
+
+			if (f_botmaxspeed > 0.0f)
+				sprintf(msg, "botmaxspeed ENABLED (clamp = %.1f units)\n", f_botmaxspeed);
+			else
+				sprintf(msg, "botmaxspeed DISABLED (using sv_maxspeed)\n");
+			SERVER_PRINT( msg);
+
 			return TRUE;
 		}
 		else if (FStrEq(pcmd, "botfinditem"))
