@@ -361,6 +361,7 @@
    LINK_ENTITY_TO_FUNC(monster_barrel);
    LINK_ENTITY_TO_FUNC(flameball);
    LINK_ENTITY_TO_FUNC(flamestream);
+   LINK_ENTITY_TO_FUNC(napalm_pool);
    LINK_ENTITY_TO_FUNC(weapon_flamethrower);
    LINK_ENTITY_TO_FUNC(weapon_dual_flamethrower);
    LINK_ENTITY_TO_FUNC(weapon_portalgun);

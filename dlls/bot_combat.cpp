@@ -48,6 +48,7 @@ static const float BOT_HOOK_RELEASE_RETRY     = 0.35f;   // re-send 218 briefly 
 static const float BOT_HOOK_ITEM_Z_THRESHOLD  = 96.0f;   // min height delta to detour-hook
 static const float BOT_HOOK_ITEM_MAX_RANGE    = 1024.0f; // max hook range for any intent
 static const int   BOT_HOOK_ESCAPE_HP         = 25;      // HP at or below which escape triggers
+static const float BOT_NAPALM_AVOID_RADIUS    = 256.0f;  // prefer evade logic for nearby napalm pools
 static const float BOT_HOOK_PURSUIT_MIN_DIST  = 600.0f;  // min enemy dist to consider pursuit
 static const float BOT_HOOK_PURSUIT_MIN_VEL   = 200.0f;  // min enemy speed to consider pursuit
 static const float BOT_HOOK_PURSUIT_AWAY_DOT  = 0.3f;    // dot(enemy_vel_dir, away_from_bot)
@@ -157,12 +158,28 @@ static bool BotIsSnarkOrChumtoadClassname(const char *classname)
 		(strcmp(classname, "monster_chumtoad") == 0);
 }
 
+static bool BotIsNapalmPoolClassname(const char *classname)
+{
+	if (classname == NULL)
+		return false;
+
+	return strcmp(classname, "napalm_pool") == 0;
+}
+
 static bool BotIsSnarkOrChumtoadThreat(edict_t *pEnemy)
 {
 	if (pEnemy == NULL || FNullEnt(pEnemy))
 		return false;
 
 	return BotIsSnarkOrChumtoadClassname(STRING(pEnemy->v.classname));
+}
+
+static bool BotIsNapalmPoolThreat(edict_t *pEnemy)
+{
+	if (pEnemy == NULL || FNullEnt(pEnemy))
+		return false;
+
+	return BotIsNapalmPoolClassname(STRING(pEnemy->v.classname));
 }
 
 static bool BotIsSelfSpawnBioWeaponId(int weaponId)
@@ -6141,6 +6158,12 @@ void BotShootAtEnemy( bot_t *pBot )
 		return;
 	}
 
+	if (BotIsNapalmPoolThreat(pBot->pBotEnemy))
+	{
+		BotEvadeBioThreat(pBot, v_enemy_origin);
+		return;
+	}
+
 	if (BotIsSnarkOrChumtoadThreat(pBot->pBotEnemy))
 	{
 		// Never counter snarks/chumtoads by deploying more snarks/chumtoads.
@@ -6393,13 +6416,16 @@ void BotAssessGrenades( bot_t *pBot )
 	edict_t *pEdict = pBot->pEdict;
 	edict_t *pGrenade = NULL;
 	edict_t *pNewGrenade = NULL;
+	edict_t *pNewNapalm = NULL;
 	Vector vecEnd;
 	float nearestdistance = 16384;
+	float nearestNapalmDistance = 16384;
 	float mindistance = 256;
 	// search the world for grenades...
 	while (!FNullEnt(pGrenade = UTIL_FindEntityInSphere (pGrenade, pEdict->v.origin, 1000)))
 	{
 		vecEnd = pGrenade->v.origin;
+		const char *grenadeClass = STRING(pGrenade->v.classname);
 		
 		if (mod_id == CRABBED_DLL)
 		{	// crabbed lets players shoot anything
@@ -6408,7 +6434,8 @@ void BotAssessGrenades( bot_t *pBot )
 				(strcmp("monster_proxmine", STRING(pGrenade->v.classname)) != 0) && 
 				(strcmp("grenade", STRING(pGrenade->v.classname)) != 0) && 
 				(strcmp("rpg_rocket", STRING(pGrenade->v.classname)) != 0) && 
-				(strcmp("monster_snark", STRING(pGrenade->v.classname)) != 0))
+				(strcmp("monster_snark", STRING(pGrenade->v.classname)) != 0) &&
+				(strcmp("napalm_pool", STRING(pGrenade->v.classname)) != 0))
 				continue;
 		}
 		else
@@ -6419,12 +6446,26 @@ void BotAssessGrenades( bot_t *pBot )
 				(strcmp("grenade", STRING(pGrenade->v.classname)) != 0) &&
 				(strcmp("monster_chumtoad", STRING(pGrenade->v.classname)) != 0) &&
 				(strcmp("monster_propdecoy", STRING(pGrenade->v.classname)) != 0) &&
+				(strcmp("napalm_pool", STRING(pGrenade->v.classname)) != 0) &&
 				// loot_crate is not allowlisted here, so it is excluded from
 				// grenade/entity scanning in this path unless re-added below.
 				(strcmp("kts_snowball", STRING(pGrenade->v.classname)) != 0))
 				continue;
 
 		}
+		float distance = (pGrenade->v.origin - pEdict->v.origin).Length();
+
+		if (BotIsNapalmPoolClassname(grenadeClass))
+		{
+			if (distance <= BOT_NAPALM_AVOID_RADIUS && distance < nearestNapalmDistance)
+			{
+				nearestNapalmDistance = distance;
+				pNewNapalm = pGrenade;
+				pBot->pBotUser = NULL;
+			}
+			continue;
+		}
+
 		// don't shoot our own grenades!
 		if (pGrenade->v.owner == pEdict)
             continue;
@@ -6443,7 +6484,6 @@ void BotAssessGrenades( bot_t *pBot )
 		//if (strcmp("monster_snark", STRING(pGrenade->v.classname)) == 0)
 		mindistance = 0;
 		
-		float distance = (pGrenade->v.origin - pEdict->v.origin).Length();
 		// our current enemy is closer, forget the grenade
 		if (pBot->pBotEnemy != NULL &&
 			(pGrenade->v.origin - UTIL_GetOrigin(pBot->pBotEnemy)).Length() < distance)
@@ -6458,7 +6498,11 @@ void BotAssessGrenades( bot_t *pBot )
 		}
 	}
 	
-	if (pNewGrenade)
+	if (pNewNapalm)
+	{
+		pBot->pBotEnemy = pNewNapalm;
+	}
+	else if (pNewGrenade)
 	{
 		// the grenade is our enemy, blast it!
 		//SERVER_PRINT( "%s - found %s!\n", STRING(pEdict->v.netname), STRING(pNewGrenade->v.classname));
