@@ -176,14 +176,6 @@ static bool BotIsSnarkOrChumtoadThreat(edict_t *pEnemy)
 	return BotIsSnarkOrChumtoadClassname(STRING(pEnemy->v.classname));
 }
 
-static bool BotIsNapalmPoolThreat(edict_t *pEnemy)
-{
-	if (pEnemy == NULL || FNullEnt(pEnemy))
-		return false;
-
-	return BotIsNapalmPoolClassname(STRING(pEnemy->v.classname));
-}
-
 // Route the bot around napalm pools using the existing pAvoid/avoid_dir strafe
 // mechanism (see BotAvoidContact in bot_navigate.cpp). Runs every frame so
 // waypoint following is continuously overridden while a pool is close, instead
@@ -6299,12 +6291,6 @@ void BotShootAtEnemy( bot_t *pBot )
 			}
 		}
 
-		return;
-	}
-
-	if (BotIsNapalmPoolThreat(pBot->pBotEnemy))
-	{
-		BotEvadeBioThreat(pBot, v_enemy_origin);
 		return;
 	}
 
