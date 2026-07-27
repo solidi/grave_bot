@@ -48,6 +48,9 @@ static const float BOT_HOOK_RELEASE_RETRY     = 0.35f;   // re-send 218 briefly 
 static const float BOT_HOOK_ITEM_Z_THRESHOLD  = 96.0f;   // min height delta to detour-hook
 static const float BOT_HOOK_ITEM_MAX_RANGE    = 1024.0f; // max hook range for any intent
 static const int   BOT_HOOK_ESCAPE_HP         = 25;      // HP at or below which escape triggers
+static const float BOT_NAPALM_AVOID_RADIUS    = 256.0f;  // outer scan radius for napalm-hazard awareness
+static const float BOT_NAPALM_DANGER_RADIUS   = 160.0f;  // steer around any pool within this radius
+static const float BOT_NAPALM_TOUCH_RADIUS    = 96.0f;   // full-stop / max-speed retreat when this close
 static const float BOT_HOOK_PURSUIT_MIN_DIST  = 600.0f;  // min enemy dist to consider pursuit
 static const float BOT_HOOK_PURSUIT_MIN_VEL   = 200.0f;  // min enemy speed to consider pursuit
 static const float BOT_HOOK_PURSUIT_AWAY_DOT  = 0.3f;    // dot(enemy_vel_dir, away_from_bot)
@@ -157,12 +160,162 @@ static bool BotIsSnarkOrChumtoadClassname(const char *classname)
 		(strcmp(classname, "monster_chumtoad") == 0);
 }
 
+static bool BotIsNapalmPoolClassname(const char *classname)
+{
+	if (classname == NULL)
+		return false;
+
+	return strcmp(classname, "napalm_pool") == 0;
+}
+
 static bool BotIsSnarkOrChumtoadThreat(edict_t *pEnemy)
 {
 	if (pEnemy == NULL || FNullEnt(pEnemy))
 		return false;
 
 	return BotIsSnarkOrChumtoadClassname(STRING(pEnemy->v.classname));
+}
+
+// Route the bot around napalm pools using the existing pAvoid/avoid_dir strafe
+// mechanism (see BotAvoidContact in bot_navigate.cpp). Runs every frame so
+// waypoint following is continuously overridden while a pool is close, instead
+// of relying on the 0.2s BotAssessGrenades tick and the 0.3s f_ignore_wpt_time
+// window in BotEvadeBioThreat (which used to expire and let the bot walk right
+// back into the pool on its next waypoint step).
+void BotAvoidNapalmPools(bot_t *pBot)
+{
+	if (pBot == NULL || pBot->pEdict == NULL)
+		return;
+
+	edict_t *pEdict = pBot->pEdict;
+
+	// Find the closest napalm_pool within the danger radius. Detection loop is
+	// bounded and cheap: napalm pools are short-lived (5s) and typically few
+	// per player, so a small sphere scan per frame is acceptable.
+	edict_t *pScan = NULL;
+	edict_t *pNearest = NULL;
+	float flNearest = BOT_NAPALM_DANGER_RADIUS;
+
+	while (!FNullEnt(pScan = UTIL_FindEntityInSphere(pScan, pEdict->v.origin,
+		BOT_NAPALM_DANGER_RADIUS)))
+	{
+		if (!BotIsNapalmPoolClassname(STRING(pScan->v.classname)))
+			continue;
+
+		float flDist = (pScan->v.origin - pEdict->v.origin).Length();
+		if (flDist < flNearest)
+		{
+			flNearest = flDist;
+			pNearest = pScan;
+		}
+	}
+
+	if (pNearest == NULL)
+		return;
+
+	// Direction from pool -> bot on the horizontal plane; used as the outward
+	// "away" bias and to build the tangent (perpendicular) strafe direction.
+	Vector vecFromPool = pEdict->v.origin - pNearest->v.origin;
+	vecFromPool.z = 0.0f;
+
+	if (vecFromPool.Length() < 1.0f)
+	{
+		// Standing on the pool origin: fall back to current facing so we at
+		// least move somewhere.
+		MAKE_VECTORS(pEdict->v.v_angle);
+		vecFromPool = gpGlobals->v_forward;
+		vecFromPool.z = 0.0f;
+		if (vecFromPool.Length() < 1.0f)
+			vecFromPool = Vector(1.0f, 0.0f, 0.0f);
+	}
+
+	Vector vecOutward = vecFromPool.Normalize();
+	Vector vecTangent = CrossProduct(vecOutward, Vector(0.0f, 0.0f, 1.0f));
+
+	if (vecTangent.Length() < 0.001f)
+		vecTangent = Vector(1.0f, 0.0f, 0.0f);
+	vecTangent = vecTangent.Normalize();
+
+	// Prefer the tangent side whose direction agrees most with the bot's next
+	// waypoint / current goal, so lateral avoidance still makes route progress.
+	Vector vecGoal = g_vecZero;
+	if (pBot->curr_waypoint_index != -1)
+	{
+		vecGoal = waypoints[pBot->curr_waypoint_index].origin - pEdict->v.origin;
+		vecGoal.z = 0.0f;
+	}
+	else if (pBot->v_goal != g_vecZero)
+	{
+		vecGoal = pBot->v_goal - pEdict->v.origin;
+		vecGoal.z = 0.0f;
+	}
+
+	Vector vecTangentA = vecTangent;
+	Vector vecTangentB = -vecTangent;
+
+	if (vecGoal.Length() > 1.0f)
+	{
+		if (DotProduct(vecTangentA, vecGoal) < DotProduct(vecTangentB, vecGoal))
+			vecTangentA = vecTangentB;
+	}
+	else if (RANDOM_LONG(0, 1))
+	{
+		vecTangentA = vecTangentB;
+	}
+
+	// Trace the preferred tangent side. If blocked, try the opposite side.
+	// If both are blocked, fall back to a pure outward retreat so we still
+	// leave the pool.
+	TraceResult tr;
+	UTIL_TraceLine(pEdict->v.origin, pEdict->v.origin + vecTangentA * 64.0f,
+		dont_ignore_monsters, pEdict, &tr);
+
+	if (tr.flFraction < 1.0f)
+	{
+		UTIL_TraceLine(pEdict->v.origin, pEdict->v.origin - vecTangentA * 64.0f,
+			dont_ignore_monsters, pEdict, &tr);
+		if (tr.flFraction < 1.0f)
+		{
+			// Both tangent sides blocked. Retreat straight away from the pool.
+			vecTangentA = vecOutward;
+		}
+		else
+		{
+			vecTangentA = -vecTangentA;
+		}
+	}
+
+	// Blend the chosen tangent with an outward bias so the bot doesn't graze
+	// the edge of the pool while circling. The 0.5 weight is tuned so lateral
+	// progress still dominates; increases when very close.
+	float flOutwardBias = (flNearest < BOT_NAPALM_TOUCH_RADIUS) ? 0.8f : 0.4f;
+	Vector vecAvoid = (vecTangentA.Normalize() + vecOutward * flOutwardBias);
+	if (vecAvoid.Length() < 0.001f)
+		vecAvoid = vecOutward;
+	vecAvoid = vecAvoid.Normalize();
+
+	// Drive the bot along the tangent using the existing pAvoid/avoid_dir path
+	// (bot.cpp uses (pEdict->origin + avoid_dir * 64) as its movement target
+	// when avoid_dir is non-zero, and gates waypoint following on
+	// f_ignore_wpt_time / f_do_avoid_time).
+	pBot->pAvoid           = pNearest;
+	pBot->avoid_dir        = vecAvoid;
+	pBot->f_do_avoid_time  = gpGlobals->time + 0.5f;
+	pBot->f_ignore_wpt_time = gpGlobals->time + 0.5f;
+	pBot->b_engaging_enemy = FALSE;
+
+	// Aim the bot along the escape vector so forward movement (cos(yaw - move)
+	// term in the navigation code) doesn't collapse to zero and freeze the
+	// bot on top of the pool. Yaw update is cheap and only matters while an
+	// avoid is active.
+	Vector vecAvoidAngles = UTIL_VecToAngles(vecAvoid);
+	pEdict->v.ideal_yaw = vecAvoidAngles.y;
+	BotFixIdealYaw(pEdict);
+
+	// Always move at full speed while inside the danger radius: standing still
+	// on a burning pool would let it tick damage while the bot debates.
+	pBot->f_move_speed   = pBot->f_max_speed;
+	pBot->f_strafe_speed = 0.0f;
 }
 
 static bool BotIsSelfSpawnBioWeaponId(int weaponId)
@@ -6393,13 +6546,16 @@ void BotAssessGrenades( bot_t *pBot )
 	edict_t *pEdict = pBot->pEdict;
 	edict_t *pGrenade = NULL;
 	edict_t *pNewGrenade = NULL;
+	edict_t *pNewNapalm = NULL;
 	Vector vecEnd;
 	float nearestdistance = 16384;
+	float nearestNapalmDistance = 16384;
 	float mindistance = 256;
 	// search the world for grenades...
 	while (!FNullEnt(pGrenade = UTIL_FindEntityInSphere (pGrenade, pEdict->v.origin, 1000)))
 	{
 		vecEnd = pGrenade->v.origin;
+		const char *grenadeClass = STRING(pGrenade->v.classname);
 		
 		if (mod_id == CRABBED_DLL)
 		{	// crabbed lets players shoot anything
@@ -6408,7 +6564,8 @@ void BotAssessGrenades( bot_t *pBot )
 				(strcmp("monster_proxmine", STRING(pGrenade->v.classname)) != 0) && 
 				(strcmp("grenade", STRING(pGrenade->v.classname)) != 0) && 
 				(strcmp("rpg_rocket", STRING(pGrenade->v.classname)) != 0) && 
-				(strcmp("monster_snark", STRING(pGrenade->v.classname)) != 0))
+				(strcmp("monster_snark", STRING(pGrenade->v.classname)) != 0) &&
+				(strcmp("napalm_pool", STRING(pGrenade->v.classname)) != 0))
 				continue;
 		}
 		else
@@ -6419,12 +6576,26 @@ void BotAssessGrenades( bot_t *pBot )
 				(strcmp("grenade", STRING(pGrenade->v.classname)) != 0) &&
 				(strcmp("monster_chumtoad", STRING(pGrenade->v.classname)) != 0) &&
 				(strcmp("monster_propdecoy", STRING(pGrenade->v.classname)) != 0) &&
+				(strcmp("napalm_pool", STRING(pGrenade->v.classname)) != 0) &&
 				// loot_crate is not allowlisted here, so it is excluded from
 				// grenade/entity scanning in this path unless re-added below.
 				(strcmp("kts_snowball", STRING(pGrenade->v.classname)) != 0))
 				continue;
 
 		}
+		float distance = (pGrenade->v.origin - pEdict->v.origin).Length();
+
+		if (BotIsNapalmPoolClassname(grenadeClass))
+		{
+			if (distance <= BOT_NAPALM_AVOID_RADIUS && distance < nearestNapalmDistance)
+			{
+				nearestNapalmDistance = distance;
+				pNewNapalm = pGrenade;
+				pBot->pBotUser = NULL;
+			}
+			continue;
+		}
+
 		// don't shoot our own grenades!
 		if (pGrenade->v.owner == pEdict)
             continue;
@@ -6443,7 +6614,6 @@ void BotAssessGrenades( bot_t *pBot )
 		//if (strcmp("monster_snark", STRING(pGrenade->v.classname)) == 0)
 		mindistance = 0;
 		
-		float distance = (pGrenade->v.origin - pEdict->v.origin).Length();
 		// our current enemy is closer, forget the grenade
 		if (pBot->pBotEnemy != NULL &&
 			(pGrenade->v.origin - UTIL_GetOrigin(pBot->pBotEnemy)).Length() < distance)
@@ -6458,6 +6628,17 @@ void BotAssessGrenades( bot_t *pBot )
 		}
 	}
 	
+	if (pNewNapalm)
+	{
+		// Do not overwrite pBotEnemy with the pool: it is not shootable and
+		// setting it here used to hide real player enemies on ticks between
+		// BotFindEnemy runs. Per-frame avoidance is applied directly through
+		// pAvoid/avoid_dir in BotAvoidNapalmPools; this branch stays only to
+		// clear pBotUser so the bot drops any follow-user intent while a
+		// pool is nearby.
+		pBot->pBotUser = NULL;
+	}
+
 	if (pNewGrenade)
 	{
 		// the grenade is our enemy, blast it!
