@@ -63,6 +63,7 @@ bool BotFireWeapon( Vector v_enemy, bot_t *pBot, int weapon_choice, bool nofire 
 Vector BotGetLead( bot_t *pBot, edict_t *pEntity, float flProjSpeed);
 void BotShootAtEnemy( bot_t *pBot );
 void BotAssessGrenades( bot_t *pBot );
+void BotAvoidNapalmPools( bot_t *pBot );
 bool BotWeaponPrimaryDistance( bot_t *pBot, float distance, int weapon_id );
 bool BotWeaponSecondaryDistance( bot_t *pBot, float distance, int weapon_id );
 float BotAssessPrimaryAmmo( bot_t *pBot, int weapon_id );

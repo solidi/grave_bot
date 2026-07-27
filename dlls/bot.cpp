@@ -3048,6 +3048,13 @@ void BotThink( bot_t *pBot )
 		BotAssessGrenades(pBot);
 	}
 
+	// Per-frame napalm-pool steering. Runs every tick (not throttled) because
+	// the 0.2s BotAssessGrenades cadence + the old 0.3s f_ignore_wpt_time in
+	// BotEvadeBioThreat was too short to keep a bot from walking straight
+	// through a pool the moment waypoint navigation resumed. This helper
+	// installs a tangent avoid_dir via the existing pAvoid mechanism.
+	BotAvoidNapalmPools(pBot);
+
 	// should we be going after this goal?
 	if (pBot->f_evaluate_goal_time <= gpGlobals->time)
 	{
