@@ -2167,10 +2167,15 @@ bool ProcessCommand( edict_t *pEntity, const char *pcmd, const char *arg1, const
 			// disables the cap; positive values clamp every bot regardless of skill.
 			if ((arg1 != NULL) && (*arg1 != 0))
 			{
-				float temp = (float)atof(arg1);
-				if (temp < 0.0f)
-					temp = 0.0f;
-				f_botmaxspeed = temp;
+				char *endp = NULL;
+				float temp = strtof(arg1, &endp);
+				bool parsed_ok = (endp != arg1) && (endp != NULL) && (*endp == '\0')
+					&& std::isfinite(temp);
+
+				if (!parsed_ok)
+					SERVER_PRINT("invalid botmaxspeed value!\n");
+				else
+					f_botmaxspeed = (temp > 0.0f) ? temp : 0.0f;
 			}
 
 			if (f_botmaxspeed > 0.0f)
