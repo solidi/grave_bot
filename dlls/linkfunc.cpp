@@ -343,6 +343,7 @@
    LINK_ENTITY_TO_FUNC(weapon_freezegun);
    LINK_ENTITY_TO_FUNC(weapon_gravitygun);
    LINK_ENTITY_TO_FUNC(plasma);
+   LINK_ENTITY_TO_FUNC(egon_nova_ball);
    LINK_ENTITY_TO_FUNC(weapon_rocketcrowbar);
    LINK_ENTITY_TO_FUNC(drunk_rocket);
    LINK_ENTITY_TO_FUNC(rune_frag);
