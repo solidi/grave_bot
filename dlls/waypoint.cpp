@@ -1528,13 +1528,13 @@ void WaypointAdd(edict_t *pEntity)
 		// check if the waypoint is reachable from the new one (one-way)
 		if ( WaypointReachable(pEntity->v.origin, waypoints[i].origin, pEntity) )
 		{
-			WaypointAddPath(index, i);
+			// WaypointAddPath(index, i);
 		}
 		
 		// check if the new one is reachable from the waypoint (other way)
 		if ( WaypointReachable(waypoints[i].origin, pEntity->v.origin, pEntity) )
 		{
-			WaypointAddPath(i, index);
+			// WaypointAddPath(i, index);
 		}
 	}
 }
