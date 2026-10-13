@@ -36,6 +36,7 @@ extern int is_gameplay;
 extern bool checked_teamplay;
 extern edict_t *listenserver_edict;
 extern bool b_chat_debug;
+extern bool b_botpause;
 extern float bot_aim_difficulty;
 extern WAYPOINT waypoints[MAX_WAYPOINTS];
 FILE *fp;
@@ -6949,6 +6950,8 @@ static bool BotHookEnabled(bot_t *pBot)
 {
 	if (pBot == NULL || pBot->pEdict == NULL)
 		return false;
+	if (b_botpause)
+		return false;
 	if ((pBot->pEdict->v.flags & FL_FROZEN) != 0)
 		return false;
 	if (pBot->pEdict->v.waterlevel == 3)
@@ -6971,6 +6974,8 @@ void BotFireHook(bot_t *pBot, int intent, edict_t *pTargetItem, const Vector &vA
 
 	// Skip in water (impulse 217 spawns a hook that immediately drops in
 	// liquid) and skip while spectating/dead-cam.
+	if (b_botpause)
+		return;
 	if ((pEdict->v.flags & FL_FROZEN) != 0)
 		return;
 	if (pEdict->v.waterlevel == 3)
@@ -7045,8 +7050,8 @@ void BotMaybeReleaseHook(bot_t *pBot)
 		return;
 	}
 
-	// Freeze guard: if we become frozen after deploy, drop the hook.
-	if ((pEdict->v.flags & FL_FROZEN) != 0)
+	// Freeze / botpause guard: a hook still reels the player, so drop it when the bot must hold still.
+	if ((pEdict->v.flags & FL_FROZEN) != 0 || b_botpause)
 	{
 		BotReleaseHook(pBot);
 		return;
