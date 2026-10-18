@@ -889,6 +889,7 @@ typedef struct
 #define MUTATOR_VOLATILE 114
 #define MUTATOR_VVVVVV 115
 #define MUTATOR_WATERHURT 116
+#define MUTATOR_XRAY 117
 
 #define GAME_FFA 0
 #define GAME_ARENA 1
