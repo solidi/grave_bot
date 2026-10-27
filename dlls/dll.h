@@ -9,7 +9,7 @@
 #ifndef DLL_H
 #define DLL_H
 
-#define ICE_MOD_NAME "ice_v1_1"
+#define ICE_MOD_NAME "ice_v1_2"
 
 // DLL prototypes (from engine\eiface.h)...
 void GameDLLInit( void );
