@@ -149,6 +149,10 @@ cvar_t sv_bot = {"gravebot",""};
 cvar_t sv_defaultbots = {"sv_defaultbots","0"};
 cvar_t sv_botsmelee = {"sv_botsmelee","1"};
 cvar_t sv_bots_hook = {"sv_bots_hook","1"};
+// Votable mirror of bot_aim_difficulty (0 = deadly, 1 = default, 2 = sloppy).
+// StartFrame() copies changes into bot_aim_difficulty; the bot_aim_difficulty
+// command writes back here so both stay in sync.
+cvar_t sv_botaccuracy = {"sv_botaccuracy","1"};
 
 // Master scalar for combat lethality (aim error + reaction delay).
 // 0.0 = perfect aim / instant reaction (hardest), 1.0 = tuned human feel,
@@ -280,6 +284,7 @@ C_DLLEXPORT int Meta_Attach (PLUG_LOADTIME now, META_FUNCTIONS *pFunctionTable, 
    CVAR_REGISTER (&sv_defaultbots);
    CVAR_REGISTER (&sv_botsmelee);
    CVAR_REGISTER (&sv_bots_hook);
+   CVAR_REGISTER (&sv_botaccuracy);
 
    return (TRUE); // returning TRUE enables metamod to attach this plugin
 }
@@ -314,6 +319,7 @@ void GameDLLInit()
 		CVAR_REGISTER (&sv_defaultbots);
 		CVAR_REGISTER (&sv_botsmelee);
 		CVAR_REGISTER (&sv_bots_hook);
+		CVAR_REGISTER (&sv_botaccuracy);
    #endif
 	
 	for (i=0; i<32; i++)
@@ -744,6 +750,21 @@ void PlayerPostThink( edict_t *pEntity )
 
 void StartFrame()
 {
+	// Pick up sv_botaccuracy changes (server.cfg, rcon, or the botoptions vote).
+	static float last_bot_accuracy = -1.0f;
+	if (sv_botaccuracy.value != last_bot_accuracy)
+	{
+		last_bot_accuracy = sv_botaccuracy.value;
+		float accuracy = sv_botaccuracy.value;
+		if (!std::isfinite(accuracy))
+			accuracy = 1.0f;
+		if (accuracy < 0.0f)
+			accuracy = 0.0f;
+		else if (accuracy > 2.0f)
+			accuracy = 2.0f;
+		bot_aim_difficulty = accuracy;
+	}
+
 	if (gpGlobals->deathmatch)
 	{
 		edict_t *pPlayer;
@@ -2010,7 +2031,10 @@ bool ProcessCommand( edict_t *pEntity, const char *pcmd, const char *arg1, const
 				if (!parsed_ok || temp < 0.0f || temp > 2.0f)
 					SERVER_PRINT( "invalid bot_aim_difficulty value (0.0 - 2.0)!\n");
 				else
+				{
 					bot_aim_difficulty = temp;
+					CVAR_SET_FLOAT("sv_botaccuracy", temp);
+				}
 			}
 
 			sprintf(msg, "bot_aim_difficulty is %f (0=perfect, 1=default, 2=sloppy)\n",
