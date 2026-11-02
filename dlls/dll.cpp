@@ -752,10 +752,10 @@ void StartFrame()
 {
 	// Pick up sv_botaccuracy changes (server.cfg, rcon, or the botoptions vote).
 	static float last_bot_accuracy = -1.0f;
-	if (sv_botaccuracy.value != last_bot_accuracy)
+	float accuracy = CVAR_GET_FLOAT("sv_botaccuracy");
+	if (accuracy != last_bot_accuracy)
 	{
-		last_bot_accuracy = sv_botaccuracy.value;
-		float accuracy = sv_botaccuracy.value;
+		last_bot_accuracy = accuracy;
 		if (!std::isfinite(accuracy))
 			accuracy = 1.0f;
 		if (accuracy < 0.0f)
